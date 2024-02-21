@@ -1,4 +1,4 @@
-# slenderpy
+# Slenderpy
 
 _**slenderpy**_ is a python package to simulate the vibrations of elongated structures like cables or beams.
 
