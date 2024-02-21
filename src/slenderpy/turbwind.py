@@ -547,9 +547,9 @@ if __name__ == '__main__':
 
     # Some test of wind features
 
-    import matplotlib.pyplot as mpl
+    import matplotlib.pyplot as plt
 
-    mpl.close('all')
+    plt.close('all')
 
 
     def _fft(t, s):
@@ -588,7 +588,7 @@ if __name__ == '__main__':
     r1d = f1d.wnd
     r3d = f2d.tbw
 
-    fig, ax = mpl.subplots(nrows=3, ncols=2)
+    fig, ax = plt.subplots(nrows=3, ncols=2)
 
     ax[0, 1].loglog(f, von_karman_u(f, um, us, ul), '--k')
     ax[1, 1].loglog(f, von_karman_v(f, um, vs, vl), '--k')
@@ -647,7 +647,7 @@ if __name__ == '__main__':
         f2n[k] = tmp[0][0]
         f2b[k] = tmp[1][0]
 
-    fig, ax = mpl.subplots(nrows=2, ncols=1)
+    fig, ax = plt.subplots(nrows=2, ncols=1)
     ax[0].plot(t, f2n)
     ax[0].plot(t, f1n)
 

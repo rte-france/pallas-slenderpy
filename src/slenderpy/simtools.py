@@ -6,7 +6,7 @@ import time
 from typing import Union, Optional, List, Tuple
 
 import matplotlib.axes
-import matplotlib.pyplot as mpl
+import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 from matplotlib import cm
@@ -393,7 +393,7 @@ def multiplot(res: Results,
         cmap = cm.viridis(np.linspace(0., 1., len(res) + 2))[1:-1]
 
     # big loop
-    fig, ax = mpl.subplots(nrows=nr, ncols=nc)
+    fig, ax = plt.subplots(nrows=nr, ncols=nc)
     if nc == 1 and nr == 1:
         ax = np.array([[ax]])
     elif nc == 1:

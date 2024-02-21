@@ -762,7 +762,7 @@ def _test_bending_stiffness(bm, kk):
     cmin = bm.EImin()
     cmax = bm.EImax()
 
-    _, ax = mpl.subplots(nrows=1, ncols=2)
+    _, ax = plt.subplots(nrows=1, ncols=2)
 
     ax[0].plot(kk[[0, -1]], [cmin, cmin], '--', c='gray')
     ax[0].plot(kk[[0, -1]], [cmax, cmax], '--', c='gray')
@@ -785,25 +785,25 @@ def _test_bending_stiffness(bm, kk):
 def _test_frequencies(bm, n, d):
     fn = bm.natural_frequencies(n)
     xn = range(1, n + 1)
-    cb = mpl.cm.Blues(np.linspace(0.2, 0.8, len(d)))
-    co = mpl.cm.Oranges(np.linspace(0.2, 0.8, len(d)))
+    cb = plt.cm.Blues(np.linspace(0.2, 0.8, len(d)))
+    co = plt.cm.Oranges(np.linspace(0.2, 0.8, len(d)))
 
-    mpl.figure()
+    plt.figure()
 
     for i, k in enumerate(d):
         cf = bm.natural_frequencies_rot_none(n=n, c=k)
-        mpl.plot(xn, cf / fn, '.-', c=cb[i],
+        plt.plot(xn, cf / fn, '.-', c=cb[i],
                  label=f'rot none, c={k:.1E}')
 
     for i, k in enumerate(d):
         ff = bm.natural_frequencies_rot_free(n=n, c=k)
-        mpl.plot(xn, ff / fn, '.-', c=co[i],
+        plt.plot(xn, ff / fn, '.-', c=co[i],
                  label=f'rot free, c={k:.1E}')
 
-    mpl.xlabel('mode ($n$)')
-    mpl.ylabel('normalized freq ($f_n/nf_0$, Hz)')
-    mpl.legend()
-    mpl.grid(True)
+    plt.xlabel('mode ($n$)')
+    plt.ylabel('normalized freq ($f_n/nf_0$, Hz)')
+    plt.legend()
+    plt.grid(True)
 
 
 def _test_solve(bm):
@@ -828,27 +828,27 @@ def _test_solve(bm):
     km = 0.1
     jj = -1
 
-    mpl.figure()
-    mpl.plot([0, km], [0, km * bm.EImax()], '--', c='gray')
-    mpl.plot([0, km], [0, km * bm.EImin()], '--', c='gray')
+    plt.figure()
+    plt.plot([0, km], [0, km * bm.EImax()], '--', c='gray')
+    plt.plot([0, km], [0, km * bm.EImin()], '--', c='gray')
     for r in [rft]:
-        mpl.plot(r.data['c'][:, jj], r.data['M'][:, jj], '-',
+        plt.plot(r.data['c'][:, jj], r.data['M'][:, jj], '-',
                  label=str(pm.los[jj]))
-    mpl.grid(True)
+    plt.grid(True)
 
     kk = np.linspace(0, km, 101)
-    mpl.plot(kk, bm.mdl.eval_m(kk), '--', c='red')
+    plt.plot(kk, bm.mdl.eval_m(kk), '--', c='red')
 
-    mpl.xlabel('curvature (m$^{-1}$)')
-    mpl.ylabel('bending moment (Nm)')
+    plt.xlabel('curvature (m$^{-1}$)')
+    plt.ylabel('bending moment (Nm)')
 
 
 if __name__ == '__main__':
-    import matplotlib.pyplot as mpl
+    import matplotlib.pyplot as plt
 
     from structvib.force import Excitation
 
-    mpl.close('all')
+    plt.close('all')
 
     kk = np.linspace(0., 0.5, 501)
     bm = Beam(mass=1.57, ei=[2155., 797., 222., 50., 28.],
