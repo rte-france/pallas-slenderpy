@@ -1,7 +1,6 @@
-# !/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Utility functions hidden to the user."""
 from typing import Tuple, Optional
+
 import numpy as np
 import scipy.interpolate
 import scipy.sparse

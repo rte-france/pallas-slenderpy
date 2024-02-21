@@ -1,14 +1,12 @@
 """Solver for a wake-oscillator force on a cable."""
-# !/usr/bin/env python
-# -*- coding: utf-8 -*-
+
 import numpy as np
 import scipy as sp
-
 from structvib import _cable_utils as cbu
 from structvib import _progress_bar as spb
-from structvib import simtools
 from structvib import cable
 from structvib import force
+from structvib import simtools
 
 
 def solve(cb: cable.SCable,

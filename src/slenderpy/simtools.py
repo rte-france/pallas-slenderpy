@@ -1,15 +1,15 @@
 """Simulation tools."""
-# !/usr/bin/env python
-# -*- coding: utf-8 -*-
+
 import json
 import pickle as pk
 import time
 from typing import Union, Optional, List, Tuple
+
 import matplotlib.axes
-from matplotlib import cm
 import matplotlib.pyplot as mpl
 import numpy as np
 import xarray as xr
+from matplotlib import cm
 
 # figure default font sizes
 __tts__ = 12

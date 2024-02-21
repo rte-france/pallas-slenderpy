@@ -1,7 +1,7 @@
 """Beam object and associated solvers."""
-# !/usr/bin/env python3
-# -*- coding: utf-8 -*-
+
 from typing import Tuple, List, Union, Optional, Callable
+
 import numpy as np
 import scipy as sp
 from scipy.optimize import newton
@@ -11,7 +11,7 @@ from structvib import fdm_utils as fdu
 from structvib import simtools
 
 
-def _bmom(k, cmin, cmax,  kc):
+def _bmom(k, cmin, cmax, kc):
     kb = (1. - cmin / cmax) * kc
     return (cmin * k + cmax * kb) * (1. - np.exp(-k / kb))
 
@@ -411,7 +411,7 @@ def solve_cst(bm: Beam,
               pm: simtools.Parameters,
               force: Optional[Callable[[np.ndarray, float, np.ndarray,
                                         np.ndarray, np.ndarray, np.ndarray],
-                                        Tuple[np.ndarray, np.ndarray]]] = None,
+              Tuple[np.ndarray, np.ndarray]]] = None,
               am: Optional[np.ndarray] = None,
               y0: Optional[np.ndarray] = None,
               v0: Optional[np.ndarray] = None,
@@ -462,7 +462,7 @@ def solve_ft(bm: Beam,
              pm: simtools.Parameters,
              force: Optional[Callable[[np.ndarray, float, np.ndarray,
                                        np.ndarray, np.ndarray, np.ndarray],
-                                      Tuple[np.ndarray, np.ndarray]]] = None,
+             Tuple[np.ndarray, np.ndarray]]] = None,
              am: Optional[np.ndarray] = None,
              y0: Optional[np.ndarray] = None,
              v0: Optional[np.ndarray] = None,
@@ -716,7 +716,7 @@ def static_gravity_cst(bm: Beam,
 def static_gravity_ft(bm: Beam,
                       bl: fdu.BoundaryCondition,
                       br: fdu.BoundaryCondition,
-                      ns: int = 1001)\
+                      ns: int = 1001) \
         -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Static solver with gravity and hysteretic behaviour (foti model).
 
@@ -845,7 +845,6 @@ def _test_solve(bm):
 
 if __name__ == '__main__':
     import matplotlib.pyplot as mpl
-    from matplotlib import cm
 
     from structvib.force import Excitation
 
