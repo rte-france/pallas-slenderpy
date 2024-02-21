@@ -5,8 +5,8 @@ from typing import Optional
 
 import numpy as np
 from scipy.interpolate import RectBivariateSpline
-from structvib import _progress_bar as spb
-from structvib import wind
+from slenderpy import _progress_bar as spb
+from slenderpy import wind
 
 
 def von_karman_u(f, mean, std, lx):

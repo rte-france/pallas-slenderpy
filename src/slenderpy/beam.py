@@ -5,10 +5,10 @@ from typing import Tuple, List, Union, Optional, Callable
 import numpy as np
 import scipy as sp
 from scipy.optimize import newton
-from structvib import _cable_utils as cbu
-from structvib import _progress_bar as spb
-from structvib import fdm_utils as fdu
-from structvib import simtools
+from slenderpy import _cable_utils as cbu
+from slenderpy import _progress_bar as spb
+from slenderpy import fdm_utils as fdu
+from slenderpy import simtools
 
 
 def _bmom(k, cmin, cmax, kc):
@@ -423,9 +423,9 @@ def solve_cst(bm: Beam,
 
     Parameters
     ----------
-    bm : structvib.beam.Beam
+    bm : slenderpy.beam.Beam
         A beam object.
-    pm : structvib.simtools.Parameters
+    pm : slenderpy.simtools.Parameters
         Simulation parameters.
     force : TYPE, optional
         A force object. The default is None, which will lead to no force applied.
@@ -442,16 +442,16 @@ def solve_cst(bm: Beam,
     c0 : float, optional
         Curvature to compute bending stiffness. The default is None. If set to
         None a zero value will be used.
-    bcl : structvib.fdm_utils.BoundaryCondition
+    bcl : slenderpy.fdm_utils.BoundaryCondition
         Left boundary condition.
-    bcr : structvib.fdm_utils.BoundaryCondition
+    bcr : slenderpy.fdm_utils.BoundaryCondition
         Right boundary condition.
     zt : float, optional
         Fluid-friction coefficient. The default is 0.
 
     Returns
     -------
-    structvib.simtools.Results
+    slenderpy.simtools.Results
         Simulation output with offset, curvature and bending moment for
         the positions and times specified in input parameters.
     """
@@ -474,9 +474,9 @@ def solve_ft(bm: Beam,
 
     Parameters
     ----------
-    bm : structvib.beam.Beam
+    bm : slenderpy.beam.Beam
         A beam object.
-    pm : structvib.simtools.Parameters
+    pm : slenderpy.simtools.Parameters
         Simulation parameters.
     force : TYPE, optional
         A force object. The default is None, which will lead to no force applied.
@@ -493,16 +493,16 @@ def solve_ft(bm: Beam,
     m0 : numpy.ndarray, optional
         Initial moment. The default is None. If set to None a zero vmomentelocity
         will be used.
-    bcl : structvib.fdm_utils.BoundaryCondition
+    bcl : slenderpy.fdm_utils.BoundaryCondition
         Left boundary condition.
-    bcr : structvib.fdm_utils.BoundaryCondition
+    bcr : slenderpy.fdm_utils.BoundaryCondition
         Right boundary condition.
     zt : float, optional
         Fluid-friction coefficient. The default is 0.
 
     Returns
     -------
-    structvib.simtools.Results
+    slenderpy.simtools.Results
         Simulation output with offset, curvature, internal hysteresis variable
         and bending moment for the positions and times specified in input
         parameters.
@@ -511,7 +511,7 @@ def solve_ft(bm: Beam,
     vrn = ['bcl', 'bcr']
     for i in range(len(vrl)):
         if not isinstance(vrl[i], fdu.BoundaryCondition):
-            raise TypeError(f'input {vrn[i]} must be a structvib.fdm_utils.'
+            raise TypeError(f'input {vrn[i]} must be a slenderpy.fdm_utils.'
                             'BoundaryCondition')
 
     # space
@@ -634,11 +634,11 @@ def static_gravity_var(bm: Beam,
 
     Parameters
     ----------
-    bm : structvib.beam.Beam
+    bm : slenderpy.beam.Beam
         A beam object.
-    bl : structvib.fdm_utils.BoundaryCondition
+    bl : slenderpy.fdm_utils.BoundaryCondition
         Left boundary condition.
-    br : structvib.fdm_utils.BoundaryCondition
+    br : slenderpy.fdm_utils.BoundaryCondition
         Right boundary condition.
     c0 : float, optional
         Initial curvature to compute bending stiffness. The default is 0.
@@ -691,11 +691,11 @@ def static_gravity_cst(bm: Beam,
 
     Parameters
     ----------
-    bm : structvib.beam.Beam
+    bm : slenderpy.beam.Beam
         A beam object.
-    bl : structvib.fdm_utils.BoundaryCondition
+    bl : slenderpy.fdm_utils.BoundaryCondition
         Left boundary condition.
-    br : structvib.fdm_utils.BoundaryCondition
+    br : slenderpy.fdm_utils.BoundaryCondition
         Right boundary condition.
     c0 : float, optional
         Initial curvature to compute bending stiffness. The default is 0.
@@ -722,11 +722,11 @@ def static_gravity_ft(bm: Beam,
 
     Parameters
     ----------
-    bm : structvib.beam.Beam
+    bm : slenderpy.beam.Beam
         A beam object.
-    bl : structvib.fdm_utils.BoundaryCondition
+    bl : slenderpy.fdm_utils.BoundaryCondition
         Left boundary condition.
-    br : structvib.fdm_utils.BoundaryCondition
+    br : slenderpy.fdm_utils.BoundaryCondition
         Right boundary condition.
     ns : int, optional
         Number of discretization points. The default is 1001.
@@ -741,7 +741,7 @@ def static_gravity_ft(bm: Beam,
           - bending stiffness (N.m**2)
           - moment (N.m)
     """
-    from structvib import force
+    from slenderpy import force
     tf = 5. / bm.natural_frequency()
     dt = 0.02 / bm.natural_frequency()
     pm = simtools.Parameters(ns=ns, t0=0., tf=tf, dt=dt, dr=10 * dt, los=ns, pp=False)
@@ -846,7 +846,7 @@ def _test_solve(bm):
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
-    from structvib.force import Excitation
+    from slenderpy.force import Excitation
 
     plt.close('all')
 

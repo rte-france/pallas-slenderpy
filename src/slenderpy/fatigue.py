@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 
-from structvib import cable
+from slenderpy import cable
 
 
 def _compress(s):
@@ -123,9 +123,9 @@ def count_cycles(res, cb, xb=89.0E-03, pos='left', var='un', add_cat=True):
 
     Parameters
     ----------
-    res : structvib.simulation.Results
+    res : slenderpy.simulation.Results
         Input results from a cable simulation.
-    cb : structvib.cable.SCable
+    cb : slenderpy.cable.SCable
         The cable object used to generate the results.
     xb : float, optional
         Distance (m) from end where to estimate offsets. The default is 89 mm,

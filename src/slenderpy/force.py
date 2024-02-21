@@ -3,7 +3,7 @@
 from typing import Optional, Union, Tuple, Any
 
 import numpy as np
-from structvib.wind import air_volumic_mass
+from slenderpy.wind import air_volumic_mass
 
 
 class WOP:

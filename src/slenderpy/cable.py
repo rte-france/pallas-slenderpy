@@ -7,9 +7,9 @@ from typing import Tuple, Union, Callable, Optional
 import numpy as np
 import scipy as sp
 from scipy.linalg import solve_banded
-from structvib import _cable_utils as cbu
-from structvib import _progress_bar as spb
-from structvib import simtools
+from slenderpy import _cable_utils as cbu
+from slenderpy import _progress_bar as spb
+from slenderpy import simtools
 
 
 def _newt2dv(f1, f2, x0, y0, epsilon=1.0E-12, maxiter=64, dx=1.0E-03, dy=1.0E-03):
@@ -521,9 +521,9 @@ def solve(cb: SCable,
 
     Parameters
     ----------
-    cb : structvib.cable.SCable
+    cb : slenderpy.cable.SCable
         A cable object.
-    pm : structvib.simtools.Parameters
+    pm : slenderpy.simtools.Parameters
         Simulation parameters.
     force : TYPE, optional
         A force object. The default is None, which will lead to no force applied.
@@ -546,7 +546,7 @@ def solve(cb: SCable,
 
     Returns
     -------
-    structvib.simtools.Results
+    slenderpy.simtools.Results
         Simulation output with offsets (tangential, normal and binormal) in
         meters and axial force in newtons for the positions and times specified
         in input parameters.
@@ -723,10 +723,10 @@ def tnb2xyz(res: simtools.Results,
 
     Parameters
     ----------
-    res : structvib.simtools.Results
+    res : slenderpy.simtools.Results
         Input results from a cable simulation. The absence of one or more keys
         among the following list will lead to undefined behaviour: [ut, un, ub].
-    cb : structvib.cable.SCable
+    cb : slenderpy.cable.SCable
         The cable object used to generate the results.
     mix_curv : TYPE, optional
         DESCRIPTION. The default is False.
@@ -779,9 +779,9 @@ def export_vtk(cb: SCable,
 
     Parameters
     ----------
-    cb : structvib.cable.SCable
+    cb : slenderpy.cable.SCable
         The cable object used to generate the results
-    res : structvib.simulation.Results
+    res : slenderpy.simulation.Results
         Results to export.
     rep : str
         Directory where to write the vtk files.

@@ -5,7 +5,7 @@ import numpy as np
 import scipy.interpolate
 import scipy.sparse
 from scipy.optimize import brenth
-from structvib import fdm_utils as fdmu
+from slenderpy import fdm_utils as fdmu
 
 
 class ZeroForce:
