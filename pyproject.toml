@@ -5,10 +5,10 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "structvib"
+name = "slenderpy"
 version = "2024.0.0"
 authors = [
-  {name = "Eurobios Mews Labs", email = "emmanuel.cieren@mews-labs.com"},
+    { name = "Eurobios Mews Labs", email = "emmanuel.cieren@mews-labs.com" },
 ]
 description = "Simulation of slender structures like cables or beams"
 readme = "README.md"
@@ -28,7 +28,4 @@ dependencies = [
 ]
 
 [project.urls]
-"Homepage" = "https://gitlab.eurobios.com/main/structvib"
-
-
-
+"Homepage" = "https://github.com/rte-france/pallas-slenderpy"

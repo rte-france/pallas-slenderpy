@@ -1,26 +1,24 @@
-# Structvib 
-_**structvib**_ is a python package to simulate the vibrations of elongated structures like cables or beams.
+# slenderpy
+
+_**slenderpy**_ is a python package to simulate the vibrations of elongated structures like cables or beams.
 
 ## Installation
 
 ### Using pip
+
 To install the package using pip, execute the following command:
+
 ```shell script
-python -m pip install git+https://gitlab.eurobios.com/main/structvib
+python -m pip install slenderpy@git+https://github.com/rte-france/pallas-slenderpy
 ```
 
 ### Using conda
-(not available yet)
 
-The package is available on conda-forge. To install, execute the following command: 
-```shell script
-python -m conda install structvib -c conda-forge
-```
+(not available yet)
 
 ## Building the documentation
 
 First, make sure you have sphinx and the Readthedocs theme installed.
-
 
 If you use pip, open a terminal and enter the following commands:
 
@@ -36,15 +34,14 @@ conda install sphinx
 conda install sphinx_rtd_theme
 ```
 
+Then, in the same terminal or anaconda prompt, go to directory `slenderpy/doc` and build the doc:
 
-Then, in the same terminal or anaconda prompt, go to directory `structvib/doc` and build the doc:
 ```shell script
 cd doc
 make html
 ```
 
 The documentation can then be accessed from `doc/_build/html/index.html`.
-
 
 ## Simple usage
 
@@ -53,9 +50,9 @@ with and without self-damping.
 
 ```python
 import numpy as np
-from structvib import cable
-from structvib import simtools
-from structvib import force
+from slenderpy import cable
+from slenderpy import simtools
+from slenderpy import force
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
@@ -100,6 +97,7 @@ un_damp = np.insert(un_damp, (0, un_damp.shape[1]), values=0, axis=1)
 ```
 
 Add the following code to show the evolution of the vertical displacement in an animation loop:
+
 ```python
 fig, ax = plt.subplots(figsize=[6, 4], tight_layout=True)
 ax.set_xlabel('horizontal position [m]')
@@ -114,6 +112,7 @@ ylim = ax.get_ylim()
 text = ax.text(0.95 * xlim[0] + 0.05 * xlim[1],
                0.9 * ylim[0] + 0.1 * ylim[1], 't=0s')
 
+
 def animate(i):
     """The function to call at each frame."""
     line1.set_ydata(un[i, :])
@@ -121,10 +120,10 @@ def animate(i):
     text.set_text("t={:2.3f}s".format(time[i]))
     return line1, line2, text
 
+
 ani = animation.FuncAnimation(
     fig, animate, interval=20, blit=True,
     frames=time.size, repeat=True)
 
 plt.show()
 ```
-

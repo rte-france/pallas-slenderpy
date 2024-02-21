@@ -1,23 +1,23 @@
-.. Structvib documentation master file, created by sphinx-quickstart
-   on Thu Mar 18 09:09:09 2021.  You can adapt this file completely to
-   your liking, but it should at least contain the root `toctree`
-   directive.
+.. slenderpy documentation master file, created by sphinx-quickstart
+on Thu Mar 18 09:09:09 2021.  You can adapt this file completely to
+your liking, but it should at least contain the root `toctree`
+directive.
 
-Welcome to Structvib's documentation!
+Welcome to slenderpy's documentation!
 =====================================
 
-**Structvib** is a python package for simulating the motion of long-span
+**slenderpy** is a python package for simulating the motion of long-span
 structures (cables and beams) using Python.
 
 Cables and beams have many structural and engineering applications:
 cable-stayed bridges, guyed masts, mooring lines, overhead
-lines. Structvib can compute the response of the cable or beam
+lines. slenderpy can compute the response of the cable or beam
 structure to a dynamic excitation. The response can then be used for
 modal analysis, e.g. to find natural frequencies or mode shapes.
 
 Our objective is to run fast simulations in order perform large
 parametric studies which cannot be accessed using full 3D
-codes. Structvib has been developed within RTE's research project
+codes. slenderpy has been developed within RTE's research project
 OLLA. RTE (Réseau de Transport d’Électricité) is the electricity
 transmission system operator of France.
 
@@ -48,7 +48,7 @@ Related Work
    :caption: Package Reference
 
    modules
-   
+
 
 Indices and tables
 ==================

@@ -1,10 +1,9 @@
 Install
 =======
 
-If you have access to eurobios gitlab, just type ``pip install -e
-git+https://gitlab.eurobios.com/escb/structvib@master#egg=structvib``
-in a terminal; you will be asked your login credentials. If you got
-this packages from the sources, type ``python3 setup.py install`` at
+If you have access to eurobios gitlab, just type ``pip install slenderpy@git+https://github.com/rte-france/pallas-slenderpy``
+in a terminal. If you got
+this package from the sources, type ``pip install .`` at
 the root of the repository.
 
 Basic usage
@@ -15,14 +14,14 @@ Cable Example
 
 .. code-block:: python
 
-   from structvib import cable
-   from structvib import simtools
-   from structvib import wind
+   from slenderpy import cable
+   from slenderpy import simtools
+   from slenderpy import wind
 
    # cable parameters
    cp = dict(mass=1.57, diameter=0.031, EA=3.76E+07, length=400., tension=3.7E+04, h=0.)
 
-   # simulation parameters 
+   # simulation parameters
    sp = dict(ns=501, t0=0., tf=30., dt=2.0E-03, dr=1.0E-02, los=[0.1,0.5], pp=True)
 
    # force parameters (bishop & hassan)
@@ -45,15 +44,15 @@ Beam Example
 
 .. code-block:: python
 
-   from structvib import beam
-   from structvib import fdm_utils as fdu
-   from structvib import force
-   from structvib import simtools
+   from slenderpy import beam
+   from slenderpy import fdm_utils as fdu
+   from slenderpy import force
+   from slenderpy import simtools
 
    # beam parameters
    bp = dict(mass=1.57, ei=[2155., 28.], kp=[0.018], length=50., tension=2.8E+04)
 
-   # simulation parameters 
+   # simulation parameters
    pp = dict(ns=501, t0=0., tf=5., dt=2.0E-03, dr=1.0E-02, los=[0.1, 0.5], pp=True)
 
    # force parameters
@@ -72,4 +71,3 @@ Beam Example
 
    # plot results overview
    simtools.multiplot(dat, lb=['test'], Lref=cb.Lp)
-   
