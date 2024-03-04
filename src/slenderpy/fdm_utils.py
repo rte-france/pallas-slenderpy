@@ -1,10 +1,10 @@
 """Finite differences utility functions."""
-# !/usr/bin/env python
-# -*- coding: utf-8 -*-
+
+from typing import Tuple, Optional
+
 import numpy as np
 import scipy as sp
 import scipy.sparse
-from typing import Tuple, Optional
 
 
 class BoundaryCondition:
@@ -107,7 +107,7 @@ def rot_none(pos, y=0., dy=0.):
 def d2M_cst(n: int,
             ds: float,
             bcl: BoundaryCondition,
-            bcr: BoundaryCondition)\
+            bcr: BoundaryCondition) \
         -> Tuple[scipy.sparse.dia.dia_matrix, np.ndarray]:
     """Get finite difference matrix for second-order derivative on a uniform discretization.
 
@@ -121,9 +121,9 @@ def d2M_cst(n: int,
         Matrix size.
     ds : float
         Discretization step.
-    bcl : structvib.fdm_utils.BoundaryCondition
+    bcl : slenderpy.fdm_utils.BoundaryCondition
         Left boundary condition.
-    bcr : structvib.fdm_utils.BoundaryCondition
+    bcr : slenderpy.fdm_utils.BoundaryCondition
         Right boundary condition.
 
     Returns
@@ -152,7 +152,7 @@ def d2M_cst(n: int,
 def d4M_cst(n: int,
             ds: float,
             bcl: BoundaryCondition,
-            bcr: BoundaryCondition)\
+            bcr: BoundaryCondition) \
         -> Tuple[scipy.sparse.dia.dia_matrix, np.ndarray]:
     """Get finite difference matrix for fourth-order derivative on a uniform discretization.
 
@@ -166,9 +166,9 @@ def d4M_cst(n: int,
         Matrix size.
     ds : float
         Discretization step.
-    bcl : structvib.fdm_utils.BoundaryCondition
+    bcl : slenderpy.fdm_utils.BoundaryCondition
         Left boundary condition.
-    bcr : structvib.fdm_utils.BoundaryCondition
+    bcr : slenderpy.fdm_utils.BoundaryCondition
         Right boundary condition.
 
     Returns

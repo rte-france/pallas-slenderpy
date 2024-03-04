@@ -1,14 +1,12 @@
 """Solver for a wake-oscillator force on a cable."""
-# !/usr/bin/env python
-# -*- coding: utf-8 -*-
+
 import numpy as np
 import scipy as sp
-
-from structvib import _cable_utils as cbu
-from structvib import _progress_bar as spb
-from structvib import simtools
-from structvib import cable
-from structvib import force
+from slenderpy import _cable_utils as cbu
+from slenderpy import _progress_bar as spb
+from slenderpy import cable
+from slenderpy import force
+from slenderpy import simtools
 
 
 def solve(cb: cable.SCable,
@@ -22,9 +20,9 @@ def solve(cb: cable.SCable,
 
     Parameters
     ----------
-    cb : structvib.cable.SCable
+    cb : slenderpy.cable.SCable
         A cable object.
-    pm : structvib.simtools.Parameters
+    pm : slenderpy.simtools.Parameters
         Simulation parameters.
     wo : structib.force.WOP
         Wake oscillator parameters.
@@ -40,7 +38,7 @@ def solve(cb: cable.SCable,
 
     Returns
     -------
-    structvib.simtools.Results
+    slenderpy.simtools.Results
         Simulation output with offsets (tangential, normal and binormal) and
         fluid variable for the positions and times specified in input parameters.
 

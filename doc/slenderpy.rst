@@ -1,85 +1,85 @@
-structvib package
+slenderpy package
 =================
 
 Submodules
 ----------
 
-structvib.beam module
+slenderpy.beam module
 ---------------------
 
-.. automodule:: structvib.beam
+.. automodule:: slenderpy.beam
    :members:
    :undoc-members:
    :show-inheritance:
 
-structvib.cable module
+slenderpy.cable module
 ----------------------
 
-.. automodule:: structvib.cable
+.. automodule:: slenderpy.cable
    :members:
    :undoc-members:
    :show-inheritance:
 
-structvib.cable\_wakeosc module
+slenderpy.cable\_wakeosc module
 -------------------------------
 
-.. automodule:: structvib.cable_wakeosc
+.. automodule:: slenderpy.cable_wakeosc
    :members:
    :undoc-members:
    :show-inheritance:
 
-structvib.fatigue module
+slenderpy.fatigue module
 ------------------------
 
-.. automodule:: structvib.fatigue
+.. automodule:: slenderpy.fatigue
    :members:
    :undoc-members:
    :show-inheritance:
 
-structvib.fdm\_utils module
+slenderpy.fdm\_utils module
 ---------------------------
 
-.. automodule:: structvib.fdm_utils
+.. automodule:: slenderpy.fdm_utils
    :members:
    :undoc-members:
    :show-inheritance:
 
-structvib.force module
+slenderpy.force module
 ----------------------
 
-.. automodule:: structvib.force
+.. automodule:: slenderpy.force
    :members:
    :undoc-members:
    :show-inheritance:
 
-structvib.simtools module
+slenderpy.simtools module
 -------------------------
 
-.. automodule:: structvib.simtools
+.. automodule:: slenderpy.simtools
    :members:
    :undoc-members:
    :show-inheritance:
 
-structvib.turbwind module
+slenderpy.turbwind module
 -------------------------
 
-.. automodule:: structvib.turbwind
+.. automodule:: slenderpy.turbwind
    :members:
    :undoc-members:
    :show-inheritance:
 
-structvib.wind module
+slenderpy.wind module
 ---------------------
 
-.. automodule:: structvib.wind
+.. automodule:: slenderpy.wind
    :members:
    :undoc-members:
    :show-inheritance:
-   
+
 Module contents
 ---------------
 
-.. automodule:: structvib
+.. automodule:: slenderpy
    :members:
    :undoc-members:
    :show-inheritance:

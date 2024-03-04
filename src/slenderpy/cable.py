@@ -1,15 +1,15 @@
 """Cable object and associated solvers."""
-# !/usr/bin/env python
-# -*- coding: utf-8 -*-
+
 import io
 import os
 from typing import Tuple, Union, Callable, Optional
+
 import numpy as np
 import scipy as sp
 from scipy.linalg import solve_banded
-from structvib import _cable_utils as cbu
-from structvib import _progress_bar as spb
-from structvib import simtools
+from slenderpy import _cable_utils as cbu
+from slenderpy import _progress_bar as spb
+from slenderpy import simtools
 
 
 def _newt2dv(f1, f2, x0, y0, epsilon=1.0E-12, maxiter=64, dx=1.0E-03, dy=1.0E-03):
@@ -181,7 +181,7 @@ def tension_corr_temperature(m: Union[float, np.ndarray],
                              dT: Union[float, np.ndarray],
                              g: float = 9.81,
                              epsilon: float = 1.0E-12,
-                             maxiter: int = 16)\
+                             maxiter: int = 16) \
         -> Tuple[Union[float, np.ndarray], Union[float, np.ndarray]]:
     """Evaluate variation of tension with temperature shift.
 
@@ -225,7 +225,7 @@ def tension_corr_temperature(m: Union[float, np.ndarray],
 
     def phi2(s, v, h, dT):
         return (v * s - 0.5 * w * s**2) / EA + h / w * (1. + al * dT) * (
-            np.sqrt(1. + (v / h)**2) - np.sqrt(1. + ((v - w * s) / h)**2))
+                np.sqrt(1. + (v / h)**2) - np.sqrt(1. + ((v - w * s) / h)**2))
 
     # (1) find length
 
@@ -265,7 +265,7 @@ def catconst_corr_temperature(m: Union[float, np.ndarray],
                               dT: Union[float, np.ndarray],
                               g: float = 9.81,
                               epsilon: float = 1.0E-12,
-                              maxiter: int = 16)\
+                              maxiter: int = 16) \
         -> Tuple[Union[float, np.ndarray], Union[float, np.ndarray]]:
     """Evaluate variation of catenary constant with temperature shift.
 
@@ -363,7 +363,6 @@ class SCable:
         self.lm = irvine_number(self.Lp, self.a, self.h, self.m, self.EA, g=self.g)
         # useful value (no unit)
         self.q = _q_factor(self.L, self.h)
-
 
     def natural_frequencies(self, n: int = 1) -> np.ndarray:
         """Compute the n first modes of the vibrating string.
@@ -507,7 +506,7 @@ def solve(cb: SCable,
           pm: simtools.Parameters,
           force: Optional[Callable[[np.ndarray, float, np.ndarray, np.ndarray,
                                     np.ndarray, np.ndarray],
-                                   Tuple[np.ndarray, np.ndarray]]] = None,
+          Tuple[np.ndarray, np.ndarray]]] = None,
           zt: float = 0.,
           un0: Optional[np.ndarray] = None,
           ub0: Optional[np.ndarray] = None,
@@ -522,9 +521,9 @@ def solve(cb: SCable,
 
     Parameters
     ----------
-    cb : structvib.cable.SCable
+    cb : slenderpy.cable.SCable
         A cable object.
-    pm : structvib.simtools.Parameters
+    pm : slenderpy.simtools.Parameters
         Simulation parameters.
     force : TYPE, optional
         A force object. The default is None, which will lead to no force applied.
@@ -547,7 +546,7 @@ def solve(cb: SCable,
 
     Returns
     -------
-    structvib.simtools.Results
+    slenderpy.simtools.Results
         Simulation output with offsets (tangential, normal and binormal) in
         meters and axial force in newtons for the positions and times specified
         in input parameters.
@@ -585,9 +584,9 @@ def solve(cb: SCable,
                                             tAd, cb.L, uAd, cb.m, cb.g)
 
         Rvn = (dt * b) * A * (un[1:-1] + 0.5 * ht * vn[1:-1]) + (1 + z) * vn[1:-1] + \
-            dt * (0.5 * (fn1[1:-1] + fn2[1:-1]) + vl2 / vt2 * e)
+              dt * (0.5 * (fn1[1:-1] + fn2[1:-1]) + vl2 / vt2 * e)
         Rvb = (dt * b) * A * (ub[1:-1] + 0.5 * ht * vb[1:-1]) + (1 + z) * vb[1:-1] + \
-            ht * (fb1[1:-1] + fb2[1:-1])
+              ht * (fb1[1:-1] + fb2[1:-1])
 
         Db[0, +1:] = tau * b * A.diagonal(k=1)
         Db[1, :] = 1. - z + tau * b * A.diagonal(k=0)
@@ -724,10 +723,10 @@ def tnb2xyz(res: simtools.Results,
 
     Parameters
     ----------
-    res : structvib.simtools.Results
+    res : slenderpy.simtools.Results
         Input results from a cable simulation. The absence of one or more keys
         among the following list will lead to undefined behaviour: [ut, un, ub].
-    cb : structvib.cable.SCable
+    cb : slenderpy.cable.SCable
         The cable object used to generate the results.
     mix_curv : TYPE, optional
         DESCRIPTION. The default is False.
@@ -780,9 +779,9 @@ def export_vtk(cb: SCable,
 
     Parameters
     ----------
-    cb : structvib.cable.SCable
+    cb : slenderpy.cable.SCable
         The cable object used to generate the results
-    res : structvib.simulation.Results
+    res : slenderpy.simulation.Results
         Results to export.
     rep : str
         Directory where to write the vtk files.

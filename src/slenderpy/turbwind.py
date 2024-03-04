@@ -2,10 +2,11 @@
 # !/usr/bin/env python3
 # -*- coding: utf-8 -*-
 from typing import Optional
+
 import numpy as np
 from scipy.interpolate import RectBivariateSpline
-from structvib import _progress_bar as spb
-from structvib import wind
+from slenderpy import _progress_bar as spb
+from slenderpy import wind
 
 
 def von_karman_u(f, mean, std, lx):
@@ -110,7 +111,7 @@ class TurbWind3D:
 
     def __init__(self,
                  mean: float = 3.0,
-                 L:  float = 100.,
+                 L: float = 100.,
                  N: int = 51,
                  t0: float = 0.,
                  tf: float = 60.,
@@ -404,7 +405,8 @@ class Force2D:
                  T: float = 293.15,
                  p: float = 1.013E+05,
                  phi: float = 0.,
-                 pp: bool = False) -> None:
+                 pp: bool = False,
+                 seed: Optional[int] = None) -> None:
         """Init with args.
 
         Parameters
@@ -462,6 +464,9 @@ class Force2D:
             Relative humidity (in [0, 1] range). The default is 0.
         pp : bool, optional
             Print (or not) progress on stderr. The default is False.
+        seed: int, optional.
+            Seed for the random number generator. The default is None (random
+            seed).
 
         Returns
         -------
@@ -470,7 +475,8 @@ class Force2D:
         self.tbw = TurbWind3D(mean=meanU, L=Lp, N=N, t0=t0, tf=tf, dt=dt,
                               stdU=stdU, stdV=stdV, stdW=stdW, lux=lxu,
                               lvx=lxv, lwx=lxw, cuy=cuy, cuz=cuz, cvy=cvy,
-                              cvz=cvz, cwy=cwy, cwz=cwz, ks=1, kt=1, pp=pp)
+                              cvz=cvz, cwy=cwy, cwz=cwz, ks=1, kt=1, pp=pp,
+                              seed=seed)
 
         self.cd = cd
         if rho is None:
@@ -541,9 +547,10 @@ if __name__ == '__main__':
 
     # Some test of wind features
 
-    import matplotlib.pyplot as mpl
+    import matplotlib.pyplot as plt
 
-    mpl.close('all')
+    plt.close('all')
+
 
     def _fft(t, s):
         T = np.nanmean(np.diff(t))
@@ -553,6 +560,7 @@ if __name__ == '__main__':
         f = f[:N]
         y = np.abs(np.fft.fft(s) / n)[:N]
         return f, y
+
 
     t0 = 7.
     tf = 127.
@@ -580,7 +588,7 @@ if __name__ == '__main__':
     r1d = f1d.wnd
     r3d = f2d.tbw
 
-    fig, ax = mpl.subplots(nrows=3, ncols=2)
+    fig, ax = plt.subplots(nrows=3, ncols=2)
 
     ax[0, 1].loglog(f, von_karman_u(f, um, us, ul), '--k')
     ax[1, 1].loglog(f, von_karman_v(f, um, vs, vl), '--k')
@@ -639,7 +647,7 @@ if __name__ == '__main__':
         f2n[k] = tmp[0][0]
         f2b[k] = tmp[1][0]
 
-    fig, ax = mpl.subplots(nrows=2, ncols=1)
+    fig, ax = plt.subplots(nrows=2, ncols=1)
     ax[0].plot(t, f2n)
     ax[0].plot(t, f1n)
 

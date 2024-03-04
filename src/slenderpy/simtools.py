@@ -1,15 +1,15 @@
 """Simulation tools."""
-# !/usr/bin/env python
-# -*- coding: utf-8 -*-
+
 import json
 import pickle as pk
 import time
 from typing import Union, Optional, List, Tuple
+
 import matplotlib.axes
-from matplotlib import cm
-import matplotlib.pyplot as mpl
+import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
+from matplotlib import cm
 
 # figure default font sizes
 __tts__ = 12
@@ -325,11 +325,11 @@ def multiplot(res: Results,
               fst: int = __tts__,
               fsl: int = __lbs__) \
         -> Tuple[matplotlib.figure.Figure, np.ndarray]:
-    """Plot on a figure one or more structvib.simtools.Results instances.
+    """Plot on a figure one or more slenderpy.simtools.Results instances.
 
     Parameters
     ----------
-    res : structvib.simtools.Results or list of structvib.simtools.Results
+    res : slenderpy.simtools.Results or list of slenderpy.simtools.Results
         DESCRIPTION.
     lb : list of str, optional
         Labels for each Result instance in res arg. The default is None.
@@ -393,7 +393,7 @@ def multiplot(res: Results,
         cmap = cm.viridis(np.linspace(0., 1., len(res) + 2))[1:-1]
 
     # big loop
-    fig, ax = mpl.subplots(nrows=nr, ncols=nc)
+    fig, ax = plt.subplots(nrows=nr, ncols=nc)
     if nc == 1 and nr == 1:
         ax = np.array([[ax]])
     elif nc == 1:
@@ -430,16 +430,16 @@ def multiplot(res: Results,
 
 
 def spectrum(res: Results) -> Results:
-    """FFT module from a structvib.simtools.Results.
+    """FFT module from a slenderpy.simtools.Results.
 
     Parameters
     ----------
-    res : structvib.simtools.Results
+    res : slenderpy.simtools.Results
         Results from a simulation.
 
     Returns
     -------
-    spc : structvib.simtools.Results
+    spc : slenderpy.simtools.Results
         Another Results object with frequencies instead of times and the abs
         value of the fft spectrum of each component.
     """

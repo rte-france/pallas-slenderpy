@@ -1,7 +1,7 @@
 """Forces from wind."""
-# !/usr/bin/env python
-# -*- coding: utf-8 -*-
+
 from typing import Union, Optional
+
 import numpy as np
 
 
@@ -26,7 +26,7 @@ def air_volumic_mass(T: float = 293.15,
 
     """
     return 1. / (287.06 * T) * (
-        p - 230.617 * phi * np.exp(17.5043 * (T - 273.15) / (T - 31.95)))
+            p - 230.617 * phi * np.exp(17.5043 * (T - 273.15) / (T - 31.95)))
 
 
 def air_density(T: float = 293.15,
@@ -55,7 +55,7 @@ def air_density(T: float = 293.15,
     return 1.0E-03 * air_volumic_mass(T, p, phi)
 
 
-def air_dynamic_viscosity(T: Union[float, np.ndarray] = 293.15)\
+def air_dynamic_viscosity(T: Union[float, np.ndarray] = 293.15) \
         -> Union[float, np.ndarray]:
     r"""Compute air dynamic viscosity.
 

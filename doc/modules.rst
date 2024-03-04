@@ -1,7 +1,7 @@
-structvib
+slenderpy
 =========
 
 .. toctree::
    :maxdepth: 4
 
-   structvib
+   slenderpy

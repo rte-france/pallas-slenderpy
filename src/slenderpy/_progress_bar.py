@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Helpers for using the progress meter functionalities of the tqdm library."""
 import tqdm
 
