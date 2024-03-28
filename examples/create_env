@@ -9,7 +9,7 @@ mkdir -p $ENV_DIR
 
 
 # -- current env with link
-VENV=/home/${USER}/ENV/slenderpy
+VENV=/home/${USER}/ENV/pallas-slenderpy
 VLNK=.venv
 ln -sf $VENV $VLNK
 python3 -m venv $VENV

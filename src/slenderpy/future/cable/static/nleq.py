@@ -3,8 +3,8 @@ from typing import Union
 
 import numpy as np
 from pyntb.optimize import qnewt2d_v
-from slenderpy._constant import _GRAVITY
-from slenderpy.cable.static import blondel
+from slenderpy.future._constant import _GRAVITY
+from slenderpy.future.cable.static import blondel
 
 _RTOL = 1.0E-12
 _MAXITER = 16

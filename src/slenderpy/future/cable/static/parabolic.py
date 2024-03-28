@@ -3,7 +3,7 @@
 from typing import Union
 
 import numpy as np
-from slenderpy._constant import _GRAVITY
+from slenderpy.future._constant import _GRAVITY
 
 
 def _f(z: float) -> float:

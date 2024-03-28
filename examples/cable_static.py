@@ -1,13 +1,7 @@
-# !/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 import matplotlib.pyplot as plt
 import numpy as np
 
-from slenderpy._constant import _GRAVITY
-
-
-# import slenderpy.cable.staticp as scsp
+from slenderpy.future.cable.static import parabolic
 
 
 def parabola_plot():
@@ -19,30 +13,26 @@ def parabola_plot():
     tension = 0.012 * 1.85E+05
     sld = 10.
     linm = 1.57
-    axs = 3.65E+07
+    # axs = 3.65E+07
 
     # compute cable stuff
 
-    # linear weight
-    linw = linm * _GRAVITY
     # static shape
     xp = np.linspace(0, lspan, 1001)
-    yp = scsp.ypos(xp, lspan, tension, sld, linw)
+    yp = parabolic.shape(xp, lspan, tension, sld, linm)
     # cable length
-    length = scsp.length(lspan, tension, sld, linm)
+    length = parabolic.length(lspan, tension, sld, linm)
     # cable sag
-    sag = scsp.sag(lspan, tension, sld, linm)
+    sag = parabolic.sag(lspan, tension, sld, linm)
     # sag points
-    xs = scsp.argsag(lspan, tension, sld, linm)
-    ys = scsp.ypos(xs, lspan, tension, sld, linw)
+    xs = parabolic.argsag(lspan, tension, sld, linm)
+    ys = parabolic.shape(xs, lspan, tension, sld, linm)
 
     # print
-
     print(f"[parabola] cable length {length:.6f}")
     print(f"[parabola] sag {sag:.6f}")
 
     # plot
-
     plt.figure()
     plt.plot(xp, xp * sld / lspan, ls='--', c='gray')
     plt.plot(xp, yp, label='Parabola', c='C0')
