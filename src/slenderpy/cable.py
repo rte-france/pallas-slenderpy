@@ -139,6 +139,32 @@ def _alts(s, Lp, a, h):
     return __alts(Lp, a, x, s)
 
 
+def argsag(Lp: Union[float, np.ndarray],
+        a: Union[float, np.ndarray],
+        h: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+    """Find curvilinear abscissa where sag occurs.
+
+    Parameters
+    ----------
+    Lp : float or numpy.ndarray
+        Span length (m).
+    a : float or numpy.ndarray
+        Mechanical parameter or catenary constant (m).
+    h : float or numpy.ndarray
+        Height difference between anchors (m).
+
+    Returns
+    -------
+    float or numpy.ndarray (depending on input)
+        Sag (m).
+
+    """
+    L = catenary_length(Lp, a, h)
+    q = _q_factor(L, h)
+    x = 0.5 * (a * q - Lp)
+    return (a * np.arcsinh(h / Lp) - x) / Lp
+
+
 def sag(Lp: Union[float, np.ndarray],
         a: Union[float, np.ndarray],
         h: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
@@ -162,7 +188,7 @@ def sag(Lp: Union[float, np.ndarray],
     L = catenary_length(Lp, a, h)
     q = _q_factor(L, h)
     x = 0.5 * (a * q - Lp)
-    s = (a * np.arcsinh(h / Lp) - x) / Lp
+    s = argsag(Lp, a, h)
     return s * h - __alts(Lp, a, 2.0 * x, s)
 
 
