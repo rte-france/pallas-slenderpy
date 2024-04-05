@@ -4,7 +4,7 @@ from slenderpy.future.cable.static import nleq
 
 
 def test_shape(ast570, random_spans):
-    """Check that nleq shape's ends matche span length and support level difference."""
+    """Check that shape's ends matche span length and support level difference."""
     nx = 999
     tol = 1.0E-15
 
@@ -23,6 +23,7 @@ def test_shape(ast570, random_spans):
 
 
 def test_stress(ast570, random_spans):
+    """Check that the computed mean stress matches its integration."""
     nx = 59999
     atol = 1.0E-06
     rtol = 1.0E-09
@@ -43,7 +44,7 @@ def test_stress(ast570, random_spans):
 
 
 def test_length(ast570, random_spans):
-    """Check that the computed parabolic length matches a numerical one."""
+    """Check that the computed length matches a numerical one."""
     nx = 9999
     rtol = 1.0E-09
 
@@ -63,6 +64,7 @@ def test_length(ast570, random_spans):
 
 
 def test_sag(ast570, random_spans):
+    """Check that the computed sag matches a numerical one."""
     nx = 9999
     rtol = 1.0E-09
 
@@ -99,6 +101,7 @@ def test_sag(ast570, random_spans):
 
 
 def test_chord(ast570, random_spans):
+    """Check that the computed chord length matches a numerical one."""
     nx = 9999
     rtol = 1.0E-09
 

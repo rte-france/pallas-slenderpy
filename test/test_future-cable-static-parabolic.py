@@ -4,7 +4,7 @@ from slenderpy.future.cable.static import parabolic
 
 
 def test_shape(ast570, random_spans):
-    """Check that parabolic shape's ends matche span length and support level difference."""
+    """Check that shape's ends matche span length and support level difference."""
     nx = 999
     tol = 1.0E-15
 
@@ -24,7 +24,7 @@ def test_shape(ast570, random_spans):
 
 
 def test_length(ast570, random_spans):
-    """Check that the computed parabolic length matches a numerical one."""
+    """Check that the computed length matches a numerical one."""
     nx = 59999
     atol = 1.0E-06
     rtol = 1.0E-09
