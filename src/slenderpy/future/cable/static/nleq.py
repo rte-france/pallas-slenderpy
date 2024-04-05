@@ -3,8 +3,10 @@ from typing import Union
 
 import numpy as np
 from pyntb.optimize import qnewt2d_v
+
 from slenderpy.future._constant import _GRAVITY
 from slenderpy.future.cable.static import blondel
+from slenderpy.future.cable.static.parabolic import _g
 
 _RTOL = 1.0E-12
 _MAXITER = 16
@@ -92,7 +94,7 @@ def solve(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
 
     Returns
     -------
-    lcab: cable length (m)
+    lcab: cable length before applying load (m)
     lve: left vertical effort (N)
 
     Return arrays have the same size as the given inputs.
@@ -130,7 +132,7 @@ def shape(s: Union[int, float, np.ndarray], lspan: Union[float, np.ndarray],
           maxiter=_MAXITER) -> Union[float, np.ndarray]:
     """Cable position at equilibrium.
 
-    If args lcbab or lve is None, the cable equilibrium is recomputed (via the
+    If args lcab or lve is None, the cable equilibrium is recomputed (via the
     function solve). If arg s is a float or an array of floats, output values
     make sense only if s is in [0, lcab] interval. If arg s is an integer, we
     replace it with a np.linspace(0, lcab, n) array.
@@ -145,7 +147,7 @@ def shape(s: Union[int, float, np.ndarray], lspan: Union[float, np.ndarray],
     sld : support level difference (m)
     linm : linear mass (kg.m**-1)
     axs : axial stiffness (N)
-    lcab: cable length (m)
+    lcab: cable length before applying load (m)
     lve: left vertical effort (N)
     g : gravitational acceleration (m.s**-2)
     rtol : relative tolerance for quasi-newton algorithm
@@ -171,9 +173,119 @@ def shape(s: Union[int, float, np.ndarray], lspan: Union[float, np.ndarray],
     return x, y
 
 
-def length(lspan, tension, sld, linm, axs, g=_GRAVITY, rtol=_RTOL, maxiter=_MAXITER):
-    """Shortcut to get cable length at equilibrium."""
-    return solve(lspan, tension, sld, linm, axs, g=g, rtol=rtol, maxiter=maxiter)[0]
+def stress(s: Union[int, float, np.ndarray], lspan: Union[float, np.ndarray],
+           tension: Union[float, np.ndarray], sld: Union[float, np.ndarray],
+           linm: Union[float, np.ndarray], axs: Union[float, np.ndarray],
+           lcab=None, lve=None, g=_GRAVITY, rtol=_RTOL,
+           maxiter=_MAXITER):
+    """Stress in cable when moving along curvilinear abscissa.
+
+    From Pierre Latteur, "Calculer une structure : de la théorie à l'exemple",
+    Bruylant, 2006. Chap. 13, paragraph 7, equation [5]; see
+    https://www.issd.be/PDF/13_Chap13_6Juillet2006.pdf.
+
+    If args lcab or lve is None, the cable equilibrium is recomputed (via the
+    function solve). If arg s is a float or an array of floats, output values
+    make sense only if s is in [0, lcab] interval. If arg s is an integer, we
+    replace it with a np.linspace(0, lcab, n) array.
+
+    If more than one arg is an array, they must have the same size (no check).
+
+    Parameters
+    ----------
+    s : curvilinear abscissa along cable (m)
+    lspan : span length (m)
+    tension : mechanical tension (N)
+    sld : support level difference (m)
+    linm : linear mass (kg.m**-1)
+    axs : axial stiffness (N)
+    lcab: cable length before applying load (m)
+    lve: left vertical effort (N)
+    g : gravitational acceleration (m.s**-2)
+    rtol : relative tolerance for quasi-newton algorithm
+    maxiter : maximum number of iterations in quasi-newton algorithm
+
+    Returns
+    -------
+    Stress along cable (N). Return arrays have the same size as the given inputs.
+
+    """
+    if lcab is None or lve is None:
+        lcab, lve = solve(lspan, tension, sld, linm, axs, g=g, rtol=rtol, maxiter=maxiter)
+    linw = -linm * g
+    if isinstance(s, int):
+        s_ = np.linspace(0, lcab, s)
+    else:
+        s_ = s
+
+    return np.sqrt(tension**2 + (lve - linw * s_)**2)
+
+
+def mean_stress(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
+                sld: Union[float, np.ndarray], linm: Union[float, np.ndarray],
+                axs: Union[float, np.ndarray], lcab=None, lve=None, g=_GRAVITY,
+                rtol=_RTOL, maxiter=_MAXITER):
+    """Average stress in cable.
+
+    If more than one arg is an array, they must have the same size (no check).
+
+    Parameters
+    ----------
+    lspan : span length (m)
+    tension : mechanical tension (N)
+    sld : support level difference (m)
+    linm : linear mass (kg.m**-1)
+    axs : axial stiffness (N)
+    lcab: cable length before applying load (m)
+    lve: left vertical effort (N)
+    g : gravitational acceleration (m.s**-2)
+    rtol : relative tolerance for quasi-newton algorithm
+    maxiter : maximum number of iterations in quasi-newton algorithm
+
+    Returns
+    -------
+    Average stress (N). Return array has the same size as the given inputs.
+
+    """
+    if lcab is None or lve is None:
+        lcab, lve = solve(lspan, tension, sld, linm, axs, g=g, rtol=rtol, maxiter=maxiter)
+    linw = linm * g
+    a_ = (tension / linw)**2
+    b_ = lve / linw
+    N = linw / lcab * (_g(lcab, a_, b_) - _g(0., a_, b_))
+    return N
+
+
+def length(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
+           sld: Union[float, np.ndarray], linm: Union[float, np.ndarray],
+           axs: Union[float, np.ndarray], lcab=None, lve=None, g=_GRAVITY,
+           rtol=_RTOL, maxiter=_MAXITER):
+    """Cable length (after applying load).
+
+    If more than one arg is an array, they must have the same size (no check).
+
+    Parameters
+    ----------
+    lspan : span length (m)
+    tension : mechanical tension (N)
+    sld : support level difference (m)
+    linm : linear mass (kg.m**-1)
+    axs : axial stiffness (N)
+    lcab: cable length before applying load (m)
+    lve: left vertical effort (N)
+    g : gravitational acceleration (m.s**-2)
+    rtol : relative tolerance for quasi-newton algorithm
+    maxiter : maximum number of iterations in quasi-newton algorithm
+
+    Returns
+    -------
+    Cable length (m). Return array has the same size as the given inputs.
+
+    """
+    if lcab is None or lve is None:
+        lcab, lve = solve(lspan, tension, sld, linm, axs, g=g, rtol=rtol, maxiter=maxiter)
+    n = mean_stress(lspan, tension, sld, linm, axs, lcab=lcab, lve=lve, g=g, rtol=rtol, maxiter=maxiter)
+    return lcab * (1. + n / axs)
 
 
 def argsag(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
@@ -194,7 +306,7 @@ def argsag(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
     sld : support level difference (m)
     linm : linear mass (kg.m**-1)
     axs : axial stiffness (N)
-    lcab: cable length (m)
+    lcab: cable length before applying load (m)
     lve: left vertical effort (N)
     g : gravitational acceleration (m.s**-2)
     rtol : relative tolerance for quasi-newton algorithm
@@ -229,7 +341,7 @@ def sag(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
     sld : support level difference (m)
     linm : linear mass (kg.m**-1)
     axs : axial stiffness (N)
-    lcab: cable length (m)
+    lcab: cable length before applying load (m)
     lve: left vertical effort (N)
     g : gravitational acceleration (m.s**-2)
     rtol : relative tolerance for quasi-newton algorithm
@@ -278,7 +390,7 @@ def max_chord(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray]
     sld : support level difference (m)
     linm : linear mass (kg.m**-1)
     axs : axial stiffness (N)
-    lcab: cable length (m)
+    lcab: cable length before applying load (m)
     lve: left vertical effort (N)
     g : gravitational acceleration (m.s**-2)
     rtol : relative tolerance for quasi-newton algorithm

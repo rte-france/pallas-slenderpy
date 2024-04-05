@@ -10,6 +10,7 @@ def test_shape(ast570, random_spans):
 
     linm, _, rts = ast570
     lspan, tratio, sld = random_spans
+
     tension = rts * tratio
     x = np.linspace(0, lspan, nx)
     y = parabolic.shape(x, lspan, tension, sld, linm)
@@ -30,6 +31,7 @@ def test_length(ast570, random_spans):
 
     linm, _, rts = ast570
     lspan, tratio, sld = random_spans
+
     tension = rts * tratio
     x = np.linspace(0, lspan, nx)
     y = parabolic.shape(x, lspan, tension, sld, linm)
@@ -47,8 +49,8 @@ def test_sag(ast570, random_spans):
 
     linm, _, rts = ast570
     lspan, tratio, sld = random_spans
-    tension = rts * tratio
 
+    tension = rts * tratio
     x = np.linspace(0, lspan, nx)
     y = parabolic.shape(x, lspan, tension, sld, linm)
 
