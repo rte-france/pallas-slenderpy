@@ -147,6 +147,6 @@ if __name__ == '__main__':
     plt.close('all')
 
     parabolic_vs_nleq()
-    compare_all(lspan=400., ratio=0.25, sld=0.)
+    compare_all(lspan=400., ratio=0.25, sld=10.)
     print()
-    compare_all(lspan=100., ratio=0.01, sld=10.)
+    compare_all(lspan=100., ratio=0.01, sld=15.)
