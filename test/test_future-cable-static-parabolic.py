@@ -115,6 +115,6 @@ def test_stress(ast570, random_spans):
     s = parabolic.stress(x, lspan, tension, sld, linm)
 
     sm1 = parabolic.mean_stress(lspan, tension, sld, linm)
-    sm2 = np.sum(0.5 * (s[1:] + s[:-1]) * np.diff(x, axis=0) / lspan, axis=0)
+    sm2 = np.sum(0.5 * (s[1:, :] + s[:-1, :]) * np.diff(x, axis=0), axis=0) / lspan
 
     assert np.all(np.isclose(sm1, sm2, atol=atol, rtol=rtol))
