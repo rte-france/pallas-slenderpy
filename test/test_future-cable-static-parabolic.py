@@ -1,8 +1,9 @@
 import numpy as np
+
 from slenderpy.future.cable.static import parabolic
 
 
-def test_parabolic_shape(ast570, random_spans):
+def test_shape(ast570, random_spans):
     """Check that parabolic shape's ends matche span length and support level difference."""
     nx = 999
     tol = 1.0E-15
@@ -21,7 +22,7 @@ def test_parabolic_shape(ast570, random_spans):
     )
 
 
-def test_parabolic_length(ast570, random_spans):
+def test_length(ast570, random_spans):
     """Check that the computed parabolic length matches a numerical one."""
     nx = 59999
     atol = 1.0E-06
@@ -39,7 +40,7 @@ def test_parabolic_length(ast570, random_spans):
     assert np.all(np.isclose(length_1, length_2, atol=atol, rtol=rtol))
 
 
-def test_parabolic_sag(ast570, random_spans):
+def test_sag(ast570, random_spans):
     """Check that the computed sag matches a numerical one."""
     nx = 9999
     rtol = 1.0E-09
@@ -70,7 +71,7 @@ def test_parabolic_sag(ast570, random_spans):
     )
 
 
-def test_parabolic_chord(ast570, random_spans):
+def test_chord(ast570, random_spans):
     """Check that the computed chord length matches a numerical one."""
     nx = 9999
     rtol = 1.0E-09
@@ -99,3 +100,21 @@ def test_parabolic_chord(ast570, random_spans):
             np.all(np.isclose(x1, x0, atol=atolx, rtol=rtol)) and
             np.all(np.isclose(s1, s0, atol=atoly, rtol=rtol))
     )
+
+
+def test_stress(ast570, random_spans):
+    """Check that the computed mean stress matches its integration."""
+    nx = 59999
+    atol = 1.0E-06
+    rtol = 1.0E-09
+
+    linm, _, rts = ast570
+    lspan, tratio, sld = random_spans
+    tension = rts * tratio
+    x = np.linspace(0, lspan, nx)
+    s = parabolic.stress(x, lspan, tension, sld, linm)
+
+    sm1 = parabolic.mean_stress(lspan, tension, sld, linm)
+    sm2 = np.sum(0.5 * (s[1:] + s[:-1]) * np.diff(x, axis=0) / lspan, axis=0)
+
+    assert np.all(np.isclose(sm1, sm2, atol=atol, rtol=rtol))
