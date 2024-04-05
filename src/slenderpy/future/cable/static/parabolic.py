@@ -3,6 +3,7 @@
 from typing import Union
 
 import numpy as np
+
 from slenderpy.future._constant import _GRAVITY
 
 
@@ -10,6 +11,13 @@ def _f(z: float) -> float:
     """Primitive used to compute the length of a parabola."""
     q = np.sqrt(1 + z**2)
     return 0.5 * (z * q + np.log(z + q))
+
+
+def _g(x, a, b):
+    """Primitive used to compute an integral."""
+    y = x + b
+    s = np.sqrt(a + y**2)
+    return 0.5 * (y * s + a * np.log(y + s))
 
 
 def shape(x: Union[float, np.ndarray], lspan: Union[float, np.ndarray],
@@ -21,7 +29,7 @@ def shape(x: Union[float, np.ndarray], lspan: Union[float, np.ndarray],
 
     Parameters
     ----------
-    x : curvilinear abscissa along cable (m, before applying load)
+    x : horizontal position (m, should be in [0, lspan] range)
     lspan : span length (m)
     tension : mechanical tension (N)
     sld : support level difference (m)
@@ -89,8 +97,8 @@ def argsag(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
 
     Returns
     -------
-    Curvilinear abscissa (before applying load) of the cable where the lowest
-    point is met (m). Return array has the same size as the given inputs.
+    Horizontal position of the cable's lowest point (m). Return array has the
+    same size as the given inputs.
 
     """
     return np.minimum(np.maximum(0.5 * lspan - tension * sld / (linm * g * lspan), 0.), lspan)
@@ -154,3 +162,58 @@ def max_chord(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray]
 
     """
     return 0.125 * linm * g * lspan**2 / tension
+
+
+def stress(x: Union[float, np.ndarray], lspan: Union[float, np.ndarray],
+           tension: Union[float, np.ndarray], sld: Union[float, np.ndarray],
+           linm: Union[float, np.ndarray], g=_GRAVITY) -> Union[float, np.ndarray]:
+    """Stress modulus along cable.
+
+    If more than one arg is an array, they must have the same size (no check).
+
+    Parameters
+    ----------
+    x : horizontal position (m, should be in [0, lspan] range)
+    lspan : span length (m)
+    tension : mechanical tension (N)
+    sld : support level difference (m)
+    linm : linear mass (kg.m**-1)
+    g : gravitational acceleration (m.s**-2)
+
+    Returns
+    -------
+    Stress along x position (N). Return array has the same size as
+    the given inputs.
+
+    """
+    a = tension / (linm * g)
+    b = 0.5 * lspan / a - sld / lspan
+    N = tension * np.sqrt(1. + (x / a - b)**2)
+    return N
+
+
+def mean_stress(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
+                sld: Union[float, np.ndarray], linm: Union[float, np.ndarray],
+                g=_GRAVITY) -> Union[float, np.ndarray]:
+    """Average stress in cable.
+
+    If more than one arg is an array, they must have the same size (no check).
+
+    Parameters
+    ----------
+    lspan : span length (m)
+    tension : mechanical tension (N)
+    sld : support level difference (m)
+    linm : linear mass (kg.m**-1)
+    g : gravitational acceleration (m.s**-2)
+
+    Returns
+    -------
+    Average stress (N). Return array has the same size as the given inputs.
+
+    """
+    linw = linm * g
+    a_ = (tension / linw)**2
+    b_ = -(0.5 * lspan - tension * sld / (linw * lspan))
+    N = linw / lspan * (_g(lspan, a_, b_) - _g(0., a_, b_))
+    return N
