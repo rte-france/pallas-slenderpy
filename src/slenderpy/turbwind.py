@@ -124,7 +124,7 @@ class TurbWind3D:
                  lwx: float = 30.,
                  cuy: float = 7.,
                  cuz: float = 10.,
-                 cvy: float = 70.,
+                 cvy: float = 7.,
                  cvz: float = 10.,
                  cwy: float = 7.,
                  cwz: float = 10.,
@@ -170,7 +170,7 @@ class TurbWind3D:
         cuz : float, optional
             Co-coherence decay coefficient. The default is 10.
         cvy : float, optional
-            Co-coherence decay coefficient. The default is 70.
+            Co-coherence decay coefficient. The default is 7.
         cvz : float, optional
             Co-coherence decay coefficient. The default is 10.
         cwy : float, optional
@@ -398,7 +398,7 @@ class Force2D:
                  lxw: float = 30.,
                  cuy: float = 7.,
                  cuz: float = 10.,
-                 cvy: float = 70.,
+                 cvy: float = 7.,
                  cvz: float = 10.,
                  cwy: float = 7.,
                  cwz: float = 10.,
@@ -449,7 +449,7 @@ class Force2D:
         cuz : float, optional
             Co-coherence decay coefficient. The default is 10.
         cvy : float, optional
-            Co-coherence decay coefficient. The default is 70.
+            Co-coherence decay coefficient. The default is 7.
         cvz : float, optional
             Co-coherence decay coefficient. The default is 10.
         cwy : float, optional
