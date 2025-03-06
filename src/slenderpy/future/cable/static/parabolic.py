@@ -109,9 +109,10 @@ def sag(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
         g=_GRAVITY) -> Union[float, np.ndarray]:
     """Cable sag.
 
-    The sag is the level difference between the lowest point of the cable and
-    the lowest anchor point. When the support level difference is important, it
-    can be equal to zero (the lowest point is one of the anchor points).
+    The sag is the vertical distance between the lowest point of the cable and
+    the  line that joins the two suspensions points. When the support level
+    difference is important, it can be equal to zero (the lowest point is one of
+    the anchor points).
 
     If more than one arg is an array, they must have the same size (no check).
 
@@ -142,9 +143,10 @@ def max_chord(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray]
               g=_GRAVITY) -> Union[float, np.ndarray]:
     """Maximum value taken by chord length.
 
-    The maximum chord length is the maximum distance between the cable's lowest
-    point and the line that joins the two suspensions points. It is often used
-    as an approximation for sag (and equal to sag if sld=0).
+    A chord is a vertical line between a point on the cable and the line that
+    joins the two suspensions points. The maximum chord length is the largest
+    chord possible. It is often used as an approximation for sag (and equal to
+    sag if sld=0).
 
     If more than one arg is an array, they must have the same size (no check).
 
