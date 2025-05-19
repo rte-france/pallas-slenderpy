@@ -1,29 +1,23 @@
 #!/bin/bash
 
-# Run this in slenderpy/examples directory !
-
-
 # -- dir for all envs
 ENV_DIR=/home/${USER}/ENV
 mkdir -p $ENV_DIR
 
-
 # -- current env with link
-VENV=/home/${USER}/ENV/pallas-slenderpy
+VENV=${ENV_DIR}/pallas-slenderpy-uv
 VLNK=.venv
 ln -sf $VENV $VLNK
-python3 -m venv $VENV
+uv venv $VENV  # --python 3.11
 source $VENV/bin/activate
-
+# .venv\Scripts\activate
 
 # -- upgrade pip
-python3 -m pip install --upgrade pip
-
+uv pip install --upgrade pip
 
 # -- install local package
-cd ..
-pip install .[examples,test]
-
+rm -rf build
+uv pip install .[examples,dev]
 
 # -- end text
 echo "---"

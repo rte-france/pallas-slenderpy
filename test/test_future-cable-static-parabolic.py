@@ -16,10 +16,10 @@ def test_shape(ast570, random_spans):
     y = parabolic.shape(x, lspan, tension, sld, linm)
 
     assert (
-            np.all(np.isclose(x[0, :], 0., atol=tol)) and
-            np.all(np.isclose(x[-1, :], lspan, atol=tol)) and
-            np.all(np.isclose(y[0, :], 0., atol=tol)) and
-            np.all(np.isclose(y[-1, :], sld, atol=tol))
+            np.allclose(x[0, :], 0., atol=tol) and
+            np.allclose(x[-1, :], lspan, atol=tol) and
+            np.allclose(y[0, :], 0., atol=tol) and
+            np.allclose(y[-1, :], sld, atol=tol)
     )
 
 
@@ -39,7 +39,7 @@ def test_length(ast570, random_spans):
     length_1 = parabolic.length(lspan, tension, sld, linm)
     length_2 = np.sqrt(np.diff(x, axis=0)**2 + np.diff(y, axis=0)**2).sum(axis=0)
 
-    assert np.all(np.isclose(length_1, length_2, atol=atol, rtol=rtol))
+    assert np.allclose(length_1, length_2, atol=atol, rtol=rtol)
 
 
 def test_sag(ast570, random_spans):
@@ -68,8 +68,8 @@ def test_sag(ast570, random_spans):
     atoly = 0.5 * np.maximum(np.abs(y2[0, :] - y2[1, :]), np.abs(y2[1, :] - y2[2, :]))
 
     assert (
-            np.all(np.isclose(x1, x0, atol=atolx, rtol=rtol)) and
-            np.all(np.isclose(s1, s0, atol=atoly, rtol=rtol))
+            np.allclose(x1, x0, atol=atolx, rtol=rtol) and
+            np.allclose(s1, s0, atol=atoly, rtol=rtol)
     )
 
 
@@ -99,8 +99,8 @@ def test_chord(ast570, random_spans):
     atoly = 0.5 * np.maximum(np.abs(y2[0, :] - y2[1, :]), np.abs(y2[1, :] - y2[2, :]))
 
     assert (
-            np.all(np.isclose(x1, x0, atol=atolx, rtol=rtol)) and
-            np.all(np.isclose(s1, s0, atol=atoly, rtol=rtol))
+            np.allclose(x1, x0, atol=atolx, rtol=rtol) and
+            np.allclose(s1, s0, atol=atoly, rtol=rtol)
     )
 
 
@@ -119,4 +119,4 @@ def test_stress(ast570, random_spans):
     sm1 = parabolic.mean_stress(lspan, tension, sld, linm)
     sm2 = np.sum(0.5 * (s[1:, :] + s[:-1, :]) * np.diff(x, axis=0), axis=0) / lspan
 
-    assert np.all(np.isclose(sm1, sm2, atol=atol, rtol=rtol))
+    assert np.allclose(sm1, sm2, atol=atol, rtol=rtol)

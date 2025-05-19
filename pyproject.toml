@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-    "setuptools>=40.8.0",
+    "setuptools>=68.0.0",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -35,6 +35,14 @@ examples = [
 test = [
     "pylint",
     "pytest", 
+]
+lint = [
+    "black ~= 25.1.0",
+    "mypy ~= 1.13.0",
+    "ruff ~= 0.8.0"
+]
+dev = [
+    "slenderpy[test,lint]",
 ]
 
 [project.urls]
