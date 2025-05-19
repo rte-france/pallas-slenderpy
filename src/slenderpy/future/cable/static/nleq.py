@@ -409,10 +409,10 @@ def max_chord(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLik
     return ch
 
 
-def thermexp_tension(lspan: floatArrayLike, tension_i: floatArrayLike, sld: floatArrayLike,
-                     temperature_i: floatArrayLike, temperature_f: floatArrayLike, linm_i: floatArrayLike,
-                     axs: floatArrayLike, alpha: floatArrayLike, g: floatArrayLike = _GRAVITY, rtol: int = _RTOL,
-                     maxiter: int = _MAXITER):
+def thermal_expansion_tension(lspan: floatArrayLike, tension_i: floatArrayLike, sld: floatArrayLike,
+                              temperature_i: floatArrayLike, temperature_f: floatArrayLike, linm_i: floatArrayLike,
+                              axs: floatArrayLike, alpha: floatArrayLike, g: floatArrayLike = _GRAVITY,
+                              rtol: int = _RTOL, maxiter: int = _MAXITER):
     """Compute new tension with temperature change.
 
     If more than one arg is an array, they must have the same size (no check).
@@ -470,9 +470,10 @@ def thermexp_tension(lspan: floatArrayLike, tension_i: floatArrayLike, sld: floa
     return tension_f
 
 
-def thermexp_temperature(lspan, tension_i, tension_f, sld, temperature_i, linm_i, axs, alpha,
-                         g: floatArrayLike = _GRAVITY, rtol=_RTOL,
-                         maxiter=_MAXITER):
+def thermal_expansion_temperature(lspan: floatArrayLike, tension_i: floatArrayLike, tension_f: floatArrayLike,
+                                  sld: floatArrayLike, temperature_i: floatArrayLike, linm_i: floatArrayLike,
+                                  axs: floatArrayLike, alpha: floatArrayLike, g: floatArrayLike = _GRAVITY,
+                                  rtol: int = _RTOL, maxiter: int = _MAXITER):
     """Inverse of thermexp_tension, ie compute new temperature with tension change.
 
     If more than one arg is an array, they must have the same size (no check).
