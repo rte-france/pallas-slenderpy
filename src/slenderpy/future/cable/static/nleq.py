@@ -4,6 +4,7 @@ from typing import Union
 import numpy as np
 from pyntb.optimize import qnewt2d_v
 
+from slenderpy.future import floatArrayLike
 from slenderpy.future._constant import _GRAVITY
 from slenderpy.future.cable.static import blondel
 from slenderpy.future.cable.static.parabolic import _f
@@ -67,10 +68,9 @@ def _ypos(s, tension, linw, axs, lve):
                                                                     np.sqrt(1 + ((lve - linw * s) / tension)**2))
 
 
-def solve(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
-          sld: Union[float, np.ndarray], linm: Union[float, np.ndarray],
-          axs: Union[float, np.ndarray], g=_GRAVITY, rtol=_RTOL,
-          maxiter=_MAXITER) -> Union[float, np.ndarray]:
+def solve(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike,
+          axs: floatArrayLike, g: floatArrayLike = _GRAVITY, rtol: int = _RTOL,
+          maxiter: int = _MAXITER) -> floatArrayLike:
     """Solve cable equilibrium with quasi-newton.
 
     From Pierre Latteur, "Calculer une structure : de la théorie à l'exemple",
@@ -125,11 +125,9 @@ def solve(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
     return lcab, lve
 
 
-def shape(s: Union[int, float, np.ndarray], lspan: Union[float, np.ndarray],
-          tension: Union[float, np.ndarray], sld: Union[float, np.ndarray],
-          linm: Union[float, np.ndarray], axs: Union[float, np.ndarray],
-          lcab=None, lve=None, g=_GRAVITY, rtol=_RTOL,
-          maxiter=_MAXITER) -> Union[float, np.ndarray]:
+def shape(s: Union[int, floatArrayLike], lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike,
+          linm: floatArrayLike, axs: floatArrayLike, lcab=None, lve=None, g: floatArrayLike = _GRAVITY, rtol=_RTOL,
+          maxiter=_MAXITER) -> floatArrayLike:
     """Cable position at equilibrium.
 
     If args lcab or lve is None, the cable equilibrium is recomputed (via the
@@ -173,11 +171,9 @@ def shape(s: Union[int, float, np.ndarray], lspan: Union[float, np.ndarray],
     return x, y
 
 
-def stress(s: Union[int, float, np.ndarray], lspan: Union[float, np.ndarray],
-           tension: Union[float, np.ndarray], sld: Union[float, np.ndarray],
-           linm: Union[float, np.ndarray], axs: Union[float, np.ndarray],
-           lcab=None, lve=None, g=_GRAVITY, rtol=_RTOL,
-           maxiter=_MAXITER):
+def stress(s: Union[int, floatArrayLike], lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike,
+           linm: floatArrayLike, axs: floatArrayLike, lcab=None, lve=None, g: floatArrayLike = _GRAVITY,
+           rtol: int = _RTOL, maxiter: int = _MAXITER):
     """Stress in cable when moving along curvilinear abscissa.
 
     From Pierre Latteur, "Calculer une structure : de la théorie à l'exemple",
@@ -221,10 +217,9 @@ def stress(s: Union[int, float, np.ndarray], lspan: Union[float, np.ndarray],
     return np.sqrt(tension**2 + (lve - linw * s_)**2)
 
 
-def mean_stress(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
-                sld: Union[float, np.ndarray], linm: Union[float, np.ndarray],
-                axs: Union[float, np.ndarray], lcab=None, lve=None, g=_GRAVITY,
-                rtol=_RTOL, maxiter=_MAXITER):
+def mean_stress(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike,
+                axs: floatArrayLike, lcab=None, lve=None, g: floatArrayLike = _GRAVITY, rtol: int = _RTOL,
+                maxiter: int = _MAXITER):
     """Average stress in cable.
 
     If more than one arg is an array, they must have the same size (no check).
@@ -255,10 +250,9 @@ def mean_stress(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarra
     return N
 
 
-def length(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
-           sld: Union[float, np.ndarray], linm: Union[float, np.ndarray],
-           axs: Union[float, np.ndarray], lcab=None, lve=None, g=_GRAVITY,
-           rtol=_RTOL, maxiter=_MAXITER):
+def length(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike,
+           axs: floatArrayLike, lcab=None, lve=None, g: floatArrayLike = _GRAVITY, rtol: int = _RTOL,
+           maxiter: int = _MAXITER):
     """Cable length (after applying load).
 
     If more than one arg is an array, they must have the same size (no check).
@@ -287,10 +281,9 @@ def length(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
     return lcab * (1. + n / axs)
 
 
-def argsag(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
-           sld: Union[float, np.ndarray], linm: Union[float, np.ndarray],
-           axs: Union[float, np.ndarray], lcab=None, lve=None, g=_GRAVITY,
-           rtol=_RTOL, maxiter=_MAXITER) -> Union[float, np.ndarray]:
+def argsag(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike,
+           axs: floatArrayLike, lcab=None, lve=None, g: floatArrayLike = _GRAVITY, rtol: int = _RTOL,
+           maxiter: int = _MAXITER) -> floatArrayLike:
     """Find curvilinear abscissa where sag occurs.
 
     If args lcbab or lve is None, the cable equilibrium is recomputed (via the
@@ -322,10 +315,9 @@ def argsag(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
     return np.minimum(np.maximum(ell, 0.), lcab)
 
 
-def sag(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
-        sld: Union[float, np.ndarray], linm: Union[float, np.ndarray],
-        axs: Union[float, np.ndarray], lcab=None, lve=None, g=_GRAVITY,
-        rtol=_RTOL, maxiter=_MAXITER) -> Union[float, np.ndarray]:
+def sag(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike, axs: floatArrayLike,
+        lcab=None, lve=None, g: floatArrayLike = _GRAVITY, rtol: int = _RTOL,
+        maxiter: int = _MAXITER) -> floatArrayLike:
     """Compute sag given a suspended cable characteristics.
 
     The sag is the vertical distance between the lowest point of the cable and
@@ -372,10 +364,9 @@ def sag(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
     return sag_
 
 
-def max_chord(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
-              sld: Union[float, np.ndarray], linm: Union[float, np.ndarray],
-              axs: Union[float, np.ndarray], lcab=None, lve=None, g=_GRAVITY,
-              rtol=_RTOL, maxiter=_MAXITER) -> Union[float, np.ndarray]:
+def max_chord(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike,
+              axs: floatArrayLike, lcab=None, lve=None, g: floatArrayLike = _GRAVITY, rtol: int = _RTOL,
+              maxiter: int = _MAXITER) -> floatArrayLike:
     """Maximum value taken by chord length.
 
     A chord is a vertical line between a point on the cable and the line that
@@ -418,11 +409,10 @@ def max_chord(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray]
     return ch
 
 
-def thermexp_tension(lspan: Union[float, np.ndarray], tension_i: Union[float, np.ndarray],
-                     sld: Union[float, np.ndarray], temperature_i: Union[float, np.ndarray],
-                     temperature_f: Union[float, np.ndarray], linm_i: Union[float, np.ndarray],
-                     axs: Union[float, np.ndarray], alpha: Union[float, np.ndarray],
-                     g=_GRAVITY, rtol=_RTOL, maxiter=_MAXITER):
+def thermexp_tension(lspan: floatArrayLike, tension_i: floatArrayLike, sld: floatArrayLike,
+                     temperature_i: floatArrayLike, temperature_f: floatArrayLike, linm_i: floatArrayLike,
+                     axs: floatArrayLike, alpha: floatArrayLike, g: floatArrayLike = _GRAVITY, rtol: int = _RTOL,
+                     maxiter: int = _MAXITER):
     """Compute new tension with temperature change.
 
     If more than one arg is an array, they must have the same size (no check).
@@ -481,7 +471,8 @@ def thermexp_tension(lspan: Union[float, np.ndarray], tension_i: Union[float, np
 
 
 def thermexp_temperature(lspan, tension_i, tension_f, sld, temperature_i, linm_i, axs, alpha,
-                         g=_GRAVITY, rtol=_RTOL, maxiter=_MAXITER):
+                         g: floatArrayLike = _GRAVITY, rtol=_RTOL,
+                         maxiter=_MAXITER):
     """Inverse of thermexp_tension, ie compute new temperature with tension change.
 
     If more than one arg is an array, they must have the same size (no check).

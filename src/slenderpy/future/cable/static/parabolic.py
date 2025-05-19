@@ -1,9 +1,8 @@
 """Small sag cable functions."""
 
-from typing import Union
-
 import numpy as np
 
+from slenderpy.future import floatArrayLike
 from slenderpy.future._constant import _GRAVITY
 
 
@@ -20,9 +19,8 @@ def _g(x, a, b):
     return 0.5 * (y * s + a * np.log(y + s))
 
 
-def shape(x: Union[float, np.ndarray], lspan: Union[float, np.ndarray],
-          tension: Union[float, np.ndarray], sld: Union[float, np.ndarray],
-          linm: Union[float, np.ndarray], g=_GRAVITY) -> Union[float, np.ndarray]:
+def shape(x: floatArrayLike, lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike,
+          g: floatArrayLike = _GRAVITY) -> floatArrayLike:
     """Parabola equation for cable.
 
     If more than one arg is an array, they must have the same size (no check).
@@ -46,9 +44,8 @@ def shape(x: Union[float, np.ndarray], lspan: Union[float, np.ndarray],
     return 0.5 * x / a * (x + 2. * a * sld / lspan - lspan)
 
 
-def length(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
-           sld: Union[float, np.ndarray], linm: Union[float, np.ndarray],
-           g=_GRAVITY) -> Union[float, np.ndarray]:
+def length(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike,
+           g: floatArrayLike = _GRAVITY) -> floatArrayLike:
     """Compute suspended cable length using a parabola model.
 
     If more than one arg is an array, they must have the same size (no check).
@@ -80,9 +77,8 @@ def length(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
     return a * (_f(z2) - _f(z1))
 
 
-def argsag(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
-           sld: Union[float, np.ndarray], linm: Union[float, np.ndarray],
-           g=_GRAVITY) -> Union[float, np.ndarray]:
+def argsag(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike,
+           g: floatArrayLike = _GRAVITY) -> floatArrayLike:
     """Sag position.
 
     If more than one arg is an array, they must have the same size (no check).
@@ -104,9 +100,8 @@ def argsag(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
     return np.minimum(np.maximum(0.5 * lspan - tension * sld / (linm * g * lspan), 0.), lspan)
 
 
-def sag(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
-        sld: Union[float, np.ndarray], linm: Union[float, np.ndarray],
-        g=_GRAVITY) -> Union[float, np.ndarray]:
+def sag(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike,
+        g: floatArrayLike = _GRAVITY) -> floatArrayLike:
     """Cable sag.
 
     The sag is the vertical distance between the lowest point of the cable and
@@ -138,9 +133,8 @@ def sag(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
     return sld * x0 / lspan - shape(x0, lspan, tension, sld, linm)
 
 
-def max_chord(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
-              sld: Union[float, np.ndarray], linm: Union[float, np.ndarray],
-              g=_GRAVITY) -> Union[float, np.ndarray]:
+def max_chord(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike,
+              g: floatArrayLike = _GRAVITY) -> floatArrayLike:
     """Maximum value taken by chord length.
 
     A chord is a vertical line between a point on the cable and the line that
@@ -166,9 +160,9 @@ def max_chord(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray]
     return 0.125 * linm * g * lspan**2 / tension
 
 
-def stress(x: Union[float, np.ndarray], lspan: Union[float, np.ndarray],
-           tension: Union[float, np.ndarray], sld: Union[float, np.ndarray],
-           linm: Union[float, np.ndarray], g=_GRAVITY) -> Union[float, np.ndarray]:
+def stress(x: floatArrayLike, lspan: floatArrayLike,
+           tension: floatArrayLike, sld: floatArrayLike,
+           linm: floatArrayLike, g: floatArrayLike = _GRAVITY) -> floatArrayLike:
     """Stress modulus along cable.
 
     If more than one arg is an array, they must have the same size (no check).
@@ -194,9 +188,8 @@ def stress(x: Union[float, np.ndarray], lspan: Union[float, np.ndarray],
     return N
 
 
-def mean_stress(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarray],
-                sld: Union[float, np.ndarray], linm: Union[float, np.ndarray],
-                g=_GRAVITY) -> Union[float, np.ndarray]:
+def mean_stress(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike,
+                g: floatArrayLike = _GRAVITY) -> floatArrayLike:
     """Average stress in cable.
 
     If more than one arg is an array, they must have the same size (no check).
