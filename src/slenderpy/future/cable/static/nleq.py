@@ -6,7 +6,7 @@ from pyntb.optimize import qnewt2d_v
 
 from slenderpy.future._constant import _GRAVITY
 from slenderpy.future.cable.static import blondel
-from slenderpy.future.cable.static.parabolic import _g
+from slenderpy.future.cable.static.parabolic import _f
 
 _RTOL = 1.0E-12
 _MAXITER = 16
@@ -249,10 +249,9 @@ def mean_stress(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarra
     """
     if lcab is None or lve is None:
         lcab, lve = solve(lspan, tension, sld, linm, axs, g=g, rtol=rtol, maxiter=maxiter)
-    linw = linm * g
-    a_ = (tension / linw)**2
-    b_ = lve / linw
-    N = linw / lcab * (_g(lcab, a_, b_) - _g(0., a_, b_))
+    a = tension / (linm * g)
+    b = lve / tension
+    N = tension * a / lcab * (_f(lcab / a + b) - _f(b))
     return N
 
 

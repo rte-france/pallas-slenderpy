@@ -214,8 +214,7 @@ def mean_stress(lspan: Union[float, np.ndarray], tension: Union[float, np.ndarra
     Average stress (N). Return array has the same size as the given inputs.
 
     """
-    linw = linm * g
-    a_ = (tension / linw)**2
-    b_ = -(0.5 * lspan - tension * sld / (linw * lspan))
-    N = linw / lspan * (_g(lspan, a_, b_) - _g(0., a_, b_))
+    a = tension / (linm * g)
+    b = 0.5 * lspan / a - sld / lspan
+    N = tension * a / lspan * (_f(lspan / a - b) - _f(-b))
     return N
