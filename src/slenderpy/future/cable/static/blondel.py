@@ -5,8 +5,14 @@ from pyntb.polynomial import solve_p3_v
 from slenderpy.future import floatArrayLike
 
 
-def tension(weight: floatArrayLike, tension_i: floatArrayLike, temperature_i: floatArrayLike,
-            temperature_f: floatArrayLike, axs: floatArrayLike, alpha: floatArrayLike) -> floatArrayLike:
+def tension(
+    weight: floatArrayLike,
+    tension_i: floatArrayLike,
+    temperature_i: floatArrayLike,
+    temperature_f: floatArrayLike,
+    axs: floatArrayLike,
+    alpha: floatArrayLike,
+) -> floatArrayLike:
     """Compute new tension with temperature change.
 
     If more than one arg is an array, they must have the same size (no check).
@@ -26,16 +32,26 @@ def tension(weight: floatArrayLike, tension_i: floatArrayLike, temperature_i: fl
     the given inputs.
 
     """
-    a = 1. / axs
-    b = alpha * (temperature_f - temperature_i) - tension_i / axs + (weight / tension_i)**2 / 24
-    c = 0.
-    d = - weight**2 / 24
+    a = 1.0 / axs
+    b = (
+        alpha * (temperature_f - temperature_i)
+        - tension_i / axs
+        + (weight / tension_i) ** 2 / 24
+    )
+    c = 0.0
+    d = -(weight**2) / 24
     tension_f, _, _ = solve_p3_v(a, b, c, d)
     return tension_f
 
 
-def temperature(weight: floatArrayLike, tension_i: floatArrayLike, tension_f: floatArrayLike,
-                temperature_i: floatArrayLike, axs: floatArrayLike, alpha: floatArrayLike) -> floatArrayLike:
+def temperature(
+    weight: floatArrayLike,
+    tension_i: floatArrayLike,
+    tension_f: floatArrayLike,
+    temperature_i: floatArrayLike,
+    axs: floatArrayLike,
+    alpha: floatArrayLike,
+) -> floatArrayLike:
     """Inverse of tension function, ie compute new temperature given tension change.
 
     If more than one arg is an array, they must have the same size (no check).
@@ -55,5 +71,11 @@ def temperature(weight: floatArrayLike, tension_i: floatArrayLike, tension_f: fl
     inputs.
 
     """
-    return temperature_i + (weight**2 / 24 * (1. / tension_f**2 - 1. / tension_i**2) -
-                            (tension_f - tension_i) / axs) / alpha
+    return (
+        temperature_i
+        + (
+            weight**2 / 24 * (1.0 / tension_f**2 - 1.0 / tension_i**2)
+            - (tension_f - tension_i) / axs
+        )
+        / alpha
+    )

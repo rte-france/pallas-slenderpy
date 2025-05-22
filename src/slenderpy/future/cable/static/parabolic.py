@@ -19,8 +19,14 @@ def _g(x, a, b):
     return 0.5 * (y * s + a * np.log(y + s))
 
 
-def shape(x: floatArrayLike, lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike,
-          g: floatArrayLike = _GRAVITY) -> floatArrayLike:
+def shape(
+    x: floatArrayLike,
+    lspan: floatArrayLike,
+    tension: floatArrayLike,
+    sld: floatArrayLike,
+    linm: floatArrayLike,
+    g: floatArrayLike = _GRAVITY,
+) -> floatArrayLike:
     """Parabola equation for cable.
 
     If more than one arg is an array, they must have the same size (no check).
@@ -41,11 +47,16 @@ def shape(x: floatArrayLike, lspan: floatArrayLike, tension: floatArrayLike, sld
 
     """
     a = tension / (linm * g)
-    return 0.5 * x / a * (x + 2. * a * sld / lspan - lspan)
+    return 0.5 * x / a * (x + 2.0 * a * sld / lspan - lspan)
 
 
-def length(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike,
-           g: floatArrayLike = _GRAVITY) -> floatArrayLike:
+def length(
+    lspan: floatArrayLike,
+    tension: floatArrayLike,
+    sld: floatArrayLike,
+    linm: floatArrayLike,
+    g: floatArrayLike = _GRAVITY,
+) -> floatArrayLike:
     """Compute suspended cable length using a parabola model.
 
     If more than one arg is an array, they must have the same size (no check).
@@ -77,8 +88,13 @@ def length(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, 
     return a * (_f(z2) - _f(z1))
 
 
-def argsag(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike,
-           g: floatArrayLike = _GRAVITY) -> floatArrayLike:
+def argsag(
+    lspan: floatArrayLike,
+    tension: floatArrayLike,
+    sld: floatArrayLike,
+    linm: floatArrayLike,
+    g: floatArrayLike = _GRAVITY,
+) -> floatArrayLike:
     """Sag position.
 
     If more than one arg is an array, they must have the same size (no check).
@@ -97,11 +113,18 @@ def argsag(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, 
     same size as the given inputs.
 
     """
-    return np.minimum(np.maximum(0.5 * lspan - tension * sld / (linm * g * lspan), 0.), lspan)
+    return np.minimum(
+        np.maximum(0.5 * lspan - tension * sld / (linm * g * lspan), 0.0), lspan
+    )
 
 
-def sag(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike,
-        g: floatArrayLike = _GRAVITY) -> floatArrayLike:
+def sag(
+    lspan: floatArrayLike,
+    tension: floatArrayLike,
+    sld: floatArrayLike,
+    linm: floatArrayLike,
+    g: floatArrayLike = _GRAVITY,
+) -> floatArrayLike:
     """Cable sag.
 
     The sag is the vertical distance between the lowest point of the cable and
@@ -133,8 +156,13 @@ def sag(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, lin
     return sld * x0 / lspan - shape(x0, lspan, tension, sld, linm)
 
 
-def max_chord(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike,
-              g: floatArrayLike = _GRAVITY) -> floatArrayLike:
+def max_chord(
+    lspan: floatArrayLike,
+    tension: floatArrayLike,
+    sld: floatArrayLike,
+    linm: floatArrayLike,
+    g: floatArrayLike = _GRAVITY,
+) -> floatArrayLike:
     """Maximum value taken by chord length.
 
     A chord is a vertical line between a point on the cable and the line that
@@ -160,9 +188,14 @@ def max_chord(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLik
     return 0.125 * linm * g * lspan**2 / tension
 
 
-def stress(x: floatArrayLike, lspan: floatArrayLike,
-           tension: floatArrayLike, sld: floatArrayLike,
-           linm: floatArrayLike, g: floatArrayLike = _GRAVITY) -> floatArrayLike:
+def stress(
+    x: floatArrayLike,
+    lspan: floatArrayLike,
+    tension: floatArrayLike,
+    sld: floatArrayLike,
+    linm: floatArrayLike,
+    g: floatArrayLike = _GRAVITY,
+) -> floatArrayLike:
     """Stress modulus along cable.
 
     If more than one arg is an array, they must have the same size (no check).
@@ -184,12 +217,17 @@ def stress(x: floatArrayLike, lspan: floatArrayLike,
     """
     a = tension / (linm * g)
     b = 0.5 * lspan / a - sld / lspan
-    N = tension * np.sqrt(1. + (x / a - b)**2)
+    N = tension * np.sqrt(1.0 + (x / a - b) ** 2)
     return N
 
 
-def mean_stress(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike,
-                g: floatArrayLike = _GRAVITY) -> floatArrayLike:
+def mean_stress(
+    lspan: floatArrayLike,
+    tension: floatArrayLike,
+    sld: floatArrayLike,
+    linm: floatArrayLike,
+    g: floatArrayLike = _GRAVITY,
+) -> floatArrayLike:
     """Average stress in cable.
 
     If more than one arg is an array, they must have the same size (no check).

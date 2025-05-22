@@ -2,6 +2,7 @@
 
 import numpy as np
 from pyntb.optimize import bisect_v
+
 from slenderpy.future._constant import _GRAVITY
 from slenderpy.future.cable.static.nleq import _RTOL, _MAXITER, length as n_length
 from slenderpy.future.cable.static.parabolic import length as p_length, sag
@@ -24,20 +25,34 @@ def _natural_parabolic(lspan, tension, sld, linm, g=_GRAVITY):
     return _natural(length, tension, sld, linm)
 
 
-def _natural_nleq(lspan, tension, sld, linm, axs, g=_GRAVITY, rtol=_RTOL, maxiter=_MAXITER):
+def _natural_nleq(
+    lspan, tension, sld, linm, axs, g=_GRAVITY, rtol=_RTOL, maxiter=_MAXITER
+):
     """Get natural frequency using taut string formula and length from nleq models."""
     length = n_length(lspan, tension, sld, linm, axs, g=g, rtol=rtol, maxiter=maxiter)
     return _natural(length, tension, sld, linm)
 
 
-def natural(lspan, tension, sld, linm, axs=None, method='taut', g=_GRAVITY, rtol=_RTOL, maxiter=_MAXITER):
+def natural(
+    lspan,
+    tension,
+    sld,
+    linm,
+    axs=None,
+    method="taut",
+    g=_GRAVITY,
+    rtol=_RTOL,
+    maxiter=_MAXITER,
+):
     """Get natural frequency using taut string formula with different lengths according to arg method."""
-    if method == 'taut':
+    if method == "taut":
         return _natural_taut(lspan, tension, sld, linm)
-    elif method == 'parabolic':
+    elif method == "parabolic":
         return _natural_parabolic(lspan, tension, sld, linm, g=g)
-    elif method == 'nleq':
-        return _natural_nleq(lspan, tension, sld, linm, axs, g=g, rtol=rtol, maxiter=maxiter)
+    elif method == "nleq":
+        return _natural_nleq(
+            lspan, tension, sld, linm, axs, g=g, rtol=rtol, maxiter=maxiter
+        )
     else:
         raise ValueError()
 
@@ -48,8 +63,17 @@ def irvine_number(lspan, tension, sld, linm, axs, g=_GRAVITY):
     return np.sqrt(64 * r**2 * lspan / (1 + 8 * r**2) * axs / tension)
 
 
-def _irvine_frequencies(lspan: float, tension: float, sld: float, linm: float, axs: float, g=_GRAVITY,
-                        n: int = 10, tol: float = 1.0E-09, maxiter: int = 64) -> np.ndarray:
+def _irvine_frequencies(
+    lspan: float,
+    tension: float,
+    sld: float,
+    linm: float,
+    axs: float,
+    g=_GRAVITY,
+    n: int = 10,
+    tol: float = 1.0e-09,
+    maxiter: int = 64,
+) -> np.ndarray:
     """Compute Irvine frequencies.
 
     Solve transcendental equation in [Irvine1974]. Float version.
@@ -74,8 +98,17 @@ def _irvine_frequencies(lspan: float, tension: float, sld: float, linm: float, a
     return f0 * x / np.pi
 
 
-def _ip_frequencies(lspan: float, tension: float, sld: float, linm: float, axs: float, g=_GRAVITY,
-                    n: int = 10, tol: float = 1.0E-09, maxiter: int = 64) -> np.ndarray:
+def _ip_frequencies(
+    lspan: float,
+    tension: float,
+    sld: float,
+    linm: float,
+    axs: float,
+    g=_GRAVITY,
+    n: int = 10,
+    tol: float = 1.0e-09,
+    maxiter: int = 64,
+) -> np.ndarray:
     """Compute in-plane natural frequencies (normal direction).
 
     Parameters
@@ -88,13 +121,22 @@ def _ip_frequencies(lspan: float, tension: float, sld: float, linm: float, axs: 
     f0 = _natural_taut(lspan, tension, sld, linm)
     fq = f0 * np.arange(1, n + 1)
     ni = (1 + n) // 2
-    tf = _irvine_frequencies(lspan, tension, sld, linm, axs, n=ni, tol=tol, maxiter=maxiter)
+    tf = _irvine_frequencies(
+        lspan, tension, sld, linm, axs, n=ni, tol=tol, maxiter=maxiter
+    )
     fq[::2] = tf
     return fq
 
 
-def _op_frequencies(lspan: float, tension: float, sld: float, linm: float, axs: float, g=_GRAVITY,
-                    n: int = 10) -> np.ndarray:
+def _op_frequencies(
+    lspan: float,
+    tension: float,
+    sld: float,
+    linm: float,
+    axs: float,
+    g=_GRAVITY,
+    n: int = 10,
+) -> np.ndarray:
     """Compute out-of-plane natural frequencies (binormal direction).
 
     Parameters

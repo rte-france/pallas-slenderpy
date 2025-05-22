@@ -1,24 +1,27 @@
 """Utility functions hidden to the user."""
+
 from typing import Tuple, Optional
 
 import numpy as np
 import scipy.interpolate
 import scipy.sparse
 from scipy.optimize import brenth
+
 from slenderpy import fdm_utils as fdmu
 
 
 class ZeroForce:
     """Base class for a force to apply on a structure."""
 
-    def __call__(self,
-                 s: np.ndarray,
-                 t: float,
-                 un: Optional[np.ndarray] = None,
-                 ub: Optional[np.ndarray] = None,
-                 vn: Optional[np.ndarray] = None,
-                 vb: Optional[np.ndarray] = None) \
-            -> Tuple[np.ndarray, np.ndarray]:
+    def __call__(
+        self,
+        s: np.ndarray,
+        t: float,
+        un: Optional[np.ndarray] = None,
+        ub: Optional[np.ndarray] = None,
+        vn: Optional[np.ndarray] = None,
+        vb: Optional[np.ndarray] = None,
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute force value.
 
@@ -53,8 +56,7 @@ class ZeroForce:
         return fl, fd
 
 
-def geom_discretization(N: int = 501,
-                        delta: float = 0.001) -> np.ndarray:
+def geom_discretization(N: int = 501, delta: float = 0.001) -> np.ndarray:
     """Geometric discretization of [0, 1] interval.
 
     With refinement towards both ends.
@@ -81,29 +83,29 @@ def geom_discretization(N: int = 501,
 
     """
     if not isinstance(N, int):
-        raise TypeError('input N must be an int')
+        raise TypeError("input N must be an int")
     if N < 1:
-        raise ValueError('input N must be positive')
+        raise ValueError("input N must be positive")
     if N % 2 == 0:
         N += 1
     if not isinstance(delta, float):
-        raise TypeError('input delta must be a float')
-    if delta >= 1. / (N - 1):
-        raise ValueError('input delta too large')
+        raise TypeError("input delta must be a float")
+    if delta >= 1.0 / (N - 1):
+        raise ValueError("input delta too large")
     n = (N - 1) // 2
 
     def fun(x):
-        return 2. * delta * (x**n - 1.) + 1. - x
+        return 2.0 * delta * (x**n - 1.0) + 1.0 - x
 
-    q = brenth(fun, 1.0 + 1.0E-15, np.exp(np.log(0.5 / delta) / (n - 1)))
+    q = brenth(fun, 1.0 + 1.0e-15, np.exp(np.log(0.5 / delta) / (n - 1)))
     d = delta * np.power(q, np.arange(0, n, 1))
-    d = np.concatenate(([0.], d, np.flip(d)))
+    d = np.concatenate(([0.0], d, np.flip(d)))
     return np.cumsum(d)
 
 
 def spacediscr(ns):
     """Generate space discretization and other related values."""
-    s = np.linspace(0., 1., ns)
+    s = np.linspace(0.0, 1.0, ns)
     ds = np.diff(s)
     N = len(s)
     n = N - 2
@@ -145,10 +147,10 @@ def times(pm, tAd):
 
 def utef(un, ub, C, s, ds, vt2):
     """Compute tangential offset and axial force [Lee]."""
-    h = -1. / vt2 * un + 0.5 * ((C * un)**2 + (C * ub)**2)
+    h = -1.0 / vt2 * un + 0.5 * ((C * un) ** 2 + (C * ub) ** 2)
     H = 0.5 * (h[:-1] + h[1:]) * ds
-    ut = np.sum(H) * s - np.cumsum(np.concatenate(([0.], H)))
-    e = (C * ut) + 0.5 * ((C * ut)**2 + (C * un)**2 + (C * ub)**2)
+    ut = np.sum(H) * s - np.cumsum(np.concatenate(([0.0], H)))
+    e = (C * ut) + 0.5 * ((C * ut) ** 2 + (C * un) ** 2 + (C * ub) ** 2)
     ef = np.log(np.sqrt(1.0 + 2.0 * e))
     return ut, ef
 
@@ -189,10 +191,10 @@ def adim_force(force, s, t, dt, un, ub, vn, vb, tAd, L, uAd, m, g):
     vb_ = vb * uAd
     fn1, fb1 = force(s, t_, un_, ub_, vn_, vb_)
     fn2, fb2 = force(s, tp_, un_, ub_, vn_, vb_)
-    fn1 /= (m * g)
-    fb1 /= (m * g)
-    fn2 /= (m * g)
-    fb2 /= (m * g)
+    fn1 /= m * g
+    fb1 /= m * g
+    fn2 /= m * g
+    fb2 /= m * g
 
     return fn1, fn2, fb1, fb2
 
@@ -202,6 +204,6 @@ def adjust(y, c, bl, br, A, B, ds):
     y[0] = bl.c1c + bl.c1q * y[1]
     y[-1] = br.c1c + br.c1q * y[-2]
     c[1:-1] = A * y[1:-1] + B
-    c[0] = ((bl.c2c + bl.c2q * y[1]) - 2. * y[0] + y[1]) / ds**2
-    c[-1] = (y[-2] - 2. * y[-1] + (br.c2c + br.c2q * y[-2])) / ds**2
+    c[0] = ((bl.c2c + bl.c2q * y[1]) - 2.0 * y[0] + y[1]) / ds**2
+    c[-1] = (y[-2] - 2.0 * y[-1] + (br.c2c + br.c2q * y[-2])) / ds**2
     return y, c
