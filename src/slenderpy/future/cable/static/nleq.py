@@ -565,8 +565,6 @@ def thermal_expansion_tension(
 
     """
 
-    # """Compute new tension with temperature change."""
-
     # first equilibrium
     lcab_i, lve_i = solve(
         lspan, tension_i, sld, linm_i, axs, g=g, rtol=rtol, maxiter=maxiter

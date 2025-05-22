@@ -40,7 +40,9 @@ def tension(
     )
     c = 0.0
     d = -(weight**2) / 24
+
     tension_f, _, _ = solve_p3_v(a, b, c, d)
+
     return tension_f
 
 
