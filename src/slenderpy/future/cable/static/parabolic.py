@@ -297,7 +297,7 @@ def thermal_expansion_tension(
     weight = linm_i * g * length_i
 
     def fun(tension):
-        linm_f = linm_i * dl
+        linm_f = linm_i / dl
         return np.abs(length(lspan, tension, sld, linm_f, g) - length_f)
 
     tension_guess = blondel.tension(
@@ -350,7 +350,7 @@ def thermal_expansion_temperature(
     def fun(temperature):
         dl = 1.0 + alpha * (temperature - temperature_i)
         length_f = length_i * dl
-        linm_f = linm_i * dl
+        linm_f = linm_i / dl
         return np.abs(length(lspan, tension_f, sld, linm_f, g) - length_f)
 
     temperature_guess = blondel.temperature(
