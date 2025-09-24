@@ -65,8 +65,6 @@ def parabolic_vs_catenary_vs_nleq():
 def compare_all(lspan=400.0, ratio=0.25, sld=0.0):
     """Quick plot script to make visual check"""
 
-    # NB: we can see that the sag/argsag functions in cable are max chord and not sag ...
-
     # lspan = 100.
     # ratio = 0.01
     # sld = 10.
