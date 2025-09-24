@@ -8,7 +8,7 @@ mkdir -p $ENV_DIR
 VENV=${ENV_DIR}/pallas-slenderpy-uv
 VLNK=.venv
 ln -sf $VENV $VLNK
-uv venv $VENV  # --python 3.11
+uv venv $VENV --python-preference=system # --python 3.11
 source $VENV/bin/activate
 # .venv\Scripts\activate
 
