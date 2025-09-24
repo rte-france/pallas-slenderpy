@@ -155,7 +155,7 @@ def sag(
     # h = sld
     # sag = 0.5 / a * (l / 2 - a*h/l) * (l / 2 + a*h/l)
     x0 = argsag(lspan, tension, sld, linm, g=g)
-    return sld * x0 / lspan - shape(x0, lspan, tension, sld, linm)
+    return sld * x0 / lspan - shape(x0, lspan, tension, sld, linm, g=g)
 
 
 def max_chord(
