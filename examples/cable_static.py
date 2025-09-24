@@ -3,6 +3,7 @@ import numpy as np
 
 from slenderpy.future._constant import _GRAVITY
 from slenderpy.future.cable.static import blondel
+from slenderpy.future.cable.static import catenary
 from slenderpy.future.cable.static import nleq
 from slenderpy.future.cable.static import parabolic
 
@@ -15,7 +16,7 @@ def _aster570():
     return linm, axs, rts, alpha
 
 
-def parabolic_vs_nleq():
+def parabolic_vs_catenary_vs_nleq():
     """Check differences between parabolic and nleq models when everything
     except mechanical tension is set."""
 
@@ -31,10 +32,14 @@ def parabolic_vs_nleq():
     xa1 = np.linspace(0, lspan * np.ones_like(tension), 401)
     ya1 = parabolic.shape(xa1, lspan, tension, sld, linm)
 
+    # position (catenary)
+    xa2 = np.array(xa1)
+    ya2 = catenary.shape(xa1, lspan, tension, sld, linm)
+
     # position (nleq)
     lcab, lve = nleq.solve(lspan, tension, sld, linm, axs, rtol=1.0e-99, maxiter=2)
     s = np.linspace(0, lcab * np.ones_like(tension), 401)
-    xa2, ya2 = nleq.shape(s, lspan, tension, sld, linm, axs, lcab=lcab, lve=lve)
+    xa3, ya3 = nleq.shape(s, lspan, tension, sld, linm, axs, lcab=lcab, lve=lve)
 
     # sag-to-length ratio
     ratio = nleq.sag(lspan, tension, sld, linm, axs) / np.sqrt(lspan**2 + sld**2)
@@ -47,7 +52,8 @@ def parabolic_vs_nleq():
         plt.plot(
             xa1[:, n], ya1[:, n], c=f"C{n}", ls="-", label=f"parabolic r={ratio[n]:.3f}"
         )
-        plt.plot(xa2[:, n], ya2[:, n], c=f"C{n}", ls="--", label="nleq")
+        plt.plot(xa2[:, n], ya2[:, n], c=f"C{n}", ls="--", label="catenary")
+        plt.plot(xa3[:, n], ya3[:, n], c=f"C{n}", ls=":", lw=2, label="nleq")
     plt.grid(True)
     plt.xlabel("$x$ (m)")
     plt.ylabel("$y$ (m)")
@@ -100,32 +106,37 @@ def compare_all(lspan=400.0, ratio=0.25, sld=0.0):
     sx_ = np.max(nleq.stress(1001, lspan, tension, sld, linm, axs, lcab=lcab, lve=lve))
     sa_ = nleq.mean_stress(lspan, tension, sld, linm, axs, lcab=lcab, lve=lve)
 
-    # [old] [catenary]
-    from slenderpy.future._constant import _GRAVITY
-    import slenderpy.cable as sc
+    # [catenary] compute cable stuff
 
     # static shape
-    s = np.linspace(0, 1, 101)
-    a = tension / (linm * _GRAVITY)
-    y = sc._alts(s, lspan, a, sld)
-
+    xc = np.linspace(0, 1, 101)
+    yc = catenary.shape(xc, lspan, tension, sld, linm)
+    # cable length
+    lc = catenary.length(lspan, tension, sld, linm)
+    # cable sag
+    sagc = catenary.sag(lspan, tension, sld, linm)
     # sag points
-    xc = sc.argsag(lspan, a, sld) * lspan
-    yc = sc._alts(xc / lspan, lspan, a, sld)
+    xu = catenary.argsag(lspan, tension, sld, linm)
+    yu = catenary.shape(xu, lspan, tension, sld, linm)
+    # stress
+    nn = float("nan")
+    # > not implemented yet
 
     # [print]
     print(f"[all] flat length  {lspan:.6f}")
     print(f"[all] 3dim length  {np.sqrt(lspan**2 + sld**2):.6f}")
     print(f"[pbl] cable length {length:.6f}")
-    print(f"[cat] cable length {sc.catenary_length(lspan, a, sld):.6f}")
+    print(f"[cat] cable length {lc:.6f}")
     print(f"[nle] cable len 0  {lcab:.6f}")
     print(f"[nle] cable len 1  {length_:.6f}")
     print(f"[pbl] sag          {sag:.6f}")
-    print(f"[cat] sag          {sc.sag(lspan, a, sld):.6f}")
+    print(f"[cat] sag          {sagc:.6f}")
     print(f"[nle] sag          {sag_:.6f}")
     print(f"[pbl] max stress   {sx:.6f}")
+    print(f"[cat] max stress   {nn:.6f}")
     print(f"[nle] max stress   {sx_:.6f}")
     print(f"[pbl] avg stress   {sa:.6f}")
+    print(f"[cat] avg stress   {nn:.6f}")
     print(f"[nle] avg stress   {sa_:.6f}")
 
     # [plot]
@@ -135,8 +146,8 @@ def compare_all(lspan=400.0, ratio=0.25, sld=0.0):
     plt.plot([xs, xs], [ys, xs * sld / lspan], ls="--", c="C0")
     plt.plot(xn, yn, label="NL eq.", c="C1")
     plt.plot([xt, xt], [yt, xt * sld / lspan], ls="--", c="C1")
-    plt.plot(s * lspan, y, c="C2", label="catenary")
-    plt.plot([xc, xc], [yc, xc * sld / lspan], ls="--", c="C2")
+    plt.plot(xc, yc, c="C2", label="catenary")
+    plt.plot([xu, xu], [yu, xu * sld / lspan], ls="--", c="C2")
     plt.legend()
     plt.xlabel("$x$")
     plt.ylabel("$y$")
@@ -202,10 +213,10 @@ if __name__ == "__main__":
     matplotlib.use("TkAgg")
     plt.close("all")
 
-    parabolic_vs_nleq()
+    parabolic_vs_catenary_vs_nleq()
 
     compare_all(lspan=400.0, ratio=0.25, sld=10.0)
     print()
     compare_all(lspan=100.0, ratio=0.01, sld=15.0)
-
+    #
     test_blondel()
