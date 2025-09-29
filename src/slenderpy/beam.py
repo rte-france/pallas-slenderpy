@@ -5,6 +5,7 @@ from typing import Tuple, List, Union, Optional, Callable
 import numpy as np
 import scipy as sp
 from scipy.optimize import newton
+
 from slenderpy import _cable_utils as cbu
 from slenderpy import _progress_bar as spb
 from slenderpy import fdm_utils as fdu

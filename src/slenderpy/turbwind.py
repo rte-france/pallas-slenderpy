@@ -6,6 +6,7 @@ from typing import Optional
 
 import numpy as np
 from scipy.interpolate import RectBivariateSpline
+
 from slenderpy import _progress_bar as spb
 from slenderpy import wind
 

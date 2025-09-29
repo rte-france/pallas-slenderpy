@@ -8,3 +8,5 @@ __pycache__
 build
 dist
 doc/_build
+_build
+meta.yaml

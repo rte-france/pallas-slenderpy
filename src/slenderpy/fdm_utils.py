@@ -21,10 +21,10 @@ class BoundaryCondition:
         Input t1 and t2 are tuples with four floats each such that
         ti = (ai, bi, ci, di) for i in {1, 2} and:
             a1 * y(b) + b1 * (dy/dx)(b) * c1 * (d2y/dx2)(b) = d1
-            a2 * y(b) + b2 * (dy/dx)(b) * c2 * (d2y/dx2)(b) = d
+            a2 * y(b) + b2 * (dy/dx)(b) * c2 * (d2y/dx2)(b) = d2
 
         b is the bound defined by pos (min for left, max for right). The
-        equation system defined by both tuples shoud have a nonzero det.
+        equation system defined by both tuples should have a nonzero det.
 
         If None values are used for t1 or t2, Dirichlet boundary conditions are
         used.
@@ -91,8 +91,9 @@ class BoundaryCondition:
         if det == 0.0:
             raise ValueError("Matrix is singular")
         self.c1c = (B2 * d1 - B1 * d2) / det
-        self.c1q = (B2 * C1 - B1 * C2) / det
         self.c2c = (A1 * d2 - A2 * d1) / det
+
+        self.c1q = (B2 * C1 - B1 * C2) / det
         self.c2q = (A1 * C2 - A2 * C1) / det
 
 
@@ -108,7 +109,7 @@ def rot_none(pos, y=0.0, dy=0.0):
 
 def d2M_cst(
     n: int, ds: float, bcl: BoundaryCondition, bcr: BoundaryCondition
-) -> Tuple[scipy.sparse.dia.dia_matrix, np.ndarray]:
+) -> Tuple[scipy.sparse.dia_matrix, np.ndarray]:
     """Get finite difference matrix for second-order derivative on a uniform discretization.
 
     Compute matrix and boundary condition vector for finite-difference space
@@ -128,7 +129,7 @@ def d2M_cst(
 
     Returns
     -------
-    scipy.sparse.dia.dia_matrix
+    scipy.sparse.dia_matrix
         Derivative matrix.
     numpy.ndarray
         Boundary condition vector.
@@ -151,7 +152,7 @@ def d2M_cst(
 
 def d4M_cst(
     n: int, ds: float, bcl: BoundaryCondition, bcr: BoundaryCondition
-) -> Tuple[scipy.sparse.dia.dia_matrix, np.ndarray]:
+) -> Tuple[scipy.sparse.dia_matrix, np.ndarray]:
     """Get finite difference matrix for fourth-order derivative on a uniform discretization.
 
     Compute matrix and boundary condition vector for finite-difference space
@@ -171,7 +172,7 @@ def d4M_cst(
 
     Returns
     -------
-    scipy.sparse.dia.dia_matrix
+    scipy.sparse.dia_matrix
         Derivative matrix.
     numpy.ndarray
         Boundary condition vector.
@@ -201,7 +202,7 @@ def d4M_cst(
     return D / ds**4, d / ds**4
 
 
-def d2M(ds: np.ndarray) -> scipy.sparse.dia.dia_matrix:
+def d2M(ds: np.ndarray) -> scipy.sparse.dia_matrix:
     """Get finite difference matrix for second-order derivative.
 
     Compute matrix for finite-difference space second derivative on a general
@@ -216,7 +217,7 @@ def d2M(ds: np.ndarray) -> scipy.sparse.dia.dia_matrix:
 
     Returns
     -------
-    scipy.sparse.dia.dia_matrix
+    scipy.sparse.dia_matrix
         Derivative matrix.
     """
     h1 = ds[:-1]
@@ -227,7 +228,7 @@ def d2M(ds: np.ndarray) -> scipy.sparse.dia.dia_matrix:
     return sp.sparse.diags([dinf[1:], diag, dsup[:-1]], [-1, 0, 1])
 
 
-def d1M(ds: np.ndarray) -> scipy.sparse.dia.dia_matrix:
+def d1M(ds: np.ndarray) -> scipy.sparse.dia_matrix:
     """Get finite difference matrix for first-order derivative.
 
     Compute matrix for finite-difference space first derivative on a general
@@ -242,7 +243,7 @@ def d1M(ds: np.ndarray) -> scipy.sparse.dia.dia_matrix:
 
     Returns
     -------
-    scipy.sparse.dia.dia_matrix
+    scipy.sparse.dia_matrix
         Derivative matrix.
     """
     h1 = ds[:-1]

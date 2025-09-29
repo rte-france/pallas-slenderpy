@@ -6,33 +6,12 @@ from typing import Tuple, Union, Callable, Optional
 
 import numpy as np
 import scipy as sp
+from pyntb.optimize import qnewt2d_v
 from scipy.linalg import solve_banded
+
 from slenderpy import _cable_utils as cbu
 from slenderpy import _progress_bar as spb
 from slenderpy import simtools
-
-
-def _newt2dv(f1, f2, x0, y0, epsilon=1.0e-12, maxiter=64, dx=1.0e-03, dy=1.0e-03):
-    """2D quasi-Newton with arrays."""
-    q = 1.0
-    c = 0
-    x = x0
-    y = y0
-    while q > epsilon and c < maxiter:
-        F1 = f1(x, y)
-        F2 = f2(x, y)
-        Ja = 0.5 * (f1(x + dx, y) - f1(x - dx, y)) / dx
-        Jb = 0.5 * (f1(x, y + dy) - f1(x, y - dy)) / dy
-        Jc = 0.5 * (f2(x + dx, y) - f2(x - dx, y)) / dx
-        Jd = 0.5 * (f2(x, y + dy) - f2(x, y - dy)) / dy
-        di = 1.0 / (Ja * Jd - Jb * Jc)
-        ex = di * (Jd * F1 - Jb * F2)
-        ey = di * (Ja * F2 - Jc * F1)
-        x -= ex
-        y -= ey
-        q = max(np.nanmax(np.abs(ex / x)), np.nanmax(np.abs(ey / y)))
-        c += 1
-    return x, y, c, np.maximum(np.abs(ex / x), np.abs(ey / y))
 
 
 def _solve_p3(c1, c2, c3):
@@ -143,6 +122,34 @@ def _alts(s, Lp, a, h):
     return __alts(Lp, a, x, s)
 
 
+def argsag(
+    Lp: Union[float, np.ndarray],
+    a: Union[float, np.ndarray],
+    h: Union[float, np.ndarray],
+) -> Union[float, np.ndarray]:
+    """Find curvilinear abscissa where sag occurs.
+
+    Parameters
+    ----------
+    Lp : float or numpy.ndarray
+        Span length (m).
+    a : float or numpy.ndarray
+        Mechanical parameter or catenary constant (m).
+    h : float or numpy.ndarray
+        Height difference between anchors (m).
+
+    Returns
+    -------
+    float or numpy.ndarray (depending on input)
+        Sag (m).
+
+    """
+    L = catenary_length(Lp, a, h)
+    q = _q_factor(L, h)
+    x = 0.5 * (a * q - Lp)
+    return (a * np.arcsinh(h / Lp) - x) / Lp
+
+
 def sag(
     Lp: Union[float, np.ndarray],
     a: Union[float, np.ndarray],
@@ -168,7 +175,7 @@ def sag(
     L = catenary_length(Lp, a, h)
     q = _q_factor(L, h)
     x = 0.5 * (a * q - Lp)
-    s = (a * np.arcsinh(h / Lp) - x) / Lp
+    s = argsag(Lp, a, h)
     return s * h - __alts(Lp, a, 2.0 * x, s)
 
 
@@ -249,7 +256,7 @@ def tension_corr_temperature(
     def f2(v, l):
         return phi2(l, v, H, 0.0) - l * sv / cv
 
-    v_, l_, _, qa = _newt2dv(f1, f2, v_, l_, epsilon=epsilon, maxiter=maxiter)
+    v_, l_, _, qa = qnewt2d_v(f1, f2, v_, l_, rtol=epsilon, maxiter=maxiter)
 
     # (2) find tension
 
@@ -262,7 +269,7 @@ def tension_corr_temperature(
         return phi2(L0, v, h, dT) - L0 * sv / cv
 
     h_ = _blondel(m, EA, al, L0, H, dT, g=g)
-    v_, h_, _, qb = _newt2dv(g1, g2, v_, h_, epsilon=epsilon, maxiter=maxiter)
+    v_, h_, _, qb = qnewt2d_v(g1, g2, v_, h_, rtol=epsilon, maxiter=maxiter)
 
     return h_, np.maximum(qa, qb)
 
@@ -540,6 +547,7 @@ def solve(
     vn0: Optional[np.ndarray] = None,
     vb0: Optional[np.ndarray] = None,
     remove_cat: bool = False,
+    cfl_hint=None,
 ) -> simtools.Results:
     """EOM solver for a suspended cable and an external force.
 
@@ -607,6 +615,21 @@ def solve(
         h = -1.0 / vt2 * un + 0.5 * ((C * un) ** 2 + (C * ub) ** 2)
         e = 0.5 * np.sum((h[:-1] + h[1:]) * ds)
         b = vt2 + vl2 * e
+
+        cfl = np.sqrt(b) * dt / np.min(ds)
+        if cfl_hint is not None and cfl > 1.0:
+            msg = (
+                f"CFL condition is not met: c={cfl:.2E}; increase the number of timesteps (dt={dt}) or decrease the"
+                f"number of space points (dx={np.min(ds)})."
+            )
+            if cfl_hint == "err":
+                raise RuntimeError(msg)
+            elif cfl_hint == "print":
+                print(msg)
+            else:
+                raise ValueError(
+                    "Wrong value for cfl_hint (must be in [None, 'err', 'print'])."
+                )
 
         fn1, fn2, fb1, fb2 = cbu.adim_force(
             force, s, t, dt, un, ub, vn, vb, tAd, cb.L, uAd, cb.m, cb.g
