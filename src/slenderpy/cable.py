@@ -569,7 +569,7 @@ def solve(
     vn0: Optional[np.ndarray] = None,
     vb0: Optional[np.ndarray] = None,
     remove_cat: bool = False,
-    cfl_hint = None,
+    cfl_hint=None,
 ) -> simtools.Results:
     """EOM solver for a suspended cable and an external force.
 
