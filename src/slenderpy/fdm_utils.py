@@ -91,8 +91,9 @@ class BoundaryCondition:
         if det == 0.0:
             raise ValueError("Matrix is singular")
         self.c1c = (B2 * d1 - B1 * d2) / det
-        self.c1q = (B2 * C1 - B1 * C2) / det
         self.c2c = (A1 * d2 - A2 * d1) / det
+
+        self.c1q = (B2 * C1 - B1 * C2) / det
         self.c2q = (A1 * C2 - A2 * C1) / det
 
 
