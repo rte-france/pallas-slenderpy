@@ -2,6 +2,7 @@
 
 import numpy as np
 import scipy as sp
+
 from slenderpy import _cable_utils as cbu
 from slenderpy import _progress_bar as spb
 from slenderpy import cable

@@ -16,11 +16,11 @@ sys.path.insert(0, os.path.abspath("../"))
 # -- Project information -----------------------------------------------------
 
 project = "slenderpy"
-copyright = "2024, RTE & Eurobios Mews Labs"
-author = "Eurobios Mews Labs"
+copyright = "2025, RTE & Mews Labs"
+author = "Mews Labs"
 
 # The full version, including alpha/beta/rc tags
-release = "2024.0.0"
+release = "2025.0.0"
 
 # -- General configuration ---------------------------------------------------
 

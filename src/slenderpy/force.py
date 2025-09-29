@@ -3,6 +3,7 @@
 from typing import Optional, Union, Tuple, Any
 
 import numpy as np
+
 from slenderpy.wind import air_volumic_mass
 
 

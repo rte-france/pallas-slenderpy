@@ -1,18 +1,18 @@
 """Using Blondel formulae to compute changes of tension or temperature."""
 
-import numpy as np
 from pyntb.polynomial import solve_p3_v
-from typing import Union
+
+from slenderpy.future import floatArrayLike
 
 
 def tension(
-    weight: Union[float, np.ndarray],
-    tension_i: Union[float, np.ndarray],
-    temperature_i: Union[float, np.ndarray],
-    temperature_f: Union[float, np.ndarray],
-    axs: Union[float, np.ndarray],
-    alpha: Union[float, np.ndarray],
-) -> Union[float, np.ndarray]:
+    weight: floatArrayLike,
+    tension_i: floatArrayLike,
+    temperature_i: floatArrayLike,
+    temperature_f: floatArrayLike,
+    axs: floatArrayLike,
+    alpha: floatArrayLike,
+) -> floatArrayLike:
     """Compute new tension with temperature change.
 
     If more than one arg is an array, they must have the same size (no check).
@@ -40,18 +40,20 @@ def tension(
     )
     c = 0.0
     d = -(weight**2) / 24
+
     tension_f, _, _ = solve_p3_v(a, b, c, d)
+
     return tension_f
 
 
 def temperature(
-    weight: Union[float, np.ndarray],
-    tension_i: Union[float, np.ndarray],
-    tension_f: Union[float, np.ndarray],
-    temperature_i: Union[float, np.ndarray],
-    axs: Union[float, np.ndarray],
-    alpha: Union[float, np.ndarray],
-) -> Union[float, np.ndarray]:
+    weight: floatArrayLike,
+    tension_i: floatArrayLike,
+    tension_f: floatArrayLike,
+    temperature_i: floatArrayLike,
+    axs: floatArrayLike,
+    alpha: floatArrayLike,
+) -> floatArrayLike:
     """Inverse of tension function, ie compute new temperature given tension change.
 
     If more than one arg is an array, they must have the same size (no check).

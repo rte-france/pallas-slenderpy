@@ -1,10 +1,11 @@
 """Small sag cable functions."""
 
-from typing import Union
-
 import numpy as np
+from scipy.optimize import root
 
+from slenderpy.future import floatArrayLike
 from slenderpy.future._constant import _GRAVITY
+from slenderpy.future.cable.static import blondel
 
 
 def _f(z: float) -> float:
@@ -21,13 +22,13 @@ def _g(x, a, b):
 
 
 def shape(
-    x: Union[float, np.ndarray],
-    lspan: Union[float, np.ndarray],
-    tension: Union[float, np.ndarray],
-    sld: Union[float, np.ndarray],
-    linm: Union[float, np.ndarray],
-    g=_GRAVITY,
-) -> Union[float, np.ndarray]:
+    x: floatArrayLike,
+    lspan: floatArrayLike,
+    tension: floatArrayLike,
+    sld: floatArrayLike,
+    linm: floatArrayLike,
+    g: floatArrayLike = _GRAVITY,
+) -> floatArrayLike:
     """Parabola equation for cable.
 
     If more than one arg is an array, they must have the same size (no check).
@@ -52,12 +53,12 @@ def shape(
 
 
 def length(
-    lspan: Union[float, np.ndarray],
-    tension: Union[float, np.ndarray],
-    sld: Union[float, np.ndarray],
-    linm: Union[float, np.ndarray],
-    g=_GRAVITY,
-) -> Union[float, np.ndarray]:
+    lspan: floatArrayLike,
+    tension: floatArrayLike,
+    sld: floatArrayLike,
+    linm: floatArrayLike,
+    g: floatArrayLike = _GRAVITY,
+) -> floatArrayLike:
     """Compute suspended cable length using a parabola model.
 
     If more than one arg is an array, they must have the same size (no check).
@@ -90,12 +91,12 @@ def length(
 
 
 def argsag(
-    lspan: Union[float, np.ndarray],
-    tension: Union[float, np.ndarray],
-    sld: Union[float, np.ndarray],
-    linm: Union[float, np.ndarray],
-    g=_GRAVITY,
-) -> Union[float, np.ndarray]:
+    lspan: floatArrayLike,
+    tension: floatArrayLike,
+    sld: floatArrayLike,
+    linm: floatArrayLike,
+    g: floatArrayLike = _GRAVITY,
+) -> floatArrayLike:
     """Sag position.
 
     If more than one arg is an array, they must have the same size (no check).
@@ -120,12 +121,12 @@ def argsag(
 
 
 def sag(
-    lspan: Union[float, np.ndarray],
-    tension: Union[float, np.ndarray],
-    sld: Union[float, np.ndarray],
-    linm: Union[float, np.ndarray],
-    g=_GRAVITY,
-) -> Union[float, np.ndarray]:
+    lspan: floatArrayLike,
+    tension: floatArrayLike,
+    sld: floatArrayLike,
+    linm: floatArrayLike,
+    g: floatArrayLike = _GRAVITY,
+) -> floatArrayLike:
     """Cable sag.
 
     The sag is the vertical distance between the lowest point of the cable and
@@ -154,16 +155,16 @@ def sag(
     # h = sld
     # sag = 0.5 / a * (l / 2 - a*h/l) * (l / 2 + a*h/l)
     x0 = argsag(lspan, tension, sld, linm, g=g)
-    return sld * x0 / lspan - shape(x0, lspan, tension, sld, linm)
+    return sld * x0 / lspan - shape(x0, lspan, tension, sld, linm, g=g)
 
 
 def max_chord(
-    lspan: Union[float, np.ndarray],
-    tension: Union[float, np.ndarray],
-    sld: Union[float, np.ndarray],
-    linm: Union[float, np.ndarray],
-    g=_GRAVITY,
-) -> Union[float, np.ndarray]:
+    lspan: floatArrayLike,
+    tension: floatArrayLike,
+    sld: floatArrayLike,
+    linm: floatArrayLike,
+    g: floatArrayLike = _GRAVITY,
+) -> floatArrayLike:
     """Maximum value taken by chord length.
 
     A chord is a vertical line between a point on the cable and the line that
@@ -190,13 +191,13 @@ def max_chord(
 
 
 def stress(
-    x: Union[float, np.ndarray],
-    lspan: Union[float, np.ndarray],
-    tension: Union[float, np.ndarray],
-    sld: Union[float, np.ndarray],
-    linm: Union[float, np.ndarray],
-    g=_GRAVITY,
-) -> Union[float, np.ndarray]:
+    x: floatArrayLike,
+    lspan: floatArrayLike,
+    tension: floatArrayLike,
+    sld: floatArrayLike,
+    linm: floatArrayLike,
+    g: floatArrayLike = _GRAVITY,
+) -> floatArrayLike:
     """Stress modulus along cable.
 
     If more than one arg is an array, they must have the same size (no check).
@@ -223,12 +224,12 @@ def stress(
 
 
 def mean_stress(
-    lspan: Union[float, np.ndarray],
-    tension: Union[float, np.ndarray],
-    sld: Union[float, np.ndarray],
-    linm: Union[float, np.ndarray],
-    g=_GRAVITY,
-) -> Union[float, np.ndarray]:
+    lspan: floatArrayLike,
+    tension: floatArrayLike,
+    sld: floatArrayLike,
+    linm: floatArrayLike,
+    g: floatArrayLike = _GRAVITY,
+) -> floatArrayLike:
     """Average stress in cable.
 
     If more than one arg is an array, they must have the same size (no check).
@@ -246,8 +247,116 @@ def mean_stress(
     Average stress (N). Return array has the same size as the given inputs.
 
     """
-    linw = linm * g
-    a_ = (tension / linw) ** 2
-    b_ = -(0.5 * lspan - tension * sld / (linw * lspan))
-    N = linw / lspan * (_g(lspan, a_, b_) - _g(0.0, a_, b_))
+    a = tension / (linm * g)
+    b = 0.5 * lspan / a - sld / lspan
+    N = tension * a / lspan * (_f(lspan / a - b) - _f(-b))
     return N
+
+
+_RTOL = 1.0e-12
+_MAXITER = 16
+
+
+def thermal_expansion_tension(
+    lspan: floatArrayLike,
+    tension_i: floatArrayLike,
+    sld: floatArrayLike,
+    temperature_i: floatArrayLike,
+    temperature_f: floatArrayLike,
+    linm_i: floatArrayLike,
+    alpha: floatArrayLike,
+    g: floatArrayLike = _GRAVITY,
+):
+    """Compute new tension with temperature change.
+
+    If more than one arg is an array, they must have the same size (no check).
+
+    Parameters
+    ----------
+    lspan : span length (m)
+    tension_i : initial mechanical tension (N)
+    sld : support level difference (m)
+    temperature_i : initial temperature of cable (K)
+    temperature_f : final temperature of cable (K)
+    linm_i : initial linear mass (kg.m**-1)
+    axs : axial stiffness (N)
+    alpha : thermal expansion coefficient (K**-1)
+    g : gravitational acceleration (m.s**-2)
+    rtol : relative tolerance for quasi-newton algorithm
+    maxiter : maximum number of iterations in quasi-newton algorithm
+
+    Returns
+    -------
+    Mechanical tension in final state (N). Return array has the same size as
+    the given inputs.
+
+    """
+    length_i = length(lspan, tension_i, sld, linm_i, g)
+    dl = 1.0 + alpha * (temperature_f - temperature_i)
+    length_f = length_i * dl
+    weight = linm_i * g * length_i
+
+    def fun(tension):
+        linm_f = linm_i / dl
+        return np.abs(length(lspan, tension, sld, linm_f, g) - length_f)
+
+    tension_guess = blondel.tension(
+        weight, tension_i, temperature_i, temperature_f, 1.0e12, alpha
+    )
+
+    sol = root(fun, tension_guess)
+
+    return sol.x
+
+
+def thermal_expansion_temperature(
+    lspan: floatArrayLike,
+    tension_i: floatArrayLike,
+    tension_f: floatArrayLike,
+    sld: floatArrayLike,
+    temperature_i: floatArrayLike,
+    linm_i: floatArrayLike,
+    alpha: floatArrayLike,
+    g: floatArrayLike = _GRAVITY,
+):
+    """Inverse of thermexp_tension, ie compute new temperature with tension change.
+
+    If more than one arg is an array, they must have the same size (no check).
+
+    Parameters
+    ----------
+    lspan : span length (m)
+    tension_i : initial mechanical tension (N)
+    tension_f : final mechanical tension (N)
+    sld : support level difference (m)
+    temperature_i : initial temperature of cable (K)
+    linm_i : initial linear mass (kg.m**-1)
+    axs : axial stiffness (N)
+    alpha : thermal expansion coefficient (K**-1)
+    g : gravitational acceleration (m.s**-2)
+    rtol : relative tolerance for quasi-newton algorithm
+    maxiter : maximum number of iterations in quasi-newton algorithm
+
+    Returns
+    -------
+    Mechanical tension in final state (N). Return array has the same size as
+    the given inputs.
+
+    """
+
+    length_i = length(lspan, tension_i, sld, linm_i, g)
+    weight = linm_i * g * length_i
+
+    def fun(temperature):
+        dl = 1.0 + alpha * (temperature - temperature_i)
+        length_f = length_i * dl
+        linm_f = linm_i / dl
+        return np.abs(length(lspan, tension_f, sld, linm_f, g) - length_f)
+
+    temperature_guess = blondel.temperature(
+        weight, tension_i, tension_f, temperature_i, 1.0e12, alpha
+    )
+
+    sol = root(fun, temperature_guess)
+
+    return sol.x

@@ -15,10 +15,10 @@ def test_shape(ast570, random_spans):
     x, y = nleq.shape(nx, lspan, tension, sld, linm, axs)
 
     assert (
-        np.all(np.isclose(x[0, :], 0.0, atol=tol))
-        and np.all(np.isclose(x[-1, :], lspan, atol=tol))
-        and np.all(np.isclose(y[0, :], 0.0, atol=tol))
-        and np.all(np.isclose(y[-1, :], sld, atol=tol))
+        np.allclose(x[0, :], 0.0, atol=tol)
+        and np.allclose(x[-1, :], lspan, atol=tol)
+        and np.allclose(y[0, :], 0.0, atol=tol)
+        and np.allclose(y[-1, :], sld, atol=tol)
     )
 
 
@@ -40,7 +40,7 @@ def test_stress(ast570, random_spans):
     sm1 = nleq.mean_stress(lspan, tension, sld, linm, axs, lcab=lcab, lve=lve)
     sm2 = np.sum(0.5 * (n[1:] + n[:-1]) * np.diff(s, axis=0), axis=0) / lcab
 
-    assert np.all(np.isclose(sm1, sm2, atol=atol, rtol=rtol))
+    assert np.allclose(sm1, sm2, atol=atol, rtol=rtol)
 
 
 def test_length(ast570, random_spans):
@@ -94,8 +94,8 @@ def test_sag(ast570, random_spans):
     atolx = 0.5 * np.abs(x2[2, :] - x2[0, :])
     atoly = 0.5 * np.maximum(np.abs(y2[0, :] - y2[1, :]), np.abs(y2[1, :] - y2[2, :]))
 
-    assert np.all(np.isclose(x1, x0, atol=atolx, rtol=rtol)) and np.all(
-        np.isclose(s1, s0, atol=atoly, rtol=rtol)
+    assert np.allclose(x1, x0, atol=atolx, rtol=rtol) and np.allclose(
+        s1, s0, atol=atoly, rtol=rtol
     )
 
 
@@ -130,6 +130,6 @@ def test_chord(ast570, random_spans):
     atolx = 0.5 * np.abs(x2[2, :] - x2[0, :])
     atoly = 0.5 * np.maximum(np.abs(y2[0, :] - y2[1, :]), np.abs(y2[1, :] - y2[2, :]))
 
-    assert np.all(np.isclose(x1, x0, atol=atolx, rtol=rtol)) and np.all(
-        np.isclose(s1, s0, atol=atoly, rtol=rtol)
+    assert np.allclose(x1, x0, atol=atolx, rtol=rtol) and np.allclose(
+        s1, s0, atol=atoly, rtol=rtol
     )
