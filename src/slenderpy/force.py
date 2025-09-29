@@ -9,14 +9,16 @@ from slenderpy.wind import air_volumic_mass
 class WOP:
     """Wake oscillator parameterss."""
 
-    def __init__(self,
-                 u: Optional[float] = None,
-                 st: Optional[float] = None,
-                 cl0: Optional[float] = None,
-                 eps: Optional[float] = None,
-                 al: Optional[float] = None,
-                 bt: Optional[float] = None,
-                 gm: Optional[float] = None) -> None:
+    def __init__(
+        self,
+        u: Optional[float] = None,
+        st: Optional[float] = None,
+        cl0: Optional[float] = None,
+        eps: Optional[float] = None,
+        al: Optional[float] = None,
+        bt: Optional[float] = None,
+        gm: Optional[float] = None,
+    ) -> None:
         """Init with args.
 
         Parameters
@@ -56,16 +58,18 @@ class WOP:
 class Excitation:
     """Sinusoidal vertical excitation."""
 
-    def __init__(self,
-                 f: float = 1.,
-                 a: float = 1.,
-                 s: float = 0.5,
-                 m: Union[float, np.ndarray] = 1.,
-                 L: float = 1.,
-                 t0: float = 0.,
-                 tf: float = np.inf,
-                 gravity: bool = False,
-                 g: float = 9.81) -> None:
+    def __init__(
+        self,
+        f: float = 1.0,
+        a: float = 1.0,
+        s: float = 0.5,
+        m: Union[float, np.ndarray] = 1.0,
+        L: float = 1.0,
+        t0: float = 0.0,
+        tf: float = np.inf,
+        gravity: bool = False,
+        g: float = 9.81,
+    ) -> None:
         """Init with args.
 
         Parameters
@@ -103,18 +107,18 @@ class Excitation:
         None.
         """
         vrl = [f, a, s, L, t0, tf, g]
-        vrn = ['f', 'a', 's', 'L', 't0', 'tf', 'g']
+        vrn = ["f", "a", "s", "L", "t0", "tf", "g"]
         for i in range(len(vrl)):
             if not isinstance(vrl[i], float):
-                raise TypeError(f'input {vrn[i]} must be a float')
+                raise TypeError(f"input {vrn[i]} must be a float")
         if not isinstance(gravity, bool):
-            raise TypeError('input gravity must be a bool')
+            raise TypeError("input gravity must be a bool")
         if t0 >= tf:
-            raise ValueError('input t0 must be less than tf')
-        if L <= 0.:
-            raise ValueError('input L must be strictly positive')
-        if s <= 0. or s >= L:
-            raise ValueError('input s must be in ]0, L[ range')
+            raise ValueError("input t0 must be less than tf")
+        if L <= 0.0:
+            raise ValueError("input L must be strictly positive")
+        if s <= 0.0 or s >= L:
+            raise ValueError("input s must be in ]0, L[ range")
 
         self.f = f
         self.a = a
@@ -131,13 +135,15 @@ class Excitation:
             return -self.g * self.m * np.ones_like(s)
         return np.zeros_like(s)
 
-    def __call__(self,
-                 s: np.ndarray,
-                 t: float,
-                 un: Optional[Any] = None,
-                 ub: Optional[Any] = None,
-                 vn: Optional[Any] = None,
-                 vb: Optional[Any] = None) -> Tuple[np.ndarray, np.ndarray]:
+    def __call__(
+        self,
+        s: np.ndarray,
+        t: float,
+        un: Optional[Any] = None,
+        ub: Optional[Any] = None,
+        vn: Optional[Any] = None,
+        vb: Optional[Any] = None,
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """Force computation.
 
         Parameters
@@ -176,9 +182,9 @@ class Excitation:
             be integrated on the structure to have a "real" force.
         """
         if not isinstance(s, np.ndarray):
-            raise TypeError('input s must be a numpy.ndarray')
+            raise TypeError("input s must be a numpy.ndarray")
         if not isinstance(t, float):
-            raise TypeError('input t must be a float')
+            raise TypeError("input t must be a float")
 
         p = self._gravity(s)
 
@@ -186,8 +192,8 @@ class Excitation:
             n = len(s)
             i = max(1, min(n - 2, int(np.round(self.s / self.L * (n - 1)))))
             d = s[i + 1] - s[i - 1]
-            a = 2. * self.a / d
-            p[i] += a * np.sin(2. * np.pi * self.f * (t - self.t0))
+            a = 2.0 * self.a / d
+            p[i] += a * np.sin(2.0 * np.pi * self.f * (t - self.t0))
 
         return p, np.zeros_like(s)
 

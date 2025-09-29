@@ -6,7 +6,7 @@ from slenderpy.future.cable.static import nleq
 def test_shape(ast570, random_spans):
     """Check that shape's ends matche span length and support level difference."""
     nx = 999
-    tol = 1.0E-15
+    tol = 1.0e-15
 
     linm, axs, rts = ast570
     lspan, tratio, sld = random_spans
@@ -15,18 +15,18 @@ def test_shape(ast570, random_spans):
     x, y = nleq.shape(nx, lspan, tension, sld, linm, axs)
 
     assert (
-            np.all(np.isclose(x[0, :], 0., atol=tol)) and
-            np.all(np.isclose(x[-1, :], lspan, atol=tol)) and
-            np.all(np.isclose(y[0, :], 0., atol=tol)) and
-            np.all(np.isclose(y[-1, :], sld, atol=tol))
+        np.all(np.isclose(x[0, :], 0.0, atol=tol))
+        and np.all(np.isclose(x[-1, :], lspan, atol=tol))
+        and np.all(np.isclose(y[0, :], 0.0, atol=tol))
+        and np.all(np.isclose(y[-1, :], sld, atol=tol))
     )
 
 
 def test_stress(ast570, random_spans):
     """Check that the computed mean stress matches its integration."""
     nx = 59999
-    atol = 1.0E-06
-    rtol = 1.0E-09
+    atol = 1.0e-06
+    rtol = 1.0e-09
 
     linm, axs, rts = ast570
     lspan, tratio, sld = random_spans
@@ -34,7 +34,7 @@ def test_stress(ast570, random_spans):
     tension = rts * tratio
     lcab, lve = nleq.solve(lspan, tension, sld, linm, axs)
 
-    s = np.linspace(0., lcab, nx)
+    s = np.linspace(0.0, lcab, nx)
     n = nleq.stress(s, lspan, tension, sld, linm, axs, lcab=lcab, lve=lve)
 
     sm1 = nleq.mean_stress(lspan, tension, sld, linm, axs, lcab=lcab, lve=lve)
@@ -46,7 +46,7 @@ def test_stress(ast570, random_spans):
 def test_length(ast570, random_spans):
     """Check that the computed length matches a numerical one."""
     nx = 9999
-    rtol = 1.0E-09
+    rtol = 1.0e-09
 
     linm, axs, rts = ast570
     lspan, tratio, sld = random_spans
@@ -58,7 +58,7 @@ def test_length(ast570, random_spans):
     x, y = nleq.shape(l, lspan, tension, sld, linm, axs, lcab=lcab, lve=lve)
 
     length_1 = nleq.length(lspan, tension, sld, linm, axs, lcab=lcab, lve=lve)
-    length_2 = np.sqrt(np.diff(x, axis=0)**2 + np.diff(y, axis=0)**2).sum(axis=0)
+    length_2 = np.sqrt(np.diff(x, axis=0) ** 2 + np.diff(y, axis=0) ** 2).sum(axis=0)
 
     assert np.max(np.abs(length_2 - length_1) / lspan) < rtol
 
@@ -66,7 +66,7 @@ def test_length(ast570, random_spans):
 def test_sag(ast570, random_spans):
     """Check that the computed sag matches a numerical one."""
     nx = 9999
-    rtol = 1.0E-09
+    rtol = 1.0e-09
 
     linm, axs, rts = ast570
     lspan, tratio, sld = random_spans
@@ -94,16 +94,15 @@ def test_sag(ast570, random_spans):
     atolx = 0.5 * np.abs(x2[2, :] - x2[0, :])
     atoly = 0.5 * np.maximum(np.abs(y2[0, :] - y2[1, :]), np.abs(y2[1, :] - y2[2, :]))
 
-    assert (
-            np.all(np.isclose(x1, x0, atol=atolx, rtol=rtol)) and
-            np.all(np.isclose(s1, s0, atol=atoly, rtol=rtol))
+    assert np.all(np.isclose(x1, x0, atol=atolx, rtol=rtol)) and np.all(
+        np.isclose(s1, s0, atol=atoly, rtol=rtol)
     )
 
 
 def test_chord(ast570, random_spans):
     """Check that the computed chord length matches a numerical one."""
     nx = 9999
-    rtol = 1.0E-09
+    rtol = 1.0e-09
 
     linm, axs, rts = ast570
     lspan, tratio, sld = random_spans
@@ -131,7 +130,6 @@ def test_chord(ast570, random_spans):
     atolx = 0.5 * np.abs(x2[2, :] - x2[0, :])
     atoly = 0.5 * np.maximum(np.abs(y2[0, :] - y2[1, :]), np.abs(y2[1, :] - y2[2, :]))
 
-    assert (
-            np.all(np.isclose(x1, x0, atol=atolx, rtol=rtol)) and
-            np.all(np.isclose(s1, s0, atol=atoly, rtol=rtol))
+    assert np.all(np.isclose(x1, x0, atol=atolx, rtol=rtol)) and np.all(
+        np.isclose(s1, s0, atol=atoly, rtol=rtol)
     )

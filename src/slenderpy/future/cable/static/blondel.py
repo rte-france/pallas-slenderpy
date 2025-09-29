@@ -5,12 +5,14 @@ from pyntb.polynomial import solve_p3_v
 from typing import Union
 
 
-def tension(weight: Union[float, np.ndarray],
-            tension_i: Union[float, np.ndarray],
-            temperature_i: Union[float, np.ndarray],
-            temperature_f: Union[float, np.ndarray],
-            axs: Union[float, np.ndarray],
-            alpha: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+def tension(
+    weight: Union[float, np.ndarray],
+    tension_i: Union[float, np.ndarray],
+    temperature_i: Union[float, np.ndarray],
+    temperature_f: Union[float, np.ndarray],
+    axs: Union[float, np.ndarray],
+    alpha: Union[float, np.ndarray],
+) -> Union[float, np.ndarray]:
     """Compute new tension with temperature change.
 
     If more than one arg is an array, they must have the same size (no check).
@@ -30,20 +32,26 @@ def tension(weight: Union[float, np.ndarray],
     the given inputs.
 
     """
-    a = 1. / axs
-    b = alpha * (temperature_f - temperature_i) - tension_i / axs + (weight / tension_i)**2 / 24
-    c = 0.
-    d = - weight**2 / 24
+    a = 1.0 / axs
+    b = (
+        alpha * (temperature_f - temperature_i)
+        - tension_i / axs
+        + (weight / tension_i) ** 2 / 24
+    )
+    c = 0.0
+    d = -(weight**2) / 24
     tension_f, _, _ = solve_p3_v(a, b, c, d)
     return tension_f
 
 
-def temperature(weight: Union[float, np.ndarray],
-                tension_i: Union[float, np.ndarray],
-                tension_f: Union[float, np.ndarray],
-                temperature_i: Union[float, np.ndarray],
-                axs: Union[float, np.ndarray],
-                alpha: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+def temperature(
+    weight: Union[float, np.ndarray],
+    tension_i: Union[float, np.ndarray],
+    tension_f: Union[float, np.ndarray],
+    temperature_i: Union[float, np.ndarray],
+    axs: Union[float, np.ndarray],
+    alpha: Union[float, np.ndarray],
+) -> Union[float, np.ndarray]:
     """Inverse of tension function, ie compute new temperature given tension change.
 
     If more than one arg is an array, they must have the same size (no check).
@@ -63,5 +71,11 @@ def temperature(weight: Union[float, np.ndarray],
     inputs.
 
     """
-    return temperature_i + (weight**2 / 24 * (1. / tension_f**2 - 1. / tension_i**2) -
-                            (tension_f - tension_i) / axs) / alpha
+    return (
+        temperature_i
+        + (
+            weight**2 / 24 * (1.0 / tension_f**2 - 1.0 / tension_i**2)
+            - (tension_f - tension_i) / axs
+        )
+        / alpha
+    )
