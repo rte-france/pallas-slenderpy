@@ -21,10 +21,10 @@ class BoundaryCondition:
         Input t1 and t2 are tuples with four floats each such that
         ti = (ai, bi, ci, di) for i in {1, 2} and:
             a1 * y(b) + b1 * (dy/dx)(b) * c1 * (d2y/dx2)(b) = d1
-            a2 * y(b) + b2 * (dy/dx)(b) * c2 * (d2y/dx2)(b) = d
+            a2 * y(b) + b2 * (dy/dx)(b) * c2 * (d2y/dx2)(b) = d2
 
         b is the bound defined by pos (min for left, max for right). The
-        equation system defined by both tuples shoud have a nonzero det.
+        equation system defined by both tuples should have a nonzero det.
 
         If None values are used for t1 or t2, Dirichlet boundary conditions are
         used.
