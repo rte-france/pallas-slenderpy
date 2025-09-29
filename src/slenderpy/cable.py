@@ -632,27 +632,20 @@ def solve(
     pb = spb.generate(pm.pp, pm.nt, desc=__name__)
     for k in range(pm.nt):
 
-        h = -1.0 / vt2 * un + 0.5 * ((C * un) ** 2 + (C * ub) ** 2)
+        h = -1. / vt2 * un + 0.5 * ((C * un)**2 + (C * ub)**2)
         e = 0.5 * np.sum((h[:-1] + h[1:]) * ds)
         b = vt2 + vl2 * e
 
-        fn1, fn2, fb1, fb2 = cbu.adim_force(
-            force, s, t, dt, un, ub, vn, vb, tAd, cb.L, uAd, cb.m, cb.g
-        )
+        fn1, fn2, fb1, fb2 = cbu.adim_force(force, s, t, dt, un, ub, vn, vb,
+                                            tAd, cb.L, uAd, cb.m, cb.g)
 
-        Rvn = (
-            (dt * b) * A * (un[1:-1] + 0.5 * ht * vn[1:-1])
-            + (1 + z) * vn[1:-1]
-            + dt * (0.5 * (fn1[1:-1] + fn2[1:-1]) + vl2 / vt2 * e)
-        )
-        Rvb = (
-            (dt * b) * A * (ub[1:-1] + 0.5 * ht * vb[1:-1])
-            + (1 + z) * vb[1:-1]
-            + ht * (fb1[1:-1] + fb2[1:-1])
-        )
+        Rvn = (dt * b) * A * (un[1:-1] + 0.5 * ht * vn[1:-1]) + (1 + z) * vn[1:-1] + \
+              dt * (0.5 * (fn1[1:-1] + fn2[1:-1]) + vl2 / vt2 * e)
+        Rvb = (dt * b) * A * (ub[1:-1] + 0.5 * ht * vb[1:-1]) + (1 + z) * vb[1:-1] + \
+              ht * (fb1[1:-1] + fb2[1:-1])
 
         Db[0, +1:] = tau * b * A.diagonal(k=1)
-        Db[1, :] = 1.0 - z + tau * b * A.diagonal(k=0)
+        Db[1, :] = 1. - z + tau * b * A.diagonal(k=0)
         Db[2, :-1] = tau * b * A.diagonal(k=-1)
 
         Rhs = np.column_stack((Rvn, Rvb))
@@ -674,43 +667,25 @@ def solve(
     # END FOR
     pb.close()
     res.stop_timer()
-    res.set_state({"un": un * cb.L, "ub": ub * cb.L, "vn": vn * uAd, "vb": vb * uAd})
+    res.set_state({"un": un * cb.L,
+                   "ub": ub * cb.L,
+                   "vn": vn * uAd,
+                   "vb": vb * uAd})
 
     # add dim
-    res.data.assign_coords(
-        {simtools.__stime__: res.data[simtools.__stime__].values * tAd}
-    )
-    for v in ["ut", "un", "ub"]:
+    res.data.assign_coords({simtools.__stime__: res.data[simtools.__stime__].values * tAd})
+    for v in ['ut', 'un', 'ub']:
         res.data[v] *= cb.L
-    res.data["ef"] *= cb.EA
+    res.data['ef'] *= cb.EA
 
     return res
 
 
-def _solve_added_mass(
-    cb,
-    pm,
-    force=None,
-    am=None,
-    zt=0.0,
-    un0=None,
-    ub0=None,
-    vn0=None,
-    vb0=None,
-    remove_cat=False,
-):
+def _solve_added_mass(cb, pm, force=None, am=None, zt=0., un0=None, ub0=None,
+                      vn0=None, vb0=None, remove_cat=False):
     if am is None:
-        return solve(
-            cb,
-            pm,
-            force=force,
-            zt=0.0,
-            un0=un0,
-            ub0=ub0,
-            vn0=vn0,
-            vb0=vb0,
-            remove_cat=remove_cat,
-        )
+        return solve(cb, pm, force=force, zt=0., un0=un0, ub0=ub0, vn0=vn0,
+                     vb0=vb0, remove_cat=remove_cat)
 
     ns, s, ds, N, n = cbu.spacediscr(pm.ns)
 
@@ -722,13 +697,13 @@ def _solve_added_mass(
     C, A, _, J = cbu.matrix(ds, n)
     tAd, uAd = cbu.adim(cb)
     t, tf, dt, ht, ht2 = cbu.times(pm, tAd)
-    tau = -1.0 * ht2
+    tau = -1. * ht2
     un, ub, vn, vb = cbu.init_vars(cb, s, un0, ub0, vn0, vb0, uAd, remove_cat)
     ut, ef = cbu.utef(un, ub, C, s, ds, vt2)
 
-    z = -2.0 * np.pi * np.sqrt(vt2[1:-1]) * zt * ht
+    z = -2. * np.pi * np.sqrt(vt2[1:-1]) * zt * ht
 
-    lov = ["ut", "un", "ub", "ef"]
+    lov = ['ut', 'un', 'ub', 'ef']
     res = simtools.Results(lot=pm.time_vector_output().tolist(), lov=lov, los=pm.los)
     res.update(0, s, lov, [ut, un, ub, ef])
 
@@ -742,29 +717,22 @@ def _solve_added_mass(
     pb = spb.generate(pm.pp, pm.nt, desc=__name__)
     for k in range(pm.nt):
 
-        h = -1.0 / vt2 * un + 0.5 * ((C * un) ** 2 + (C * ub) ** 2)
+        h = -1. / vt2 * un + 0.5 * ((C * un)**2 + (C * ub)**2)
         e = 0.5 * np.sum((h[:-1] + h[1:]) * ds)
         b = vt2 + vl2 * e
         c = vl2 / vt2 * e
         bA = sp.sparse.diags([b[1:-1]], [0]) * A
 
-        fn1, fn2, fb1, fb2 = cbu.adim_force(
-            force, s, t, dt, un, ub, vn, vb, tAd, cb.L, uAd, cb.m, cb.g
-        )
+        fn1, fn2, fb1, fb2 = cbu.adim_force(force, s, t, dt, un, ub, vn, vb,
+                                            tAd, cb.L, uAd, cb.m, cb.g)
 
-        Rvn = (
-            dt * bA * (un[1:-1] + 0.5 * ht * vn[1:-1])
-            + (1 + z) * vn[1:-1]
-            + dt * (0.5 * (fn1[1:-1] + fn2[1:-1]) + c[1:-1])
-        )
-        Rvb = (
-            dt * bA * (ub[1:-1] + 0.5 * ht * vb[1:-1])
-            + (1 + z) * vb[1:-1]
-            + ht * (fb1[1:-1] + fb2[1:-1])
-        )
+        Rvn = (dt * bA * (un[1:-1] + 0.5 * ht * vn[1:-1]) + (1 + z) * vn[1:-1]
+               + dt * (0.5 * (fn1[1:-1] + fn2[1:-1]) + c[1:-1]))
+        Rvb = (dt * bA * (ub[1:-1] + 0.5 * ht * vb[1:-1]) + (1 + z) * vb[1:-1]
+               + ht * (fb1[1:-1] + fb2[1:-1]))
 
         Db[0, +1:] = tau * bA.diagonal(k=1)
-        Db[1, :] = 1.0 - z + tau * bA.diagonal(k=0)
+        Db[1, :] = 1. - z + tau * bA.diagonal(k=0)
         Db[2, :-1] = tau * bA.diagonal(k=-1)
 
         Rhs = np.column_stack((Rvn, Rvb))
@@ -786,22 +754,23 @@ def _solve_added_mass(
     # END FOR
     pb.close()
     res.stop_timer()
-    res.set_state({"un": un * cb.L, "ub": ub * cb.L, "vn": vn * uAd, "vb": vb * uAd})
+    res.set_state({"un": un * cb.L,
+                   "ub": ub * cb.L,
+                   "vn": vn * uAd,
+                   "vb": vb * uAd})
 
     # add dim
-    res.data.assign_coords(
-        {simtools.__stime__: res.data[simtools.__stime__].values * tAd}
-    )
-    for v in ["ut", "un", "ub"]:
+    res.data.assign_coords({simtools.__stime__: res.data[simtools.__stime__].values * tAd})
+    for v in ['ut', 'un', 'ub']:
         res.data[v] *= cb.L
-    res.data["ef"] *= cb.EA
+    res.data['ef'] *= cb.EA
 
     return res
 
 
-def tnb2xyz(
-    res: simtools.Results, cb: SCable, mix_curv: bool = False
-) -> simtools.Results:
+def tnb2xyz(res: simtools.Results,
+            cb: SCable,
+            mix_curv: bool = False) -> simtools.Results:
     """Project raw outputs from a cable solver to classi fixed triad.
 
     Projection from local (tnb) triad to classic (xyz): ex, ez is the plane
@@ -831,40 +800,35 @@ def tnb2xyz(
         ps = s
 
     # data out
-    prj = simtools.Results(
-        lot=res.data[simtools.__stime__].values.tolist(),
-        lov=["ux", "uy", "uz", "ef"],
-        los=ps,
-    )
+    prj = simtools.Results(lot=res.data[simtools.__stime__].values.tolist(),
+                           lov=['ux', 'uy', 'uz', 'ef'], los=ps)
 
     for i, st in enumerate(s):
         # et in uxyz
-        tx = 1.0
+        tx = 1.
         tz = cb.Lp / cb.L * np.sinh(cb.Lp / cb.a * (st - 0.5) + 0.5 * cb.q)
         tn = np.sqrt(tx**2 + tz**2)
         tx /= tn
         tz /= tn
 
-        ut = res.data["ut"].values[:, i]
-        un = res.data["un"].values[:, i]
-        ub = res.data["ub"].values[:, i]
+        ut = res.data['ut'].values[:, i]
+        un = res.data['un'].values[:, i]
+        ub = res.data['ub'].values[:, i]
 
-        prj.data["ux"].values[:, i] = tx * ut - tz * un + 0.0 * ub
-        prj.data["uy"].values[:, i] = 0.0 * ut + 0.0 * un - 1.0 * ub
-        prj.data["uz"].values[:, i] = tz * ut + tx * un + 0.0 * ub
+        prj.data['ux'].values[:, i] = tx * ut - tz * un + 0. * ub
+        prj.data['uy'].values[:, i] = 0. * ut + 0. * un - 1. * ub
+        prj.data['uz'].values[:, i] = tz * ut + tx * un + 0. * ub
 
-    prj.data["ef"].values = res.data["ef"].values
+    prj.data['ef'].values = res.data['ef'].values
 
     return prj
 
 
-def export_vtk(
-    cb: SCable,
-    res: simtools.Results,
-    rep: str,
-    file: str = "snapshot",
-    fmt: str = "%+10.3E",
-) -> None:
+def export_vtk(cb: SCable,
+               res: simtools.Results,
+               rep: str,
+               file: str = 'snapshot',
+               fmt: str = '%+10.3E') -> None:
     """Export results from a simulation to VTK files.
 
     Input results must have been converted to the (xyz) triad.
@@ -888,10 +852,10 @@ def export_vtk(
         DESCRIPTION.
     """
     if not os.path.isdir(rep):
-        raise ValueError("input rep must be a directory")
+        raise ValueError('input rep must be a directory')
 
-    sep = " "
-    enc = "UTF-8"
+    sep = ' '
+    enc = 'UTF-8'
     aos = res.data[simtools.__scabs__]
 
     def nda2str(dat, delimiter=sep, fmt=fmt, encoding=enc):
@@ -899,48 +863,41 @@ def export_vtk(
         np.savetxt(s, dat, delimiter=delimiter, fmt=fmt, encoding=encoding)
         return s.getvalue().decode(encoding=encoding)
 
-    header = "# vtk DataFile Version 3.0\nvtk output\nASCII\nDATASET POLYDATA\n"
+    header = '# vtk DataFile Version 3.0\nvtk output\nASCII\nDATASET POLYDATA\n'
     tmp = np.zeros((len(aos), 3))
     tmp[:, 0] = cb.Lp * aos.values
     pos = nda2str(tmp)
 
     tmp = np.concatenate(([len(aos)], range(len(aos))))
-    lin = nda2str(tmp.reshape((1, len(tmp))), fmt="%d")
-    hdv = "vectors offset float\n"
-    hdc = "scalars cat float\nLOOKUP_TABLE default\n"
+    lin = nda2str(tmp.reshape((1, len(tmp))), fmt='%d')
+    hdv = 'vectors offset float\n'
+    hdc = 'scalars cat float\nLOOKUP_TABLE default\n'
     tmp = cb.altitude_1s(aos.values)
     cat = nda2str(tmp)
 
-    hde = "scalars ef float\nLOOKUP_TABLE default\n"
+    hde = 'scalars ef float\nLOOKUP_TABLE default\n'
 
     for i, t in enumerate(res.data[simtools.__stime__]):
-        with open(
-            os.path.join(rep, file + f"_{i:06d}.vtk"), mode="w", encoding="utf-8"
-        ) as f:
+        with open(os.path.join(rep, file + f'_{i:06d}.vtk'),
+                  mode='w', encoding="utf-8") as f:
             f.write(header)
 
-            f.write(f"POINTS {len(aos)} float\n")
+            f.write(f'POINTS {len(aos)} float\n')
             f.write(pos)
 
-            f.write(f"LINES 1 {1 + len(aos)}\n")
+            f.write(f'LINES 1 {1 + len(aos)}\n')
             f.write(lin)
 
-            f.write(f"POINT_DATA {len(aos)}\n")
+            f.write(f'POINT_DATA {len(aos)}\n')
 
             f.write(hdv)
-            tmp = nda2str(
-                np.column_stack(
-                    (
-                        res.data["ux"].values[i, :],
-                        res.data["uy"].values[i, :],
-                        res.data["uz"].values[i, :],
-                    )
-                )
-            )
+            tmp = nda2str(np.column_stack((res.data['ux'].values[i, :],
+                                           res.data['uy'].values[i, :],
+                                           res.data['uz'].values[i, :])))
             f.write(tmp)
 
             f.write(hdc)
             f.write(cat)
 
             f.write(hde)
-            f.write(nda2str(res.data["ef"].values[i, :]))
+            f.write(nda2str(res.data['ef'].values[i, :]))
