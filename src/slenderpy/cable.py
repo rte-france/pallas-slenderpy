@@ -12,9 +12,9 @@ from slenderpy import _progress_bar as spb
 from slenderpy import simtools
 
 
-def _newt2dv(f1, f2, x0, y0, epsilon=1.0E-12, maxiter=64, dx=1.0E-03, dy=1.0E-03):
+def _newt2dv(f1, f2, x0, y0, epsilon=1.0e-12, maxiter=64, dx=1.0e-03, dy=1.0e-03):
     """2D quasi-Newton with arrays."""
-    q = 1.
+    q = 1.0
     c = 0
     x = x0
     y = y0
@@ -25,7 +25,7 @@ def _newt2dv(f1, f2, x0, y0, epsilon=1.0E-12, maxiter=64, dx=1.0E-03, dy=1.0E-03
         Jb = 0.5 * (f1(x, y + dy) - f1(x, y - dy)) / dy
         Jc = 0.5 * (f2(x + dx, y) - f2(x - dx, y)) / dx
         Jd = 0.5 * (f2(x, y + dy) - f2(x, y - dy)) / dy
-        di = 1. / (Ja * Jd - Jb * Jc)
+        di = 1.0 / (Ja * Jd - Jb * Jc)
         ex = di * (Jd * F1 - Jb * F2)
         ey = di * (Ja * F2 - Jc * F1)
         x -= ex
@@ -37,25 +37,27 @@ def _newt2dv(f1, f2, x0, y0, epsilon=1.0E-12, maxiter=64, dx=1.0E-03, dy=1.0E-03
 
 def _solve_p3(c1, c2, c3):
     """Compute real solution of : x**3 + c1 x**2 + c2 x + c3 = 0."""
-    p = c2 - c1**2 / 3.
-    q = c3 - c1 * c2 / 3. + 2. * c1**3 / 27.
-    D = 4. * p**3 + 27. * q**2
-    tp1 = (-q + np.sqrt(D / 27. + 0J)) / 2.
-    tp2 = (-q - np.sqrt(D / 27. + 0J)) / 2.
-    return np.real(np.power(tp1, 1 / 3) + np.power(tp2, 1 / 3) - c1 / 3.)
+    p = c2 - c1**2 / 3.0
+    q = c3 - c1 * c2 / 3.0 + 2.0 * c1**3 / 27.0
+    D = 4.0 * p**3 + 27.0 * q**2
+    tp1 = (-q + np.sqrt(D / 27.0 + 0j)) / 2.0
+    tp2 = (-q - np.sqrt(D / 27.0 + 0j)) / 2.0
+    return np.real(np.power(tp1, 1 / 3) + np.power(tp2, 1 / 3) - c1 / 3.0)
 
 
 def __alts(Lp, a, x, s):
-    return 2. * a * np.sinh(0.5 * (Lp * s + x) / a) * np.sinh(0.5 * Lp * s / a)
+    return 2.0 * a * np.sinh(0.5 * (Lp * s + x) / a) * np.sinh(0.5 * Lp * s / a)
 
 
 def _q_factor(L, h):
     return np.log((L + h) / (L - h))
 
 
-def catenary_length(Lp: Union[float, np.ndarray],
-                    a: Union[float, np.ndarray],
-                    h: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+def catenary_length(
+    Lp: Union[float, np.ndarray],
+    a: Union[float, np.ndarray],
+    h: Union[float, np.ndarray],
+) -> Union[float, np.ndarray]:
     """Compute cable length.
 
     Parameters
@@ -73,15 +75,17 @@ def catenary_length(Lp: Union[float, np.ndarray],
         Cable length when supporting its own weight (m).
 
     """
-    return np.sqrt(h**2 + (2.0 * a * np.sinh(0.5 * Lp / a))**2)
+    return np.sqrt(h**2 + (2.0 * a * np.sinh(0.5 * Lp / a)) ** 2)
 
 
-def irvine_number(Lp: Union[float, np.ndarray],
-                  a: Union[float, np.ndarray],
-                  h: Union[float, np.ndarray],
-                  m: float,
-                  EA: float,
-                  g: float = 9.81) -> Union[float, np.ndarray]:
+def irvine_number(
+    Lp: Union[float, np.ndarray],
+    a: Union[float, np.ndarray],
+    h: Union[float, np.ndarray],
+    m: float,
+    EA: float,
+    g: float = 9.81,
+) -> Union[float, np.ndarray]:
     """Compute Irvine number.
 
     Parameters
@@ -106,12 +110,12 @@ def irvine_number(Lp: Union[float, np.ndarray],
 
     """
     L = catenary_length(Lp, a, h)
-    return np.sqrt((Lp / a)**2 * (Lp * EA / (L * a * m * g)))
+    return np.sqrt((Lp / a) ** 2 * (Lp * EA / (L * a * m * g)))
 
 
-def natural_frequency(L: Union[float, np.ndarray],
-                      a: Union[float, np.ndarray],
-                      g: float = 9.81) -> Union[float, np.ndarray]:
+def natural_frequency(
+    L: Union[float, np.ndarray], a: Union[float, np.ndarray], g: float = 9.81
+) -> Union[float, np.ndarray]:
     """Compute string natural frequency.
 
     Parameters
@@ -139,9 +143,11 @@ def _alts(s, Lp, a, h):
     return __alts(Lp, a, x, s)
 
 
-def sag(Lp: Union[float, np.ndarray],
-        a: Union[float, np.ndarray],
-        h: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+def sag(
+    Lp: Union[float, np.ndarray],
+    a: Union[float, np.ndarray],
+    h: Union[float, np.ndarray],
+) -> Union[float, np.ndarray]:
     """Compute suspended cable sag.
 
     Parameters
@@ -167,22 +173,23 @@ def sag(Lp: Union[float, np.ndarray],
 
 
 def _blondel(m, EA, al, L, H, dT, g=9.81):
-    c1 = +EA * (al * dT + (m * g * L)**2 / (24. * H**2)) - H
-    c3 = -EA * (m * g * L)**2 / 24.
-    return _solve_p3(c1, 0., c3)
+    c1 = +EA * (al * dT + (m * g * L) ** 2 / (24.0 * H**2)) - H
+    c3 = -EA * (m * g * L) ** 2 / 24.0
+    return _solve_p3(c1, 0.0, c3)
 
 
-def tension_corr_temperature(m: Union[float, np.ndarray],
-                             EA: Union[float, np.ndarray],
-                             al: Union[float, np.ndarray],
-                             Lp: Union[float, np.ndarray],
-                             H: Union[float, np.ndarray],
-                             h: Union[float, np.ndarray],
-                             dT: Union[float, np.ndarray],
-                             g: float = 9.81,
-                             epsilon: float = 1.0E-12,
-                             maxiter: int = 16) \
-        -> Tuple[Union[float, np.ndarray], Union[float, np.ndarray]]:
+def tension_corr_temperature(
+    m: Union[float, np.ndarray],
+    EA: Union[float, np.ndarray],
+    al: Union[float, np.ndarray],
+    Lp: Union[float, np.ndarray],
+    H: Union[float, np.ndarray],
+    h: Union[float, np.ndarray],
+    dT: Union[float, np.ndarray],
+    g: float = 9.81,
+    epsilon: float = 1.0e-12,
+    maxiter: int = 16,
+) -> Tuple[Union[float, np.ndarray], Union[float, np.ndarray]]:
     """Evaluate variation of tension with temperature shift.
 
     Parameters
@@ -221,11 +228,15 @@ def tension_corr_temperature(m: Union[float, np.ndarray],
     sv = -h / Lr  # sin(vv)
 
     def phi1(s, v, h, dT):
-        return h * (s / EA + (1. + al * dT) * (np.arcsinh(v / h) - np.arcsinh((v - w * s) / h)) / w)
+        return h * (
+            s / EA
+            + (1.0 + al * dT) * (np.arcsinh(v / h) - np.arcsinh((v - w * s) / h)) / w
+        )
 
     def phi2(s, v, h, dT):
-        return (v * s - 0.5 * w * s**2) / EA + h / w * (1. + al * dT) * (
-                np.sqrt(1. + (v / h)**2) - np.sqrt(1. + ((v - w * s) / h)**2))
+        return (v * s - 0.5 * w * s**2) / EA + h / w * (1.0 + al * dT) * (
+            np.sqrt(1.0 + (v / h) ** 2) - np.sqrt(1.0 + ((v - w * s) / h) ** 2)
+        )
 
     # (1) find length
 
@@ -233,10 +244,10 @@ def tension_corr_temperature(m: Union[float, np.ndarray],
     v_ = 0.5 * w * l_
 
     def f1(v, l):
-        return phi1(l, v, H, 0.) - Lp
+        return phi1(l, v, H, 0.0) - Lp
 
     def f2(v, l):
-        return phi2(l, v, H, 0.) - l * sv / cv
+        return phi2(l, v, H, 0.0) - l * sv / cv
 
     v_, l_, _, qa = _newt2dv(f1, f2, v_, l_, epsilon=epsilon, maxiter=maxiter)
 
@@ -256,17 +267,18 @@ def tension_corr_temperature(m: Union[float, np.ndarray],
     return h_, np.maximum(qa, qb)
 
 
-def catconst_corr_temperature(m: Union[float, np.ndarray],
-                              EA: Union[float, np.ndarray],
-                              al: Union[float, np.ndarray],
-                              Lp: Union[float, np.ndarray],
-                              A: Union[float, np.ndarray],
-                              h: Union[float, np.ndarray],
-                              dT: Union[float, np.ndarray],
-                              g: float = 9.81,
-                              epsilon: float = 1.0E-12,
-                              maxiter: int = 16) \
-        -> Tuple[Union[float, np.ndarray], Union[float, np.ndarray]]:
+def catconst_corr_temperature(
+    m: Union[float, np.ndarray],
+    EA: Union[float, np.ndarray],
+    al: Union[float, np.ndarray],
+    Lp: Union[float, np.ndarray],
+    A: Union[float, np.ndarray],
+    h: Union[float, np.ndarray],
+    dT: Union[float, np.ndarray],
+    g: float = 9.81,
+    epsilon: float = 1.0e-12,
+    maxiter: int = 16,
+) -> Tuple[Union[float, np.ndarray], Union[float, np.ndarray]]:
     """Evaluate variation of catenary constant with temperature shift.
 
     Parameters
@@ -300,21 +312,25 @@ def catconst_corr_temperature(m: Union[float, np.ndarray],
         Maximum error on iterative schemes.
     """
     H = m * g * A
-    h_, e = tension_corr_temperature(m, EA, al, Lp, H, h, dT, g=g, epsilon=epsilon, maxiter=maxiter)
+    h_, e = tension_corr_temperature(
+        m, EA, al, Lp, H, h, dT, g=g, epsilon=epsilon, maxiter=maxiter
+    )
     return h_ / (m * g), e
 
 
 class SCable:
     """A suspended cable."""
 
-    def __init__(self,
-                 mass: Optional[float] = None,
-                 diameter: Optional[float] = None,
-                 EA: Optional[float] = None,
-                 length: Optional[float] = None,
-                 tension: Optional[float] = None,
-                 h: float = 0.,
-                 g: float = 9.81) -> None:
+    def __init__(
+        self,
+        mass: Optional[float] = None,
+        diameter: Optional[float] = None,
+        EA: Optional[float] = None,
+        length: Optional[float] = None,
+        tension: Optional[float] = None,
+        h: float = 0.0,
+        g: float = 9.81,
+    ) -> None:
         """Init with args.
 
         Parameters
@@ -339,13 +355,13 @@ class SCable:
         None.
         """
         vrl = [mass, diameter, EA, length, tension, h, g]
-        vrn = ['mass', 'diameter', 'EA', 'length', 'tension', 'h', 'g']
+        vrn = ["mass", "diameter", "EA", "length", "tension", "h", "g"]
         pos = [True, True, True, True, True, False, False]
         for i in range(len(vrl)):
             if not isinstance(vrl[i], float):
-                raise TypeError(f'input {vrn[i]} must be a float')
-            if vrl[i] < 0. and pos[i]:
-                raise ValueError(f'input {vrn[i]} must be positive')
+                raise TypeError(f"input {vrn[i]} must be a float")
+            if vrl[i] < 0.0 and pos[i]:
+                raise ValueError(f"input {vrn[i]} must be positive")
 
         self.g = g  # gravity (m/s**2)
         self.m = mass  # mass per length unit (kg/m)
@@ -383,10 +399,9 @@ class SCable:
         """Compute the natural frequency of the vibrating string."""
         return self.natural_frequencies(n=1)[0]
 
-    def irvine_frequencies(self,
-                           n: int = 10,
-                           epsilon: float = 1.0E-09,
-                           maxiter: int = 64) -> np.ndarray:
+    def irvine_frequencies(
+        self, n: int = 10, epsilon: float = 1.0e-09, maxiter: int = 64
+    ) -> np.ndarray:
         """Compute Irvine frequencies.
 
         Solve transcendental equation in [Irvine1974].
@@ -479,8 +494,10 @@ class SCable:
     def altitude_1c(self, s):
         """Same as altitude_1s but with curvilinear abcissa along the cable."""
         xm = 0.5 * (self.a * self.q - self.Lp)
-        return self.a * (np.sqrt(1. + (self.L / self.a * s + np.sinh(xm / self.a))**2
-                                 ) - np.sqrt(1. + np.sinh(xm / self.a)**2))
+        return self.a * (
+            np.sqrt(1.0 + (self.L / self.a * s + np.sinh(xm / self.a)) ** 2)
+            - np.sqrt(1.0 + np.sinh(xm / self.a) ** 2)
+        )
 
     def altitude_2c(self, s):
         """Same as altitude_2c but regarding 2nd pole."""
@@ -489,30 +506,41 @@ class SCable:
     def cable2span(self, s):
         """Convert curvilinear abscissa along cable to curvilinear abscissa along span."""
         xm = 0.5 * (self.a * self.q - self.Lp)
-        return (self.a * np.arcsinh(self.L / self.a * s + np.sinh(xm / self.a))
-                - xm) / self.Lp
+        return (
+            self.a * np.arcsinh(self.L / self.a * s + np.sinh(xm / self.a)) - xm
+        ) / self.Lp
 
     def span2cable(self, s):
         """Convert curvilinear abscissa along span to curvilinear abscissa along cable."""
-        return (2. * self.a / self.L * np.sinh(0.5 * self.Lp / self.a * s) *
-                np.cosh(0.5 * self.Lp / self.a * (s - 1.) + 0.5 * self.q))
+        return (
+            2.0
+            * self.a
+            / self.L
+            * np.sinh(0.5 * self.Lp / self.a * s)
+            * np.cosh(0.5 * self.Lp / self.a * (s - 1.0) + 0.5 * self.q)
+        )
 
     def sag(self):
         """Get sag in meters"""
         return sag(self.Lp, self.a, self.h)
 
 
-def solve(cb: SCable,
-          pm: simtools.Parameters,
-          force: Optional[Callable[[np.ndarray, float, np.ndarray, np.ndarray,
-                                    np.ndarray, np.ndarray],
-          Tuple[np.ndarray, np.ndarray]]] = None,
-          zt: float = 0.,
-          un0: Optional[np.ndarray] = None,
-          ub0: Optional[np.ndarray] = None,
-          vn0: Optional[np.ndarray] = None,
-          vb0: Optional[np.ndarray] = None,
-          remove_cat: bool = False) -> simtools.Results:
+def solve(
+    cb: SCable,
+    pm: simtools.Parameters,
+    force: Optional[
+        Callable[
+            [np.ndarray, float, np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+            Tuple[np.ndarray, np.ndarray],
+        ]
+    ] = None,
+    zt: float = 0.0,
+    un0: Optional[np.ndarray] = None,
+    ub0: Optional[np.ndarray] = None,
+    vn0: Optional[np.ndarray] = None,
+    vb0: Optional[np.ndarray] = None,
+    remove_cat: bool = False,
+) -> simtools.Results:
     """EOM solver for a suspended cable and an external force.
 
     Results are offsets regarding the equilibrium position (catenary equations)
@@ -556,13 +584,13 @@ def solve(cb: SCable,
     C, A, _, J = cbu.matrix(ds, n)
     tAd, uAd = cbu.adim(cb)
     t, tf, dt, ht, ht2 = cbu.times(pm, tAd)
-    tau = -1. * ht2
+    tau = -1.0 * ht2
     un, ub, vn, vb = cbu.init_vars(cb, s, un0, ub0, vn0, vb0, uAd, remove_cat)
     ut, ef = cbu.utef(un, ub, C, s, ds, vt2)
 
-    z = -2. * np.pi * np.sqrt(vt2) * zt * ht
+    z = -2.0 * np.pi * np.sqrt(vt2) * zt * ht
 
-    lov = ['ut', 'un', 'ub', 'ef']
+    lov = ["ut", "un", "ub", "ef"]
     res = simtools.Results(lot=pm.time_vector_output().tolist(), lov=lov, los=pm.los)
     res.update(0, s, lov, [ut, un, ub, ef])
 
@@ -576,20 +604,27 @@ def solve(cb: SCable,
     pb = spb.generate(pm.pp, pm.nt, desc=__name__)
     for k in range(pm.nt):
 
-        h = -1. / vt2 * un + 0.5 * ((C * un)**2 + (C * ub)**2)
+        h = -1.0 / vt2 * un + 0.5 * ((C * un) ** 2 + (C * ub) ** 2)
         e = 0.5 * np.sum((h[:-1] + h[1:]) * ds)
         b = vt2 + vl2 * e
 
-        fn1, fn2, fb1, fb2 = cbu.adim_force(force, s, t, dt, un, ub, vn, vb,
-                                            tAd, cb.L, uAd, cb.m, cb.g)
+        fn1, fn2, fb1, fb2 = cbu.adim_force(
+            force, s, t, dt, un, ub, vn, vb, tAd, cb.L, uAd, cb.m, cb.g
+        )
 
-        Rvn = (dt * b) * A * (un[1:-1] + 0.5 * ht * vn[1:-1]) + (1 + z) * vn[1:-1] + \
-              dt * (0.5 * (fn1[1:-1] + fn2[1:-1]) + vl2 / vt2 * e)
-        Rvb = (dt * b) * A * (ub[1:-1] + 0.5 * ht * vb[1:-1]) + (1 + z) * vb[1:-1] + \
-              ht * (fb1[1:-1] + fb2[1:-1])
+        Rvn = (
+            (dt * b) * A * (un[1:-1] + 0.5 * ht * vn[1:-1])
+            + (1 + z) * vn[1:-1]
+            + dt * (0.5 * (fn1[1:-1] + fn2[1:-1]) + vl2 / vt2 * e)
+        )
+        Rvb = (
+            (dt * b) * A * (ub[1:-1] + 0.5 * ht * vb[1:-1])
+            + (1 + z) * vb[1:-1]
+            + ht * (fb1[1:-1] + fb2[1:-1])
+        )
 
         Db[0, +1:] = tau * b * A.diagonal(k=1)
-        Db[1, :] = 1. - z + tau * b * A.diagonal(k=0)
+        Db[1, :] = 1.0 - z + tau * b * A.diagonal(k=0)
         Db[2, :-1] = tau * b * A.diagonal(k=-1)
 
         Rhs = np.column_stack((Rvn, Rvb))
@@ -611,25 +646,43 @@ def solve(cb: SCable,
     # END FOR
     pb.close()
     res.stop_timer()
-    res.set_state({"un": un * cb.L,
-                   "ub": ub * cb.L,
-                   "vn": vn * uAd,
-                   "vb": vb * uAd})
+    res.set_state({"un": un * cb.L, "ub": ub * cb.L, "vn": vn * uAd, "vb": vb * uAd})
 
     # add dim
-    res.data.assign_coords({simtools.__stime__: res.data[simtools.__stime__].values * tAd})
-    for v in ['ut', 'un', 'ub']:
+    res.data.assign_coords(
+        {simtools.__stime__: res.data[simtools.__stime__].values * tAd}
+    )
+    for v in ["ut", "un", "ub"]:
         res.data[v] *= cb.L
-    res.data['ef'] *= cb.EA
+    res.data["ef"] *= cb.EA
 
     return res
 
 
-def _solve_added_mass(cb, pm, force=None, am=None, zt=0., un0=None, ub0=None,
-                      vn0=None, vb0=None, remove_cat=False):
+def _solve_added_mass(
+    cb,
+    pm,
+    force=None,
+    am=None,
+    zt=0.0,
+    un0=None,
+    ub0=None,
+    vn0=None,
+    vb0=None,
+    remove_cat=False,
+):
     if am is None:
-        return solve(cb, pm, force=force, zt=0., un0=un0, ub0=ub0, vn0=vn0,
-                     vb0=vb0, remove_cat=remove_cat)
+        return solve(
+            cb,
+            pm,
+            force=force,
+            zt=0.0,
+            un0=un0,
+            ub0=ub0,
+            vn0=vn0,
+            vb0=vb0,
+            remove_cat=remove_cat,
+        )
 
     ns, s, ds, N, n = cbu.spacediscr(pm.ns)
 
@@ -641,13 +694,13 @@ def _solve_added_mass(cb, pm, force=None, am=None, zt=0., un0=None, ub0=None,
     C, A, _, J = cbu.matrix(ds, n)
     tAd, uAd = cbu.adim(cb)
     t, tf, dt, ht, ht2 = cbu.times(pm, tAd)
-    tau = -1. * ht2
+    tau = -1.0 * ht2
     un, ub, vn, vb = cbu.init_vars(cb, s, un0, ub0, vn0, vb0, uAd, remove_cat)
     ut, ef = cbu.utef(un, ub, C, s, ds, vt2)
 
-    z = -2. * np.pi * np.sqrt(vt2[1:-1]) * zt * ht
+    z = -2.0 * np.pi * np.sqrt(vt2[1:-1]) * zt * ht
 
-    lov = ['ut', 'un', 'ub', 'ef']
+    lov = ["ut", "un", "ub", "ef"]
     res = simtools.Results(lot=pm.time_vector_output().tolist(), lov=lov, los=pm.los)
     res.update(0, s, lov, [ut, un, ub, ef])
 
@@ -661,22 +714,29 @@ def _solve_added_mass(cb, pm, force=None, am=None, zt=0., un0=None, ub0=None,
     pb = spb.generate(pm.pp, pm.nt, desc=__name__)
     for k in range(pm.nt):
 
-        h = -1. / vt2 * un + 0.5 * ((C * un)**2 + (C * ub)**2)
+        h = -1.0 / vt2 * un + 0.5 * ((C * un) ** 2 + (C * ub) ** 2)
         e = 0.5 * np.sum((h[:-1] + h[1:]) * ds)
         b = vt2 + vl2 * e
         c = vl2 / vt2 * e
         bA = sp.sparse.diags([b[1:-1]], [0]) * A
 
-        fn1, fn2, fb1, fb2 = cbu.adim_force(force, s, t, dt, un, ub, vn, vb,
-                                            tAd, cb.L, uAd, cb.m, cb.g)
+        fn1, fn2, fb1, fb2 = cbu.adim_force(
+            force, s, t, dt, un, ub, vn, vb, tAd, cb.L, uAd, cb.m, cb.g
+        )
 
-        Rvn = (dt * bA * (un[1:-1] + 0.5 * ht * vn[1:-1]) + (1 + z) * vn[1:-1]
-               + dt * (0.5 * (fn1[1:-1] + fn2[1:-1]) + c[1:-1]))
-        Rvb = (dt * bA * (ub[1:-1] + 0.5 * ht * vb[1:-1]) + (1 + z) * vb[1:-1]
-               + ht * (fb1[1:-1] + fb2[1:-1]))
+        Rvn = (
+            dt * bA * (un[1:-1] + 0.5 * ht * vn[1:-1])
+            + (1 + z) * vn[1:-1]
+            + dt * (0.5 * (fn1[1:-1] + fn2[1:-1]) + c[1:-1])
+        )
+        Rvb = (
+            dt * bA * (ub[1:-1] + 0.5 * ht * vb[1:-1])
+            + (1 + z) * vb[1:-1]
+            + ht * (fb1[1:-1] + fb2[1:-1])
+        )
 
         Db[0, +1:] = tau * bA.diagonal(k=1)
-        Db[1, :] = 1. - z + tau * bA.diagonal(k=0)
+        Db[1, :] = 1.0 - z + tau * bA.diagonal(k=0)
         Db[2, :-1] = tau * bA.diagonal(k=-1)
 
         Rhs = np.column_stack((Rvn, Rvb))
@@ -698,23 +758,22 @@ def _solve_added_mass(cb, pm, force=None, am=None, zt=0., un0=None, ub0=None,
     # END FOR
     pb.close()
     res.stop_timer()
-    res.set_state({"un": un * cb.L,
-                   "ub": ub * cb.L,
-                   "vn": vn * uAd,
-                   "vb": vb * uAd})
+    res.set_state({"un": un * cb.L, "ub": ub * cb.L, "vn": vn * uAd, "vb": vb * uAd})
 
     # add dim
-    res.data.assign_coords({simtools.__stime__: res.data[simtools.__stime__].values * tAd})
-    for v in ['ut', 'un', 'ub']:
+    res.data.assign_coords(
+        {simtools.__stime__: res.data[simtools.__stime__].values * tAd}
+    )
+    for v in ["ut", "un", "ub"]:
         res.data[v] *= cb.L
-    res.data['ef'] *= cb.EA
+    res.data["ef"] *= cb.EA
 
     return res
 
 
-def tnb2xyz(res: simtools.Results,
-            cb: SCable,
-            mix_curv: bool = False) -> simtools.Results:
+def tnb2xyz(
+    res: simtools.Results, cb: SCable, mix_curv: bool = False
+) -> simtools.Results:
     """Project raw outputs from a cable solver to classi fixed triad.
 
     Projection from local (tnb) triad to classic (xyz): ex, ez is the plane
@@ -744,35 +803,40 @@ def tnb2xyz(res: simtools.Results,
         ps = s
 
     # data out
-    prj = simtools.Results(lot=res.data[simtools.__stime__].values.tolist(),
-                           lov=['ux', 'uy', 'uz', 'ef'], los=ps)
+    prj = simtools.Results(
+        lot=res.data[simtools.__stime__].values.tolist(),
+        lov=["ux", "uy", "uz", "ef"],
+        los=ps,
+    )
 
     for i, st in enumerate(s):
         # et in uxyz
-        tx = 1.
+        tx = 1.0
         tz = cb.Lp / cb.L * np.sinh(cb.Lp / cb.a * (st - 0.5) + 0.5 * cb.q)
         tn = np.sqrt(tx**2 + tz**2)
         tx /= tn
         tz /= tn
 
-        ut = res.data['ut'].values[:, i]
-        un = res.data['un'].values[:, i]
-        ub = res.data['ub'].values[:, i]
+        ut = res.data["ut"].values[:, i]
+        un = res.data["un"].values[:, i]
+        ub = res.data["ub"].values[:, i]
 
-        prj.data['ux'].values[:, i] = tx * ut - tz * un + 0. * ub
-        prj.data['uy'].values[:, i] = 0. * ut + 0. * un - 1. * ub
-        prj.data['uz'].values[:, i] = tz * ut + tx * un + 0. * ub
+        prj.data["ux"].values[:, i] = tx * ut - tz * un + 0.0 * ub
+        prj.data["uy"].values[:, i] = 0.0 * ut + 0.0 * un - 1.0 * ub
+        prj.data["uz"].values[:, i] = tz * ut + tx * un + 0.0 * ub
 
-    prj.data['ef'].values = res.data['ef'].values
+    prj.data["ef"].values = res.data["ef"].values
 
     return prj
 
 
-def export_vtk(cb: SCable,
-               res: simtools.Results,
-               rep: str,
-               file: str = 'snapshot',
-               fmt: str = '%+10.3E') -> None:
+def export_vtk(
+    cb: SCable,
+    res: simtools.Results,
+    rep: str,
+    file: str = "snapshot",
+    fmt: str = "%+10.3E",
+) -> None:
     """Export results from a simulation to VTK files.
 
     Input results must have been converted to the (xyz) triad.
@@ -796,10 +860,10 @@ def export_vtk(cb: SCable,
         DESCRIPTION.
     """
     if not os.path.isdir(rep):
-        raise ValueError('input rep must be a directory')
+        raise ValueError("input rep must be a directory")
 
-    sep = ' '
-    enc = 'UTF-8'
+    sep = " "
+    enc = "UTF-8"
     aos = res.data[simtools.__scabs__]
 
     def nda2str(dat, delimiter=sep, fmt=fmt, encoding=enc):
@@ -807,41 +871,48 @@ def export_vtk(cb: SCable,
         np.savetxt(s, dat, delimiter=delimiter, fmt=fmt, encoding=encoding)
         return s.getvalue().decode(encoding=encoding)
 
-    header = '# vtk DataFile Version 3.0\nvtk output\nASCII\nDATASET POLYDATA\n'
+    header = "# vtk DataFile Version 3.0\nvtk output\nASCII\nDATASET POLYDATA\n"
     tmp = np.zeros((len(aos), 3))
     tmp[:, 0] = cb.Lp * aos.values
     pos = nda2str(tmp)
 
     tmp = np.concatenate(([len(aos)], range(len(aos))))
-    lin = nda2str(tmp.reshape((1, len(tmp))), fmt='%d')
-    hdv = 'vectors offset float\n'
-    hdc = 'scalars cat float\nLOOKUP_TABLE default\n'
+    lin = nda2str(tmp.reshape((1, len(tmp))), fmt="%d")
+    hdv = "vectors offset float\n"
+    hdc = "scalars cat float\nLOOKUP_TABLE default\n"
     tmp = cb.altitude_1s(aos.values)
     cat = nda2str(tmp)
 
-    hde = 'scalars ef float\nLOOKUP_TABLE default\n'
+    hde = "scalars ef float\nLOOKUP_TABLE default\n"
 
     for i, t in enumerate(res.data[simtools.__stime__]):
-        with open(os.path.join(rep, file + f'_{i:06d}.vtk'),
-                  mode='w', encoding="utf-8") as f:
+        with open(
+            os.path.join(rep, file + f"_{i:06d}.vtk"), mode="w", encoding="utf-8"
+        ) as f:
             f.write(header)
 
-            f.write(f'POINTS {len(aos)} float\n')
+            f.write(f"POINTS {len(aos)} float\n")
             f.write(pos)
 
-            f.write(f'LINES 1 {1 + len(aos)}\n')
+            f.write(f"LINES 1 {1 + len(aos)}\n")
             f.write(lin)
 
-            f.write(f'POINT_DATA {len(aos)}\n')
+            f.write(f"POINT_DATA {len(aos)}\n")
 
             f.write(hdv)
-            tmp = nda2str(np.column_stack((res.data['ux'].values[i, :],
-                                           res.data['uy'].values[i, :],
-                                           res.data['uz'].values[i, :])))
+            tmp = nda2str(
+                np.column_stack(
+                    (
+                        res.data["ux"].values[i, :],
+                        res.data["uy"].values[i, :],
+                        res.data["uz"].values[i, :],
+                    )
+                )
+            )
             f.write(tmp)
 
             f.write(hdc)
             f.write(cat)
 
             f.write(hde)
-            f.write(nda2str(res.data['ef'].values[i, :]))
+            f.write(nda2str(res.data["ef"].values[i, :]))

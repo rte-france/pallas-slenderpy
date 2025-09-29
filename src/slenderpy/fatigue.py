@@ -55,18 +55,18 @@ def _rainflow(array_ext, flm=0, l_ult=1e16, uc_mult=0.5):
         a[j] = array_ext[pr]  # put turning point into temporary array
         pr += 1  # increment input array pointer
 
-        while ((j >= 2) & (np.fabs(a[j - 1] - a[j - 2]) <= np.fabs(a[j] - a[j - 1]))):
+        while (j >= 2) & (np.fabs(a[j - 1] - a[j - 2]) <= np.fabs(a[j] - a[j - 1])):
             lrange = np.fabs(a[j - 1] - a[j - 2])
 
             # partial range
             if j == 2:
-                mean = (a[0] + a[1]) / 2.
+                mean = (a[0] + a[1]) / 2.0
                 adj_range = lrange * flmargin / (l_ult - np.fabs(mean))
                 adj_zero_mean_range = lrange * l_ult / (l_ult - np.fabs(mean))
                 a[0] = a[1]
                 a[1] = a[2]
                 j = 1
-                if (lrange > 0):
+                if lrange > 0:
                     array_out[0, po] = lrange
                     array_out[1, po] = mean
                     array_out[2, po] = adj_range
@@ -76,12 +76,12 @@ def _rainflow(array_ext, flm=0, l_ult=1e16, uc_mult=0.5):
 
             # full range
             else:
-                mean = (a[j - 1] + a[j - 2]) / 2.
+                mean = (a[j - 1] + a[j - 2]) / 2.0
                 adj_range = lrange * flmargin / (l_ult - np.fabs(mean))
                 adj_zero_mean_range = lrange * l_ult / (l_ult - np.fabs(mean))
                 a[j - 2] = a[j]
                 j = j - 2
-                if (lrange > 0):
+                if lrange > 0:
                     array_out[0, po] = lrange
                     array_out[1, po] = mean
                     array_out[2, po] = adj_range
@@ -92,10 +92,10 @@ def _rainflow(array_ext, flm=0, l_ult=1e16, uc_mult=0.5):
     # partial range
     for i in range(j):
         lrange = np.fabs(a[i] - a[i + 1])
-        mean = (a[i] + a[i + 1]) / 2.
+        mean = (a[i] + a[i + 1]) / 2.0
         adj_range = lrange * flmargin / (l_ult - np.fabs(mean))
         adj_zero_mean_range = lrange * l_ult / (l_ult - np.fabs(mean))
-        if (lrange > 0):
+        if lrange > 0:
             array_out[0, po] = lrange
             array_out[1, po] = mean
             array_out[2, po] = adj_range
@@ -109,7 +109,7 @@ def _rainflow(array_ext, flm=0, l_ult=1e16, uc_mult=0.5):
     return array_out
 
 
-def count_cycles(res, cb, xb=89.0E-03, pos='left', var='un', add_cat=True):
+def count_cycles(res, cb, xb=89.0e-03, pos="left", var="un", add_cat=True):
     """Count vibration cycles in simulation outputs.
 
     Given a cable object and simulation results, a post-processing chain is
@@ -149,23 +149,23 @@ def count_cycles(res, cb, xb=89.0E-03, pos='left', var='un', add_cat=True):
 
     """
     prj = cable.tnb2xyz(res, cb)
-    if var == 'un':
-        prv = 'uz'
-    elif var == 'ub':
-        prv = 'uy'
+    if var == "un":
+        prv = "uz"
+    elif var == "ub":
+        prv = "uy"
 
     # normalize xb
-    if pos == 'left':
+    if pos == "left":
         left = True
-    elif pos == 'right':
+    elif pos == "right":
         left = False
     else:
-        raise ValueError('Input pos must be left or right')
+        raise ValueError("Input pos must be left or right")
 
     if left:
         sb = xb / cb.Lp
     else:
-        sb = 1. - xb / cb.Lp
+        sb = 1.0 - xb / cb.Lp
 
     # get offset at xb
     los = np.array(prj.los())
@@ -176,7 +176,7 @@ def count_cycles(res, cb, xb=89.0E-03, pos='left', var='un', add_cat=True):
 
     # ..
     if len(tmp) == 0:
-        raise RuntimeError('not enough data in res.los()')
+        raise RuntimeError("not enough data in res.los()")
     else:
         if left:
             tmp = tmp[0]
@@ -187,8 +187,8 @@ def count_cycles(res, cb, xb=89.0E-03, pos='left', var='un', add_cat=True):
         sp = los[tmp]
         yp = prj.data[prv][:, tmp].values
         if tmp == 0:
-            sm = 0.
-            ym = 0.
+            sm = 0.0
+            ym = 0.0
         else:
             sm = los[tmp - 1]
             ym = prj.data[prv][:, tmp - 1].values
@@ -197,8 +197,8 @@ def count_cycles(res, cb, xb=89.0E-03, pos='left', var='un', add_cat=True):
         ym = prj.data[prv][:, tmp].values
         imx = len(los) - 1
         if tmp == imx:
-            sp = 0.
-            yp = 0.
+            sp = 0.0
+            yp = 0.0
         else:
             sp = los[tmp + 1]
             yp = prj.data[prv][:, tmp + 1].values
@@ -215,7 +215,8 @@ def count_cycles(res, cb, xb=89.0E-03, pos='left', var='un', add_cat=True):
 
     # count
     count = _rainflow(yb)
-    dc = pd.DataFrame(data=count[[0, 1, 3], :].T,
-                      columns=['load_range', 'range_mean', 'cycle_count'])
+    dc = pd.DataFrame(
+        data=count[[0, 1, 3], :].T, columns=["load_range", "range_mean", "cycle_count"]
+    )
 
     return dc
