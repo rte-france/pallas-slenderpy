@@ -1,4 +1,5 @@
 """Turbulent wind models and associated forces."""
+
 # !/usr/bin/env python3
 # -*- coding: utf-8 -*-
 from typing import Optional
@@ -11,36 +12,38 @@ from slenderpy import wind
 
 def von_karman_u(f, mean, std, lx):
     """Von Karman spectrum for u component."""
-    n = (lx * f / mean)**2
-    c = -5. / 6.
-    return 4. * lx * std**2 / mean * np.power(1. + 70.7 * n, c)
+    n = (lx * f / mean) ** 2
+    c = -5.0 / 6.0
+    return 4.0 * lx * std**2 / mean * np.power(1.0 + 70.7 * n, c)
 
 
 def von_karman_v(f, mean, std, lx):
     """Von Karman spectrum for v component."""
-    n = (lx * f / mean)**2
-    c = -11. / 6.
-    return 4. * lx * std**2 / mean * np.power(1. + 282.8 * n, c) * (1. + 753.6 * n)
+    n = (lx * f / mean) ** 2
+    c = -11.0 / 6.0
+    return 4.0 * lx * std**2 / mean * np.power(1.0 + 282.8 * n, c) * (1.0 + 753.6 * n)
 
 
 def von_karman_w(f, mean, std, lx):
     """Von Karman spectrum for w component."""
-    n = (lx * f / mean)**2
-    c = -11. / 6.
-    return 4. * lx * std**2 / mean * np.power(1. + 282.8 * n, c) * (1. + 753.6 * n)
+    n = (lx * f / mean) ** 2
+    c = -11.0 / 6.0
+    return 4.0 * lx * std**2 / mean * np.power(1.0 + 282.8 * n, c) * (1.0 + 753.6 * n)
 
 
 class RandomWind1D:
     """Object to generate a wind signal with Von Karman spectrum."""
 
-    def __init__(self,
-                 mean: Optional[float] = None,
-                 std: Optional[float] = None,
-                 lxu: Optional[float] = None,
-                 t0: float = 0.,
-                 tf: float = 60.,
-                 dt: float = 1.,
-                 seed: Optional[int] = None) -> None:
+    def __init__(
+        self,
+        mean: Optional[float] = None,
+        std: Optional[float] = None,
+        lxu: Optional[float] = None,
+        t0: float = 0.0,
+        tf: float = 60.0,
+        dt: float = 1.0,
+        seed: Optional[int] = None,
+    ) -> None:
         """Init with args.
 
         Generated wind is a 1D numpy.ndarray accessible from u member.
@@ -91,15 +94,20 @@ class RandomWind1D:
             f = f[:N]
             M = N
         else:
-            f = np.logspace(np.log(2. * fmax / len(t)), np.log(fmax), len(t) // 2)
+            f = np.logspace(np.log(2.0 * fmax / len(t)), np.log(fmax), len(t) // 2)
             M = len(f)
 
-        p = self.rng.uniform(0, 2. * np.pi, M - 1)
-        s = np.sqrt(np.diff(f) * (self.fun(f[1:], self.mean, self.std, self.lxu) +
-                                  self.fun(f[:-1], self.mean, self.std, self.lxu)))
+        p = self.rng.uniform(0, 2.0 * np.pi, M - 1)
+        s = np.sqrt(
+            np.diff(f)
+            * (
+                self.fun(f[1:], self.mean, self.std, self.lxu)
+                + self.fun(f[:-1], self.mean, self.std, self.lxu)
+            )
+        )
         u = self.mean * np.ones_like(t)
         for i in range(1, M - 1):
-            u += s[i] * np.cos(2. * np.pi * t * f[i] + p[i])
+            u += s[i] * np.cos(2.0 * np.pi * t * f[i] + p[i])
 
         u = self.std * (u - np.mean(u)) / np.std(u) + self.mean
 
@@ -109,29 +117,31 @@ class RandomWind1D:
 class TurbWind3D:
     """Object to generate a realistic 3D, turbulent wind Field."""
 
-    def __init__(self,
-                 mean: float = 3.0,
-                 L: float = 100.,
-                 N: int = 51,
-                 t0: float = 0.,
-                 tf: float = 60.,
-                 dt: float = 1.,
-                 stdU: float = 0.3,
-                 stdV: float = 0.3,
-                 stdW: float = 0.1,
-                 lux: float = 200.,
-                 lvx: float = 70.,
-                 lwx: float = 30.,
-                 cuy: float = 7.,
-                 cuz: float = 10.,
-                 cvy: float = 7.,
-                 cvz: float = 10.,
-                 cwy: float = 7.,
-                 cwz: float = 10.,
-                 ks: int = 1,
-                 kt: int = 1,
-                 pp: bool = False,
-                 seed: Optional[int] = None) -> None:
+    def __init__(
+        self,
+        mean: float = 3.0,
+        L: float = 100.0,
+        N: int = 51,
+        t0: float = 0.0,
+        tf: float = 60.0,
+        dt: float = 1.0,
+        stdU: float = 0.3,
+        stdV: float = 0.3,
+        stdW: float = 0.1,
+        lux: float = 200.0,
+        lvx: float = 70.0,
+        lwx: float = 30.0,
+        cuy: float = 7.0,
+        cuz: float = 10.0,
+        cvy: float = 7.0,
+        cvz: float = 10.0,
+        cwy: float = 7.0,
+        cwz: float = 10.0,
+        ks: int = 1,
+        kt: int = 1,
+        pp: bool = False,
+        seed: Optional[int] = None,
+    ) -> None:
         """Init with args.
 
         Wind fields generation is performed at init.
@@ -209,9 +219,15 @@ class TurbWind3D:
         self.stdU = stdU  # std of wind fluctuations for u component (m/s)
         self.stdV = stdV  # std of wind fluctuations for v component (m/s)
         self.stdW = stdW  # std of wind fluctuations for w component (m/s)
-        self.lux = lux  # turbulence length scale for u component along wind direction (m)
-        self.lvx = lvx  # turbulence length scale for v component along wind direction (m)
-        self.lwx = lwx  # turbulence length scale for w component along wind direction (m)
+        self.lux = (
+            lux  # turbulence length scale for u component along wind direction (m)
+        )
+        self.lvx = (
+            lvx  # turbulence length scale for v component along wind direction (m)
+        )
+        self.lwx = (
+            lwx  # turbulence length scale for w component along wind direction (m)
+        )
         self.cuy = cuy  # co-coherence decay coefficient for u-component
         self.cuz = cuz  # co-coherence decay coefficient for u-component
         self.cvy = cvy  # co-coherence decay coefficient for v-component
@@ -228,9 +244,9 @@ class TurbWind3D:
         # Compute useful values from members and generate wind field
         self.mean = mean * np.ones((self.N,))  # speed profile at eq. (m/s)
         self.t = np.linspace(t0, self.tf, 1 + int(np.floor((tf - t0) / self.dt)))
-        self.fs = 1. / self.dt
-        self.f = np.arange(1. / (tf - t0), 0.5 * self.fs, 1. / (tf - t0))
-        self.y = np.linspace(0., self.L, self.N)
+        self.fs = 1.0 / self.dt
+        self.f = np.arange(1.0 / (tf - t0), 0.5 * self.fs, 1.0 / (tf - t0))
+        self.y = np.linspace(0.0, self.L, self.N)
 
         self._generate(pp)
 
@@ -268,9 +284,15 @@ class TurbWind3D:
         R = np.zeros((3 * self.N, nt))
         pb = spb.generate(pp, len(self.f), desc=__name__)
         for jj in range(len(self.f)):
-            cu = np.exp(-self.f[jj] * np.sqrt((self.cuy * dy)**2 + (self.cuz * dz)**2) / um)
-            cv = np.exp(-self.f[jj] * np.sqrt((self.cvy * dy)**2 + (self.cvz * dz)**2) / um)
-            cw = np.exp(-self.f[jj] * np.sqrt((self.cwy * dy)**2 + (self.cwz * dz)**2) / um)
+            cu = np.exp(
+                -self.f[jj] * np.sqrt((self.cuy * dy) ** 2 + (self.cuz * dz) ** 2) / um
+            )
+            cv = np.exp(
+                -self.f[jj] * np.sqrt((self.cvy * dy) ** 2 + (self.cvz * dz) ** 2) / um
+            )
+            cw = np.exp(
+                -self.f[jj] * np.sqrt((self.cwy * dy) ** 2 + (self.cwz * dz) ** 2) / um
+            )
 
             su = von_karman_u(self.f[jj], self.mean, self.stdU, self.lux)
             sv = von_karman_v(self.f[jj], self.mean, self.stdV, self.lvx)
@@ -283,40 +305,46 @@ class TurbWind3D:
             zr = np.zeros_like(su)
             S = np.block([[su, zr, zr], [zr, sv, zr], [zr, zr, sw]])
 
-            phi = 2. * np.pi * self.rng.random(3 * self.N)
+            phi = 2.0 * np.pi * self.rng.random(3 * self.N)
             phi = np.tile(phi, (nt, 1)).T
 
-            A = np.cos(2. * np.pi * self.f[jj] * np.tile(self.t, (3 * self.N, 1)) + phi)
+            A = np.cos(
+                2.0 * np.pi * self.f[jj] * np.tile(self.t, (3 * self.N, 1)) + phi
+            )
             G = np.linalg.cholesky(S)
-            R = R + np.sqrt(2. * np.median(np.diff(self.f))) * np.matmul(np.abs(G), A)
+            R = R + np.sqrt(2.0 * np.median(np.diff(self.f))) * np.matmul(np.abs(G), A)
 
             pb.update()
 
         pb.close()
 
-        self.uu = R[:self.N, :]
-        self.vv = R[self.N: 2 * self.N, :]
-        self.ww = R[2 * self.N:, :]
+        self.uu = R[: self.N, :]
+        self.vv = R[self.N : 2 * self.N, :]
+        self.ww = R[2 * self.N :, :]
 
         self.uu = self.uu + np.tile(self.mean, (nt, 1)).T
-        self.uu = self.stdU * (self.uu - np.mean(self.uu)) / np.std(self.uu) + self.mean[0]
-        self.vv = self.stdV * (self.vv - np.mean(self.vv)) / np.std(self.vv) + 0.
-        self.ww = self.stdW * (self.ww - np.mean(self.ww)) / np.std(self.ww) + 0.
+        self.uu = (
+            self.stdU * (self.uu - np.mean(self.uu)) / np.std(self.uu) + self.mean[0]
+        )
+        self.vv = self.stdV * (self.vv - np.mean(self.vv)) / np.std(self.vv) + 0.0
+        self.ww = self.stdW * (self.ww - np.mean(self.ww)) / np.std(self.ww) + 0.0
 
 
 class Force1D:
     """Force computation from a 1D wind signal."""
 
-    def __init__(self,
-                 mean: Optional[float] = None,
-                 std: Optional[float] = None,
-                 lxu: Optional[float] = None,
-                 t0: float = 0.,
-                 tf: float = 60.,
-                 dt: float = 1.,
-                 cd: Optional[float] = None,
-                 rho: float = 1.2,
-                 d: Optional[float] = None):
+    def __init__(
+        self,
+        mean: Optional[float] = None,
+        std: Optional[float] = None,
+        lxu: Optional[float] = None,
+        t0: float = 0.0,
+        tf: float = 60.0,
+        dt: float = 1.0,
+        cd: Optional[float] = None,
+        rho: float = 1.2,
+        d: Optional[float] = None,
+    ):
         """Init with args.
 
         Parameters
@@ -371,8 +399,8 @@ class Force1D:
         ws = self._fast_interp(t)
 
         al = self.alpha * np.ones_like(s)
-        sq = np.sqrt((0. - vn)**2 + (ws - vb)**2)
-        fn = al * sq * self.cd * (0. - vn)
+        sq = np.sqrt((0.0 - vn) ** 2 + (ws - vb) ** 2)
+        fn = al * sq * self.cd * (0.0 - vn)
         fb = al * sq * self.cd * (ws - vb)
         return fn, fb
 
@@ -380,33 +408,35 @@ class Force1D:
 class Force2D:
     """Force computation from a 2D turbulent wind field."""
 
-    def __init__(self,
-                 Lp: float = 100.,
-                 N: int = 51,
-                 t0: float = 0.,
-                 tf: float = 60.,
-                 dt: float = 1.,
-                 d: float = 0.1,
-                 cd: Optional[float] = None,
-                 rho: Optional[float] = None,
-                 meanU: float = 3.0,
-                 stdU: float = 0.3,
-                 stdV: float = 0.3,
-                 stdW: float = 0.1,
-                 lxu: float = 200.,
-                 lxv: float = 70.,
-                 lxw: float = 30.,
-                 cuy: float = 7.,
-                 cuz: float = 10.,
-                 cvy: float = 7.,
-                 cvz: float = 10.,
-                 cwy: float = 7.,
-                 cwz: float = 10.,
-                 T: float = 293.15,
-                 p: float = 1.013E+05,
-                 phi: float = 0.,
-                 pp: bool = False,
-                 seed: Optional[int] = None) -> None:
+    def __init__(
+        self,
+        Lp: float = 100.0,
+        N: int = 51,
+        t0: float = 0.0,
+        tf: float = 60.0,
+        dt: float = 1.0,
+        d: float = 0.1,
+        cd: Optional[float] = None,
+        rho: Optional[float] = None,
+        meanU: float = 3.0,
+        stdU: float = 0.3,
+        stdV: float = 0.3,
+        stdW: float = 0.1,
+        lxu: float = 200.0,
+        lxv: float = 70.0,
+        lxw: float = 30.0,
+        cuy: float = 7.0,
+        cuz: float = 10.0,
+        cvy: float = 7.0,
+        cvz: float = 10.0,
+        cwy: float = 7.0,
+        cwz: float = 10.0,
+        T: float = 293.15,
+        p: float = 1.013e05,
+        phi: float = 0.0,
+        pp: bool = False,
+        seed: Optional[int] = None,
+    ) -> None:
         """Init with args.
 
         Parameters
@@ -472,11 +502,30 @@ class Force2D:
         -------
         None.
         """
-        self.tbw = TurbWind3D(mean=meanU, L=Lp, N=N, t0=t0, tf=tf, dt=dt,
-                              stdU=stdU, stdV=stdV, stdW=stdW, lux=lxu,
-                              lvx=lxv, lwx=lxw, cuy=cuy, cuz=cuz, cvy=cvy,
-                              cvz=cvz, cwy=cwy, cwz=cwz, ks=1, kt=1, pp=pp,
-                              seed=seed)
+        self.tbw = TurbWind3D(
+            mean=meanU,
+            L=Lp,
+            N=N,
+            t0=t0,
+            tf=tf,
+            dt=dt,
+            stdU=stdU,
+            stdV=stdV,
+            stdW=stdW,
+            lux=lxu,
+            lvx=lxv,
+            lwx=lxw,
+            cuy=cuy,
+            cuz=cuz,
+            cvy=cvy,
+            cvz=cvz,
+            cwy=cwy,
+            cwz=cwz,
+            ks=1,
+            kt=1,
+            pp=pp,
+            seed=seed,
+        )
 
         self.cd = cd
         if rho is None:
@@ -543,14 +592,13 @@ class Force2D:
         return fn, fb
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     # Some test of wind features
 
     import matplotlib.pyplot as plt
 
-    plt.close('all')
-
+    plt.close("all")
 
     def _fft(t, s):
         T = np.nanmean(np.diff(t))
@@ -561,20 +609,19 @@ if __name__ == '__main__':
         y = np.abs(np.fft.fft(s) / n)[:N]
         return f, y
 
-
-    t0 = 7.
-    tf = 127.
+    t0 = 7.0
+    tf = 127.0
     dt = 0.1
 
     um = 3.0
     us = 0.3
-    ul = 200.
+    ul = 200.0
     vm = 0.0
     vs = 0.3
-    vl = 70.
-    wm = 0.
+    vl = 70.0
+    wm = 0.0
     ws = 0.1
-    wl = 30.
+    wl = 30.0
 
     N = 3
     t = np.arange(t0, tf, dt)
@@ -582,17 +629,31 @@ if __name__ == '__main__':
 
     f1d = Force1D(mean=um, std=us, lxu=ul, t0=t0, tf=tf, dt=dt, d=0.1, cd=1.1)
 
-    f2d = Force2D(meanU=um, Lp=100., N=N, t0=t0, tf=tf, dt=dt, stdU=us,
-                  stdV=vs, stdW=ws, lxu=ul, lxv=vl, lxw=wl, d=0.1, cd=1.1)
+    f2d = Force2D(
+        meanU=um,
+        Lp=100.0,
+        N=N,
+        t0=t0,
+        tf=tf,
+        dt=dt,
+        stdU=us,
+        stdV=vs,
+        stdW=ws,
+        lxu=ul,
+        lxv=vl,
+        lxw=wl,
+        d=0.1,
+        cd=1.1,
+    )
 
     r1d = f1d.wnd
     r3d = f2d.tbw
 
     fig, ax = plt.subplots(nrows=3, ncols=2)
 
-    ax[0, 1].loglog(f, von_karman_u(f, um, us, ul), '--k')
-    ax[1, 1].loglog(f, von_karman_v(f, um, vs, vl), '--k')
-    ax[2, 1].loglog(f, von_karman_w(f, um, ws, wl), '--k')
+    ax[0, 1].loglog(f, von_karman_u(f, um, us, ul), "--k")
+    ax[1, 1].loglog(f, von_karman_v(f, um, vs, vl), "--k")
+    ax[2, 1].loglog(f, von_karman_w(f, um, ws, wl), "--k")
 
     k = 1
     ax[0, 0].plot(r3d.t, r3d.uu[k, :])
@@ -607,32 +668,38 @@ if __name__ == '__main__':
     ax[1, 1].loglog(fv, yv**2 * (tf - t0))
     ax[2, 1].loglog(fw, yw**2 * (tf - t0))
 
-    print(f'[3d, u] mean = {np.mean(r3d.uu[k, :]):+.3f}, std = {np.std(r3d.uu[k, :]):+.3f}')
-    print(f'[3d, v] mean = {np.mean(r3d.vv[k, :]):+.3f}, std = {np.std(r3d.vv[k, :]):+.3f}')
-    print(f'[3d, w] mean = {np.mean(r3d.ww[k, :]):+.3f}, std = {np.std(r3d.ww[k, :]):+.3f}')
+    print(
+        f"[3d, u] mean = {np.mean(r3d.uu[k, :]):+.3f}, std = {np.std(r3d.uu[k, :]):+.3f}"
+    )
+    print(
+        f"[3d, v] mean = {np.mean(r3d.vv[k, :]):+.3f}, std = {np.std(r3d.vv[k, :]):+.3f}"
+    )
+    print(
+        f"[3d, w] mean = {np.mean(r3d.ww[k, :]):+.3f}, std = {np.std(r3d.ww[k, :]):+.3f}"
+    )
 
-    ax[0, 0].set_title('Wind speed (u dir, m/s)')
-    ax[1, 0].set_title('Wind speed (v dir, m/s)')
-    ax[2, 0].set_title('Wind speed (w dir, m/s)')
+    ax[0, 0].set_title("Wind speed (u dir, m/s)")
+    ax[1, 0].set_title("Wind speed (v dir, m/s)")
+    ax[2, 0].set_title("Wind speed (w dir, m/s)")
 
-    ax[0, 1].set_title('Wind spectrum (u dir)')
-    ax[1, 1].set_title('Wind spectrum (v dir)')
-    ax[2, 1].set_title('Wind spectrum (w dir)')
+    ax[0, 1].set_title("Wind spectrum (u dir)")
+    ax[1, 1].set_title("Wind spectrum (v dir)")
+    ax[2, 1].set_title("Wind spectrum (w dir)")
 
     ax[0, 0].plot(r1d.t, r1d.u)
     fm, ym = _fft(r1d.t, r1d.u)
     ax[0, 1].loglog(fm, ym**2 * (tf - t0))
 
-    print(f'[1d, u] mean = {np.mean(r1d.u):+.3f}, std = {np.std(r1d.u):+.3f}')
+    print(f"[1d, u] mean = {np.mean(r1d.u):+.3f}, std = {np.std(r1d.u):+.3f}")
 
-    ax[-1, 0].set_xlabel('Time (s)')
-    ax[-1, 1].set_xlabel('Freq (Hz)')
+    ax[-1, 0].set_xlabel("Time (s)")
+    ax[-1, 1].set_xlabel("Freq (Hz)")
     for i in range(3):
         for j in range(2):
             ax[i, j].grid(True)
 
-    t = np.linspace(t0 - 7., tf + 13, 2 * len(t))
-    s = np.array([50.])
+    t = np.linspace(t0 - 7.0, tf + 13, 2 * len(t))
+    s = np.array([50.0])
 
     f1n = np.zeros_like(t)
     f1b = np.zeros_like(t)
@@ -640,10 +707,10 @@ if __name__ == '__main__':
     f2b = np.zeros_like(t)
 
     for k, tk in enumerate(t):
-        tmp = f1d(s, tk, None, None, 0., 0.)
+        tmp = f1d(s, tk, None, None, 0.0, 0.0)
         f1n[k] = tmp[0][0]
         f1b[k] = tmp[1][0]
-        tmp = f2d(s, tk, None, None, 0., 0.)
+        tmp = f2d(s, tk, None, None, 0.0, 0.0)
         f2n[k] = tmp[0][0]
         f2b[k] = tmp[1][0]
 
