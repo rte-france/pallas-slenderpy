@@ -108,7 +108,7 @@ def rot_none(pos, y=0.0, dy=0.0):
 
 def d2M_cst(
     n: int, ds: float, bcl: BoundaryCondition, bcr: BoundaryCondition
-) -> Tuple[scipy.sparse.dia.dia_matrix, np.ndarray]:
+) -> Tuple[scipy.sparse.dia_matrix, np.ndarray]:
     """Get finite difference matrix for second-order derivative on a uniform discretization.
 
     Compute matrix and boundary condition vector for finite-difference space
@@ -128,7 +128,7 @@ def d2M_cst(
 
     Returns
     -------
-    scipy.sparse.dia.dia_matrix
+    scipy.sparse.dia_matrix
         Derivative matrix.
     numpy.ndarray
         Boundary condition vector.
@@ -151,7 +151,7 @@ def d2M_cst(
 
 def d4M_cst(
     n: int, ds: float, bcl: BoundaryCondition, bcr: BoundaryCondition
-) -> Tuple[scipy.sparse.dia.dia_matrix, np.ndarray]:
+) -> Tuple[scipy.sparse.dia_matrix, np.ndarray]:
     """Get finite difference matrix for fourth-order derivative on a uniform discretization.
 
     Compute matrix and boundary condition vector for finite-difference space
@@ -171,7 +171,7 @@ def d4M_cst(
 
     Returns
     -------
-    scipy.sparse.dia.dia_matrix
+    scipy.sparse.dia_matrix
         Derivative matrix.
     numpy.ndarray
         Boundary condition vector.
@@ -201,7 +201,7 @@ def d4M_cst(
     return D / ds**4, d / ds**4
 
 
-def d2M(ds: np.ndarray) -> scipy.sparse.dia.dia_matrix:
+def d2M(ds: np.ndarray) -> scipy.sparse.dia_matrix:
     """Get finite difference matrix for second-order derivative.
 
     Compute matrix for finite-difference space second derivative on a general
@@ -216,7 +216,7 @@ def d2M(ds: np.ndarray) -> scipy.sparse.dia.dia_matrix:
 
     Returns
     -------
-    scipy.sparse.dia.dia_matrix
+    scipy.sparse.dia_matrix
         Derivative matrix.
     """
     h1 = ds[:-1]
@@ -227,7 +227,7 @@ def d2M(ds: np.ndarray) -> scipy.sparse.dia.dia_matrix:
     return sp.sparse.diags([dinf[1:], diag, dsup[:-1]], [-1, 0, 1])
 
 
-def d1M(ds: np.ndarray) -> scipy.sparse.dia.dia_matrix:
+def d1M(ds: np.ndarray) -> scipy.sparse.dia_matrix:
     """Get finite difference matrix for first-order derivative.
 
     Compute matrix for finite-difference space first derivative on a general
@@ -242,7 +242,7 @@ def d1M(ds: np.ndarray) -> scipy.sparse.dia.dia_matrix:
 
     Returns
     -------
-    scipy.sparse.dia.dia_matrix
+    scipy.sparse.dia_matrix
         Derivative matrix.
     """
     h1 = ds[:-1]

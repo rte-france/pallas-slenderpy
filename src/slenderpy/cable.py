@@ -569,6 +569,7 @@ def solve(
     vn0: Optional[np.ndarray] = None,
     vb0: Optional[np.ndarray] = None,
     remove_cat: bool = False,
+    cfl_hint = None,
 ) -> simtools.Results:
     """EOM solver for a suspended cable and an external force.
 
@@ -636,6 +637,21 @@ def solve(
         h = -1.0 / vt2 * un + 0.5 * ((C * un) ** 2 + (C * ub) ** 2)
         e = 0.5 * np.sum((h[:-1] + h[1:]) * ds)
         b = vt2 + vl2 * e
+
+        cfl = np.sqrt(b) * dt / np.min(ds)
+        if cfl_hint is not None and cfl > 1.0:
+            msg = (
+                f"CFL condition is not met: c={cfl:.2E}; increase the number of timesteps (dt={dt}) or decrease the"
+                f"number of space points (dx={np.min(ds)})."
+            )
+            if cfl_hint == "err":
+                raise RuntimeError(msg)
+            elif cfl_hint == "print":
+                print(msg)
+            else:
+                raise ValueError(
+                    "Wrong value for cfl_hint (must be in [None, 'err', 'print'])."
+                )
 
         fn1, fn2, fb1, fb2 = cbu.adim_force(
             force, s, t, dt, un, ub, vn, vb, tAd, cb.L, uAd, cb.m, cb.g
