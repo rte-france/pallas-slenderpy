@@ -4,7 +4,6 @@ from typing import Union
 
 import numpy as np
 from pyntb.optimize import qnewt2d_v
-
 from slenderpy.future import floatArrayLike
 from slenderpy.future._constant import _GRAVITY
 from slenderpy.future.cable.static import blondel
