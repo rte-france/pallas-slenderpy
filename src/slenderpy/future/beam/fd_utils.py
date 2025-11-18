@@ -60,14 +60,21 @@ def clean_matrix(order: int, A: sp.sparse.spmatrix) -> sp.sparse.spmatrix:
     if order == 4:
         A = sp.sparse.csr_matrix.copy(A)
 
-        A.data[0, 0] = 0
-        A.data[0, -3] = 0
+        if A.data.shape[0] == 1:
+            A.data[0, 0] = 0
+            A.data[0, 1] = 0
+            A.data[0, -1] = 0
+            A.data[0, -2] = 0
 
-        A.data[1, 1] = 0
-        A.data[1, -2] = 0
+        else:
+            A.data[0, 0] = 0
+            A.data[0, -3] = 0
 
-        A.data[2, -1] = 0
-        A.data[2, 2] = 0
+            A.data[1, 1] = 0
+            A.data[1, -2] = 0
+
+            A.data[2, -1] = 0
+            A.data[2, 2] = 0
 
     return A
 
@@ -98,7 +105,7 @@ class BoundaryCondition:
         right: Optional[
             Tuple[Tuple[float, float, float, float], Tuple[float, float, float, float]]
         ] = None,
-        dynamic_values: Optional[Tuple[callable, callable, callable, callable]] = None
+        dynamic_values: Optional[Tuple[callable, callable, callable, callable]] = None,
     ) -> None:
 
         if order != 2 and order != 4:
@@ -183,7 +190,7 @@ class BoundaryCondition:
 
     def compute(
         self, ds: float, n: int
-    ) -> Tuple[sp.sparse.spmatrix, np.ndarray[float]] :
+    ) -> Tuple[sp.sparse.spmatrix, np.ndarray[float]]:
         """Compute the matrices of the scheme and the right-hand side linked to the boundary conditions."""
         a1, b1, c1, d1 = self.left[0]
         a4, b4, c4, d4 = self.right[0]
@@ -218,21 +225,20 @@ class BoundaryCondition:
             rhs[-2] = d3
 
         return bc_matrix, rhs
-    
-    
+
     def update_rhs(self, n, x: np.ndarray[float], t: float):
         rhs = np.zeros(n)
 
         rhs[0] = self.dynamic_values[0](x[0], t)
         rhs[-1] = self.dynamic_values[-1](x[-1], t)
 
-        if self.order == 4 :
+        if self.order == 4:
             rhs[1] = self.dynamic_values[1](x[1], t)
             rhs[-2] = self.dynamic_values[-2](x[-2], t)
 
-        return rhs 
+        return rhs
 
-    
+
 def rot_free(y_left=0, y_right=0, d2y_left=0, d2y_right=0):
     """Get boundary condition with free derivative and constrained value and curvature."""
     return BoundaryCondition(

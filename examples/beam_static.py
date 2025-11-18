@@ -32,8 +32,8 @@ def curvature_approx_bending_const():
     right = [[1, 0, 0, 0], [0, 0, 1, 0]]
     bc = FD.BoundaryCondition(4, left, right)
     function = exact_solution(x)
-    beam = Beam(length=1, tension=1, ei_max=1)
-    sol = _solve_static_approx_curvature(n=n, bc=bc, beam=beam, rhs=np.zeros(n))
+    beam = Beam(length=1, boundary_condition=bc, tension=1, ei_max=1)
+    sol = _solve_static_approx_curvature(n=n, beam=beam, rhs=np.zeros(n))
 
     plt.plot(x, function, "--", color="blue", label="analytical")
     plt.plot(x, sol, color="orange", label="FD solution")
@@ -66,9 +66,9 @@ def curvature_exact_bending_const():
     left = [[1, 0, 0, np.cosh(lmin)], [0, 1, 0, np.sinh(lmin)]]
     right = [[1, 0, 0, np.cosh(lmax)], [0, 1, 0, np.sinh(lmax)]]
     bc = FD.BoundaryCondition(4, left, right)
-    beam = Beam(length=lspan, tension=1, ei_max=1)
-    approx_curvature = _solve_static_approx_curvature(n=n, bc=bc, beam=beam, rhs=rhs(x))
-    sol = _solve_static_exact_curvature(n=n, bc=bc, beam=beam, rhs=rhs(x))
+    beam = Beam(length=lspan, boundary_condition=bc, tension=1, ei_max=1)
+    approx_curvature = _solve_static_approx_curvature(n=n, beam=beam, rhs=rhs(x))
+    sol = _solve_static_exact_curvature(n=n, beam=beam, rhs=rhs(x))
     function = exact_solution(x)
 
     plt.plot(x, function, "--", color="blue", label="analytical")

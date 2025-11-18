@@ -233,6 +233,10 @@ class Results:
         for i, v in enumerate(lov):
             self.data[v][k, :] = np.interp(los, s, lod[i])
 
+    def save(self, k, lov, lod):
+        for i, v in enumerate(lov):
+            self.data[v][k, :] = lod[i]
+
     def set_state(self, state):
         """Record State. Internal or expert use only."""
         self.state = state

@@ -29,8 +29,8 @@ def test_solve_cruvature_approx_order2(plot=False):
     right = [[-1, 0, 1, 4]]
     order = 2
     bc = BoundaryCondition(order, left, right)
-    beam = Beam.Beam(length=1, tension=-1, ei_max=0)
-    sol = Beam._solve_static_approx_curvature(n=n, bc=bc, beam=beam, rhs=x)
+    beam = Beam.Beam(length=1, boundary_condition=bc, tension=-1, ei_max=0)
+    sol = Beam._solve_static_approx_curvature(n=n, beam=beam, rhs=x)
 
     def exact(x):
         A = -1 / 12
@@ -64,8 +64,8 @@ def test_solve_cruvature_approx_order4(plot=False):
     right = [[1, 0, 0, 0], [0, 0, 1, 0]]
     bc = BoundaryCondition(4, left, right)
     rhs = np.zeros(n)
-    beam = Beam.Beam(length=1, tension=1, ei_max=1)
-    sol = Beam._solve_static_approx_curvature(n=n, bc=bc, beam=beam, rhs=rhs)
+    beam = Beam.Beam(length=1, boundary_condition=bc, tension=1, ei_max=1)
+    sol = Beam._solve_static_approx_curvature(n=n, beam=beam, rhs=rhs)
 
     def exact(x):
         A = -1 / (np.exp(1) ** 2 - 1)
@@ -134,8 +134,8 @@ def test_solve_curvature_exact(plot=False):
     left = [[1, 0, 0, lmin**2], [0, 1, 0, 2 * lmin]]
     right = [[1, 0, 0, lmax**2], [0, 1, 0, 2 * lmax]]
     bc = BoundaryCondition(4, left, right)
-    beam = Beam.Beam(length=lspan, tension=-5, ei_max=8.3)
-    sol = Beam._solve_static_exact_curvature(n=n, bc=bc, beam=beam, rhs=rhs(x))
+    beam = Beam.Beam(length=lspan, boundary_condition=bc, tension=-5, ei_max=8.3)
+    sol = Beam._solve_static_exact_curvature(n=n, beam=beam, rhs=rhs(x))
 
     def exact(x):
         return x**2
@@ -192,12 +192,13 @@ def test_solve_curvature_approx_bending_moment_variable(plot=False):
     bc = BoundaryCondition(4, left, right)
     beam = Beam.Beam(
         length=lspan,
+        boundary_condition=bc,
         tension=H,
         ei_max=ei_max,
         ei_min=ei_min,
         critical_curvature=critical_curvature,
     )
-    sol = Beam._solve_static_approx_curvature(n=n, bc=bc, beam=beam, rhs=rhs(x))
+    sol = Beam._solve_static_approx_curvature(n=n, beam=beam, rhs=rhs(x))
 
     if plot:
         _plot(x, exact(x), sol)
@@ -251,12 +252,13 @@ def test_solve_curvature_exact_bending_moment_variable(plot=False):
     bc = BoundaryCondition(4, left, right)
     beam = Beam.Beam(
         length=lspan,
+        boundary_condition=bc,
         tension=H,
         ei_max=ei_max,
         ei_min=ei_min,
         critical_curvature=critical_curvature,
     )
-    sol = Beam._solve_static_exact_curvature(n=n, bc=bc, beam=beam, rhs=rhs(x))
+    sol = Beam._solve_static_exact_curvature(n=n, beam=beam, rhs=rhs(x))
 
     if plot:
         _plot(x, exact(x), sol)
