@@ -266,7 +266,7 @@ def _solve_dynamic_exact_curvature_EI_const(
         bending_moment_old = beam.compute_bending_moment(curvature_old)
         y_picard = y_old
 
-        for _ in range(10):
+        for _ in range(8):
             curvature_picard = compute_curvature(nb_space, ds, y_picard)
             bending_moment_picard = beam.compute_bending_moment(curvature_picard)
             rhs = (
@@ -337,11 +337,11 @@ def _solve_dynamic_exact_curvature(
 
     current_time = dt
 
-    lov = ["y", "c", "M"]
+    lov = ["y", "c", "M", "eta"]
     res = simtools.Results(
         lot=parameters.time_vector_output().tolist(), lov=lov, los=parameters.los
     )
-    res.save(0, lov, [y_old, curvature_old, bending_moment_old])
+    res.save(0, lov, [y_old, curvature_old, bending_moment_old, eta_old])
 
     for k in range(parameters.nt):
 
@@ -351,13 +351,13 @@ def _solve_dynamic_exact_curvature(
         force_previsous = FD.clean_rhs(order, force(x, current_time - dt))
         force_current = FD.clean_rhs(order, force(x, current_time))
         y_picard = y_old
-        eta_picard = eta_old
+        # eta_picard = eta_old
 
         for _ in range(10):
             curvature_picard = compute_curvature(nb_space, ds, y_picard)
-            bending_moment_picard = beam.compute_bending_moment(
-                curvature_picard, eta_picard
-            )
+            diff = curvature_picard - curvature_old
+            eta_picard = eta_old + (diff - 0.5 * (diff * np.abs(eta_old) + np.abs(diff) * eta_old))/ chi0
+            bending_moment_picard = beam.compute_bending_moment(curvature_picard, eta_picard)
             rhs = (
                 B @ v_old
                 + dt2 * (force_previsous + force_current)
@@ -370,28 +370,27 @@ def _solve_dynamic_exact_curvature(
 
             y_new[0:2] = v_new[0:2]
             y_new[-2:] = v_new[-2:]
+            
             y_picard = y_new
-            diff = curvature_picard - curvature_old
-            eta_new = (
-                eta_old
-                + (diff - 0.5 * (diff * np.abs(eta_picard) + np.abs(diff) * eta_picard))
-                / chi0
-            )
-            eta_picard = eta_new
 
         current_time += dt
 
-        v_old = v_new
-        y_old = y_new
-        curvature_new = compute_curvature(nb_space, ds, y_old)
-        curvature_old = curvature_new
-        bending_moment_old = beam.compute_bending_moment(curvature_old, eta_new)
+        curvature_new = compute_curvature(nb_space, ds, y_new)
+        diff = curvature_new - curvature_old
+        eta_new = eta_old + (diff - 0.5 * (diff * np.abs(eta_old) + np.abs(diff) * eta_old))/ chi0
+        bending_moment_new = beam.compute_bending_moment(curvature_new, eta_new)
 
         if (k + 1) % parameters.rr == 0:
             res.save(
                 (k // parameters.rr) + 1,
                 lov,
-                [y_new, curvature_old, bending_moment_old],
+                [y_new, curvature_new, bending_moment_new, eta_new],
             )
+
+        v_old = v_new
+        y_old = y_new
+        curvature_old = curvature_new
+        eta_old = eta_new
+        bending_moment_old = bending_moment_new
 
     return res
