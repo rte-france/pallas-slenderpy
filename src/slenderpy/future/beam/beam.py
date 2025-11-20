@@ -360,7 +360,7 @@ def _solve_dynamic_exact_curvature(
 
         it = 0
         error = 100
-        while it < 10 and error > 1e-3 :
+        while it < 15 and error > 1e-4 :
             curvature_picard = compute_curvature(nb_space, ds, y_picard)
             bending_moment_picard = beam.compute_bending_moment(curvature_picard, eta_picard)
             rhs = (

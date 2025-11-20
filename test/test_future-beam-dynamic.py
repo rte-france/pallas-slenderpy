@@ -38,6 +38,7 @@ def _plot_animation(x, exact, sol, ymin, ymax, nb_time, final_time):
         blit=True,
         repeat=True,
     )
+    # ani.save("exact_curvature_picard.mp4", writer="ffmpeg", fps=30)
     plt.show()
 
 
@@ -164,6 +165,71 @@ def test_solve_approx_curvature_dynamic_BC(plot=False):
     assert np.allclose(analitical_results, y, atol=atol, rtol=rtol)
 
 
+def test_solve_exact_curvature_EI_const(plot=False):
+    nb_space = 100
+    dt = 1e-5
+    final_time = 0.3
+    mass = 9.8
+    tension = 256.12
+    ei_max = 2698.23
+    lmin = 0.0
+    lmax = 2.0
+    lspan = lmax - lmin
+    x = np.linspace(lmin, lmax, nb_space)
+
+    def force(x, t):
+        return (
+            mass * np.cosh(x + t)
+            + ei_max
+            * (
+                -2 / np.cosh(x + t) ** 2
+                + 6.0 * np.sinh(x + t) ** 2 / np.cosh(x + t) ** 4
+            )
+            - tension * np.cosh(x + t)
+        )
+
+    def exact(x, t):
+        return np.cosh(x + t)
+
+    def exact_space_derivative(x, t):
+        return np.sinh(x + t)
+
+    def exact_time_derivative(x, t):
+        return np.sinh(x + t)
+    
+    left = [[1, 0, 0, exact(lmin, 0)], [0, 1, 0, exact_space_derivative(lmin, 0)]]
+    right = [[1, 0, 0, exact(lmax, 0)], [0, 1, 0, exact_space_derivative(lmax, 0)]]
+    dynamic_values = [exact, exact_space_derivative, exact_space_derivative, exact]
+    bc = BoundaryCondition(4, left, right, dynamic_values)
+
+    beam = Beam.Beam(
+        length=lspan, boundary_condition=bc, tension=tension, ei_max=ei_max, mass=mass
+    )
+    parameters = simtools.Parameters(
+        ns=nb_space, tf=final_time, dt=dt, dr=1e-3, los=nb_space
+    )
+    sol_ei_const = Beam._solve_dynamic_exact_curvature_EI_const(
+        beam=beam,
+        parameters=parameters,
+        initial_position=exact(x, 0),
+        initial_velocity=exact_time_derivative(x, 0),
+        force=force,
+    )
+    y = sol_ei_const.data["y"]
+
+    if plot:
+        _plot_animation(x, exact, y, 1, 7, parameters.nr, final_time)
+
+    analitical_results = np.array(
+        [exact(x, i * (final_time / parameters.nr)) for i in range(parameters.nr + 1)]
+    )
+    atol = 1.0e-2
+    rtol = 1.0e-2
+
+    assert np.allclose(analitical_results, y, atol=atol, rtol=rtol)
+ 
+
+
 def test_solve_exact_curvature(plot=False):
     nb_space = 100
     dt = 1e-5
@@ -206,9 +272,6 @@ def test_solve_exact_curvature(plot=False):
     dynamic_values = [exact, exact_space_derivative, exact_space_derivative, exact]
     bc = BoundaryCondition(4, left, right, dynamic_values)
 
-    beam_ei_const = Beam.Beam(
-        length=lspan, boundary_condition=bc, tension=tension, ei_max=ei_max, mass=mass
-    )
     beam = Beam.Beam(
         length=lspan,
         boundary_condition=bc,
@@ -219,14 +282,7 @@ def test_solve_exact_curvature(plot=False):
         mass=mass,
     )
     parameters = simtools.Parameters(
-        ns=nb_space, tf=final_time, dt=dt, dr=1e-3, los=nb_space
-    )
-    sol_ei_const = Beam._solve_dynamic_exact_curvature_EI_const(
-        beam=beam_ei_const,
-        parameters=parameters,
-        initial_position=exact(x, 0),
-        initial_velocity=exact_time_derivative(x, 0),
-        force=force,
+        ns=nb_space, tf=final_time, dt=dt, dr= 1e-3, los=nb_space
     )
     sol = Beam._solve_dynamic_exact_curvature(
         beam=beam,
@@ -237,11 +293,9 @@ def test_solve_exact_curvature(plot=False):
         force=force,
     )
 
-    y_ei_const = sol_ei_const.data["y"]
     y = sol.data["y"]
 
     if plot:
-        _plot_animation(x, exact, y_ei_const, 1, 7, parameters.nr, final_time)
         _plot_animation(x, exact, y, 1, 7, parameters.nr, final_time)
 
     analitical_results = np.array(
@@ -250,6 +304,4 @@ def test_solve_exact_curvature(plot=False):
     atol = 1.0e-2
     rtol = 1.0e-2
 
-    assert np.allclose(
-        analitical_results, y_ei_const, atol=atol, rtol=rtol
-    ) and np.allclose(analitical_results, y, atol=atol, rtol=rtol)
+    assert np.allclose(analitical_results, y, atol=atol, rtol=rtol)
