@@ -220,8 +220,8 @@ def _solve_dynamic_exact_curvature_EI_const(
     initial_velocity: np.ndarray[float],
     force: callable,
 ) -> np.ndarray[float]:
-    """Solve equation of the form : m*(d^2/dt^2)*y (d^2/dx^2)*M - tension*(d^2/dx^2)*y = rhs,
-    where M depends on the approximated curvature i.e. (d^2/dx^2)*y.
+    """Solve equation of the form : m*(d^2/dt^2)*y + (d^2/dx^2)*M - tension*(d^2/dx^2)*y = rhs,
+    where M depends on the exact curvature.
     """
     lspan = beam.length
     nb_space = parameters.ns
@@ -266,7 +266,9 @@ def _solve_dynamic_exact_curvature_EI_const(
         bending_moment_old = beam.compute_bending_moment(curvature_old)
         y_picard = y_old
 
-        for _ in range(8):
+        it = 0
+        error = 100
+        while it < 10 and error > 1e-3:
             curvature_picard = compute_curvature(nb_space, ds, y_picard)
             bending_moment_picard = beam.compute_bending_moment(curvature_picard)
             rhs = (
@@ -281,7 +283,9 @@ def _solve_dynamic_exact_curvature_EI_const(
 
             y_new[0:2] = v_new[0:2]
             y_new[-2:] = v_new[-2:]
+            error = np.linalg.norm(y_picard - y_new)
             y_picard = y_new
+            it += 1
 
         current_time += dt
         v_old = v_new
@@ -301,8 +305,8 @@ def _solve_dynamic_exact_curvature(
     initial_bending_moment: np.ndarray[float],
     force: callable,
 ) -> np.ndarray[float]:
-    """Solve equation of the form : m*(d^2/dt^2)*y (d^2/dx^2)*M - tension*(d^2/dx^2)*y = rhs,
-    where M depends on the approximated curvature i.e. (d^2/dx^2)*y.
+    """Solve equation of the form : m*(d^2/dt^2)*y + (d^2/dx^2)*M - tension*(d^2/dx^2)*y = rhs,
+    where M depends on the exact curvature.
     """
     lspan = beam.length
     nb_space = parameters.ns
@@ -335,13 +339,13 @@ def _solve_dynamic_exact_curvature(
     A = M + dt2**2 * K + BC
     B = M - dt2**2 * K
 
-    current_time = dt
+    current_time = parameters.t0 + dt
 
-    lov = ["y", "c", "M", "eta"]
+    lov = ["y", "v", "c", "M", "eta"]
     res = simtools.Results(
         lot=parameters.time_vector_output().tolist(), lov=lov, los=parameters.los
     )
-    res.save(0, lov, [y_old, curvature_old, bending_moment_old, eta_old])
+    res.save(0, lov, [y_old, v_old, curvature_old, bending_moment_old, eta_old])
 
     for k in range(parameters.nt):
 
@@ -350,13 +354,14 @@ def _solve_dynamic_exact_curvature(
 
         force_previsous = FD.clean_rhs(order, force(x, current_time - dt))
         force_current = FD.clean_rhs(order, force(x, current_time))
-        y_picard = y_old
-        # eta_picard = eta_old
 
-        for _ in range(10):
+        y_picard = y_old
+        eta_picard = eta_old
+
+        it = 0
+        error = 100
+        while it < 10 and error > 1e-3 :
             curvature_picard = compute_curvature(nb_space, ds, y_picard)
-            diff = curvature_picard - curvature_old
-            eta_picard = eta_old + (diff - 0.5 * (diff * np.abs(eta_old) + np.abs(diff) * eta_old))/ chi0
             bending_moment_picard = beam.compute_bending_moment(curvature_picard, eta_picard)
             rhs = (
                 B @ v_old
@@ -370,27 +375,31 @@ def _solve_dynamic_exact_curvature(
 
             y_new[0:2] = v_new[0:2]
             y_new[-2:] = v_new[-2:]
-            
+            error = np.linalg.norm(y_picard - y_new)
             y_picard = y_new
+
+            curvature_picard = compute_curvature(nb_space, ds, y_picard)
+            diff = curvature_picard - curvature_old
+            eta_new = ( eta_old + (diff - 0.5 * diff * np.abs(eta_picard))/ chi0 ) / ( 1 + 0.5*np.abs(diff)/chi0)
+            eta_picard = eta_new 
+            it += 1
 
         current_time += dt
 
-        curvature_new = compute_curvature(nb_space, ds, y_new)
-        diff = curvature_new - curvature_old
-        eta_new = eta_old + (diff - 0.5 * (diff * np.abs(eta_old) + np.abs(diff) * eta_old))/ chi0
+        curvature_new = curvature_picard
         bending_moment_new = beam.compute_bending_moment(curvature_new, eta_new)
 
         if (k + 1) % parameters.rr == 0:
             res.save(
                 (k // parameters.rr) + 1,
                 lov,
-                [y_new, curvature_new, bending_moment_new, eta_new],
+                [y_new, v_new, curvature_new, bending_moment_new, eta_new],
             )
 
         v_old = v_new
         y_old = y_new
-        curvature_old = curvature_new
         eta_old = eta_new
+        curvature_old = curvature_new
         bending_moment_old = bending_moment_new
 
     return res
