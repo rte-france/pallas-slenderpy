@@ -15,152 +15,99 @@ class Beam:
         length: float,
         boundary_condition: FD.BoundaryCondition,
         tension: float,
-        ei_max: float,
-        ei_min: float,
-        critical_curvature: float,
         mass: float,
+        ei_max: float, 
     ) -> None:
 
         self.length = length
         self.bc = boundary_condition
         self.tension = tension
-        self.ei_max = ei_max
-        self.ei_min = ei_min
-        self.critical_curvature = critical_curvature
         self.mass = mass
+        self.ei_max = ei_max
         
 
     def _bending_moment(
         self,
         curvature: np.ndarray[float],
-        cst_bending_stiffness: bool,
-        eta: np.ndarray[float] = None,
     ) -> np.ndarray[float]:
-        """Compute the bending moment if not constant, otherwise return ei_max."""
-        if cst_bending_stiffness:
-            return self.ei_max*curvature 
-        
-        elif eta is None:
-            self.chi_bar = (1 - self.ei_min / self.ei_max) * self.critical_curvature
-            return (self.ei_max * self.chi_bar + self.ei_min * curvature) * (
-                1 - np.exp(-curvature / self.chi_bar)
-            )
+        return self.ei_max*curvature 
+    
+    def solve_static(
+        self,
+        n: int,
+        rhs: np.ndarray[float],
+        approx_curvature: bool, 
+    ) -> np.ndarray[float]:
 
+        ds = self.length / (n - 1)
+
+        order = self.bc.order
+        D2_border = FD.second_derivative(n, ds)
+        D2 = FD.clean_matrix(order, D2_border)
+        BC, rhs_bc = self.bc.compute(ds, n)
+        D4 = FD.fourth_derivative(n, ds)
+        K = self.ei_max* D4 - self.tension * D2
+        A = K + BC
+        rhs = FD.clean_rhs(order, rhs)
+        rhs_tot = rhs + rhs_bc
+
+        sol = sp.sparse.linalg.spsolve(A, rhs_tot)
+
+        if approx_curvature:
+            def curvature(y):
+                return D2_border@y
+            
         else:
-            return (
-                self.ei_min * curvature
-                + (self.ei_max - self.ei_min) * self.critical_curvature * eta
-            )
-
-
-def _curvature(y: np.ndarray[float], function: callable) -> np.ndarray[float]:
-    """Compute the exact curvature for a given array."""
-    return function(y)
-
-
-def solve_static(
-    n: int,
-    length: float,
-    boundary_condition: FD.BoundaryCondition,
-    tension: float,
-    ei_max: float,
-    rhs: np.ndarray[float],
-    approx_curvature: bool,
-    cst_bending_stiffness: bool,
-    ei_min: Optional[float] = None,
-    critical_curvature: Optional[float] = None,
-    mass: Optional[float] = None,
-) -> np.ndarray[float]:
-    beam = Beam(length,boundary_condition,tension,ei_max,ei_min,critical_curvature,mass)
-
-    if approx_curvature:
-        return _solve_static_approx_curvature(n,beam,rhs,cst_bending_stiffness)
-    
-    else:
-        return _solve_static_exact_curvature(n,beam,rhs,cst_bending_stiffness)
-    
-
-def _solve_static_approx_curvature(
-    n: int,
-    beam: Beam,
-    rhs: np.ndarray[float],
-    cst_bending_stiffness: bool,
-) -> np.ndarray[float]:
-    """Solve equation of the form : (d^2/dx^2)*M - tension*(d^2/dx^2)*y = rhs,
-    where M depends on the approximated curvature i.e. (d^2/dx^2)*y.
-    """
-    ds = beam.length / (n - 1)
-
-    ei = beam.ei_max
-    H = beam.tension
-
-    order = beam.bc.order
-    D2_border = FD.second_derivative(n, ds)
-    D2 = FD.clean_matrix(order, D2_border)
-    BC, rhs_bc = beam.bc.compute(ds, n)
-    D4 = FD.fourth_derivative(n, ds)
-    K = ei * D4 - H * D2
-    A = K + BC
-    rhs = FD.clean_rhs(order, rhs)
-    rhs_tot = rhs + rhs_bc
-
-    sol = sp.sparse.linalg.spsolve(A, rhs_tot)
-
-    if not cst_bending_stiffness:
-
-        def curvature_function(y):
-            return D2_border@y
+            def curvature(y):
+                return D2_border@y / np.sqrt((np.ones(n) + ((FD.first_derivative(n,ds))@y)**2) ** (3))
 
         def equation(y):
-            curvature = _curvature(y, curvature_function)
-            bending_moment = beam._bending_moment(curvature, cst_bending_stiffness)
-            return D2 @ bending_moment - beam.tension * D2 @ y + BC @ y - rhs_tot
-
+            bending_moment = self._bending_moment(curvature(y))
+            return D2 @ bending_moment - self.tension * D2 @ y + BC @ y - rhs_tot
+        
         result = sp.optimize.root(equation, sol)
 
         if not result.success:
             print(result.message)
 
-        sol = result.x
+        return result.x
+        
+        
 
-    return sol
+class BeamEIVariable(Beam):
+    def __init__(
+        self,
+        length: float,
+        boundary_condition: FD.BoundaryCondition,
+        tension: float,
+        mass: float,
+        ei_max: float,
+        ei_min: float,
+        critical_curvature: float,
+    ) -> None:
 
-
-def _solve_static_exact_curvature(
-    n: int, 
-    beam: Beam, 
-    rhs: np.ndarray[float],
-    cst_bending_stiffness: bool,
-) -> np.ndarray[float]:
-    """Solve equation of the form : (d^2/dx^2)*M - tension*(d^2/dx^2)*y = rhs,
-    where M depends on the exact curvature.
-    """
-
-    ds = beam.length / (n - 1)
-    bc = beam.bc
-    Y0 = _solve_static_approx_curvature(n, beam, rhs, cst_bending_stiffness)
-
-    D2_border = FD.second_derivative(n, ds)
-    D2 = FD.clean_matrix(bc.order, D2_border)
-    D1 = FD.first_derivative(n,ds)
-    rhs = FD.clean_rhs(bc.order, rhs)
-    BC, rhs_bc = bc.compute(ds, n)
-
-    def curvature_function(y):
-        return D2_border@y * np.sqrt((np.ones(n) + (D1@y)**2) ** (-3))
-
-    def equation(y):
-        curvature = _curvature(y, curvature_function)
-        bending_moment = beam._bending_moment(curvature, cst_bending_stiffness)
-
-        return D2 @ bending_moment - beam.tension * D2 @ y + BC @ y - rhs - rhs_bc
-
-    sol = sp.optimize.root(equation, Y0)
-
-    if not sol.success:
-        print(sol.message)
-
-    return sol.x
+        super().__init__(length,boundary_condition,tension,mass,ei_max)
+        self.ei_min = ei_min
+        self.critical_curvature = critical_curvature
+        self.chi_bar = (1 - self.ei_min / self.ei_max) * self.critical_curvature
+    def _bending_moment(
+        self,
+        curvature: np.ndarray[float],
+    ) -> np.ndarray[float]:
+            return (self.ei_max * self.chi_bar + self.ei_min * curvature) * (
+                1 - np.exp(-curvature / self.chi_bar)
+            )
+    
+    def _bending_moment_dynamic(
+        self,
+        curvature: np.ndarray[float],
+        eta,
+    ):
+        return (
+            self.ei_min * curvature
+            + (self.ei_max - self.ei_min) * self.critical_curvature * eta
+        )
+        
 
 
 def _solve_dynamic_approx_curvature(
@@ -211,8 +158,8 @@ def _solve_dynamic_approx_curvature(
         if beam.bc.dynamic_values is not None:
             rhs_bc = beam.bc.update_rhs(nb_space, x, current_time)
 
-        force_previous = FD.clean_rhs(order, force(x, current_time - dt))
-        force_current = FD.clean_rhs(order, force(x, current_time))
+        force_previous = FD.clean_rhs(order, force(x, current_time - dt, y_old, v_old))
+        force_current = FD.clean_rhs(order, force(x, current_time, y_old, v_old))
         #utiliser un objet type force 
 
         rhs = (
@@ -284,8 +231,8 @@ def _solve_dynamic_exact_curvature_EI_const(
         if beam.bc.dynamic_values is not None:
             rhs_bc = beam.bc.update_rhs(nb_space, x, current_time)
 
-        force_previsous = FD.clean_rhs(order, force(x, current_time - dt))
-        force_current = FD.clean_rhs(order, force(x, current_time))
+        force_previsous = FD.clean_rhs(order, force(x, current_time - dt, y_old, v_old))
+        force_current = FD.clean_rhs(order, force(x, current_time, y_old, v_old))
 
         curvature_old = compute_curvature(nb_space, ds, y_old)
         bending_moment_old = beam.compute_bending_moment(curvature_old)
@@ -294,6 +241,7 @@ def _solve_dynamic_exact_curvature_EI_const(
         it = 0
         error = 100
         #fonction picard loop
+        #acceder aux paramètre de picard 
         while it < 10 and error > 1e-3:
             curvature_picard = compute_curvature(nb_space, ds, y_picard)
             bending_moment_picard = beam.compute_bending_moment(curvature_picard)
@@ -318,7 +266,7 @@ def _solve_dynamic_exact_curvature_EI_const(
         y_old = y_new
 
         if (k + 1) % parameters.rr == 0:
-            res.save((k // parameters.rr) + 1, lov, [y_new])
+            res.update((k // parameters.rr) + 1, x/lspan, lov, [y_new])
 
     return res
 
@@ -371,15 +319,15 @@ def _solve_dynamic_exact_curvature(
     res = simtools.Results(
         lot=parameters.time_vector_output().tolist(), lov=lov, los=parameters.los
     )
-    res.save(0, lov, [y_old, v_old, curvature_old, bending_moment_old, eta_old])
+    res.update(0, x/lspan, lov, [y_old, v_old, curvature_old, bending_moment_old, eta_old])
 
     for k in range(parameters.nt):
 
         if beam.bc.dynamic_values is not None:
             rhs_bc = beam.bc.update_rhs(nb_space, x, current_time)
 
-        force_previsous = FD.clean_rhs(order, force(x, current_time - dt))
-        force_current = FD.clean_rhs(order, force(x, current_time))
+        force_previsous = FD.clean_rhs(order, force(x, current_time - dt, y_old, v_old))
+        force_current = FD.clean_rhs(order, force(x, current_time, y_old, v_old))
 
         y_picard = y_old
         eta_picard = eta_old
