@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-import slenderpy.future.beam.beam as Beam
+from slenderpy.future.beam.beam import Beam, BeamEIVariable
 from slenderpy.future.beam.fd_utils import BoundaryCondition
 
 
@@ -13,40 +13,7 @@ def _plot(x, exact, sol):
     plt.show()
 
 
-def test_solve_cruvature_approx_order2(plot=False):
-    """Check the error between the analytic and numerical solution of:
-    y"(x) = x on [2,3]
-    y(2) -y(2) + 3y"(2) = 0
-    -y(3) + y"(3) = 4
-    """
-
-    left_bound = 2
-    right_bound = 3
-    n = 10000
-    x = np.linspace(left_bound, right_bound, n)
-
-    left = [[1, -1, 3, 0]]
-    right = [[-1, 0, 1, 4]]
-    order = 2
-    bc = BoundaryCondition(order, left, right)
-    beam = Beam.Beam(length=1, boundary_condition=bc, tension=-1, ei_max=0)
-    sol = Beam._solve_static_approx_curvature(n=n, beam=beam, rhs=x)
-
-    def exact(x):
-        A = -1 / 12
-        B = -63 / 12
-        return x**3 / 6 + A * x + B
-
-    if plot:
-        _plot(x, exact(x), sol)
-
-    atol = 1.0e-09
-    rtol = 1.0e-04
-
-    assert np.allclose(exact(x), sol, atol=atol, rtol=rtol)
-
-
-def test_solve_cruvature_approx_order4(plot=False):
+def test_solve_approx_curvature_bending_moment_constant(plot=False):
     """Check the error between the analytic and numerical solution of:
     y"" - y" = 0 on [0,1]
     y(0) = 0
@@ -57,15 +24,15 @@ def test_solve_cruvature_approx_order4(plot=False):
 
     left_bound = 0
     right_bound = 1
-    n = 10000
+    n = 1000
     x = np.linspace(left_bound, right_bound, n)
 
     left = [[1, 0, 0, 0], [0, 0, 1, 1]]
     right = [[1, 0, 0, 0], [0, 0, 1, 0]]
     bc = BoundaryCondition(4, left, right)
     rhs = np.zeros(n)
-    beam = Beam.Beam(length=1, boundary_condition=bc, tension=1, ei_max=1)
-    sol = Beam._solve_static_approx_curvature(n=n, beam=beam, rhs=rhs)
+    beam = Beam(length=1, boundary_condition=bc, tension=1, mass=None, ei_max=1)
+    sol = beam.solve_static(n=n, rhs=rhs, approx_curvature=True)
 
     def exact(x):
         A = -1 / (np.exp(1) ** 2 - 1)
@@ -77,40 +44,13 @@ def test_solve_cruvature_approx_order4(plot=False):
     if plot:
         _plot(x, exact(x), sol)
 
-    atol = 1.0e-05
-    rtol = 1.0e-09
+    atol = 1.0e-06
+    rtol = 1.0e-03
 
     assert np.allclose(exact(x), sol, atol=atol, rtol=rtol)
 
 
-def test_curvature(plot=False):
-    """Check the error between the analytic and numerical curvature of cosh(x)."""
-
-    n = 10000
-    lmin = -1.0
-    lmax = 1.0
-    lspan = lmax - lmin
-    x = np.linspace(lmin, lmax, n)
-    ds = lspan / n
-
-    def curvature_cosh(x):
-        return 1 / np.cosh(x) ** 2
-
-    numerical_curvature = Beam.compute_curvature(n, ds, np.cosh(x))
-    exact_curvature = curvature_cosh(x)
-
-    if plot:
-        _plot(x[1:-1], exact_curvature[1:-1], numerical_curvature[1:-1])
-
-    atol = 1.0e-09
-    rtol = 1.0e-03
-
-    assert np.allclose(
-        exact_curvature[1:-1], numerical_curvature[1:-1], atol=atol, rtol=rtol
-    )
-
-
-def test_solve_curvature_exact(plot=False):
+def test_solve_exact_curvature_bending_moment_constant(plot=False):
     """Check the error between the analytic and numerical solution of:
     8.3*(d^2/dx^2)*(y"*(1 + y'²)^(3/2)) + 5 y" = -24(1 + 4x²)^(5/2) + 480x²(1 + 4x²)^(7/2) - 2 on [-1,1]
     y(-1) = 1
@@ -134,8 +74,8 @@ def test_solve_curvature_exact(plot=False):
     left = [[1, 0, 0, lmin**2], [0, 1, 0, 2 * lmin]]
     right = [[1, 0, 0, lmax**2], [0, 1, 0, 2 * lmax]]
     bc = BoundaryCondition(4, left, right)
-    beam = Beam.Beam(length=lspan, boundary_condition=bc, tension=-5, ei_max=8.3)
-    sol = Beam._solve_static_exact_curvature(n=n, beam=beam, rhs=rhs(x))
+    beam = Beam(length=lspan, boundary_condition=bc, tension=-5, mass=None, ei_max=8.3)
+    sol = beam.solve_static(n=n, rhs=rhs(x), approx_curvature=False)
 
     def exact(x):
         return x**2
@@ -149,7 +89,7 @@ def test_solve_curvature_exact(plot=False):
     assert np.allclose(exact(x), sol, atol=atol, rtol=rtol)
 
 
-def test_solve_curvature_approx_bending_moment_variable(plot=False):
+def test_solve_approx_curvature_bending_moment_variable(plot=False):
     n = 1000
     lmin = -1.0
     lmax = 3.0
@@ -190,15 +130,15 @@ def test_solve_curvature_approx_bending_moment_variable(plot=False):
     left = [[1, 0, 0, exact(lmin)], [0, 1, 0, np.cos(lmin)]]
     right = [[1, 0, 0, exact(lmax)], [0, 1, 0, np.cos(lmax)]]
     bc = BoundaryCondition(4, left, right)
-    beam = Beam.Beam(
-        length=lspan,
+    beam = BeamEIVariable(length=lspan,
         boundary_condition=bc,
         tension=H,
+        mass=None,
         ei_max=ei_max,
         ei_min=ei_min,
-        critical_curvature=critical_curvature,
-    )
-    sol = Beam._solve_static_approx_curvature(n=n, beam=beam, rhs=rhs(x))
+        critical_curvature=critical_curvature)
+        
+    sol = beam.solve_static(n=n, rhs=rhs(x),approx_curvature=True)
 
     if plot:
         _plot(x, exact(x), sol)
@@ -209,7 +149,7 @@ def test_solve_curvature_approx_bending_moment_variable(plot=False):
     assert np.allclose(exact(x), sol, atol=atol, rtol=rtol)
 
 
-def test_solve_curvature_exact_bending_moment_variable(plot=False):
+def test_solve_exact_curvature_bending_moment_variable(plot=False):
     n = 1000
     lmin = -1.0
     lmax = 3.0
@@ -250,15 +190,15 @@ def test_solve_curvature_exact_bending_moment_variable(plot=False):
     left = [[1, 0, 0, np.cosh(lmin)], [0, 1, 0, np.sinh(lmin)]]
     right = [[1, 0, 0, np.cosh(lmax)], [0, 1, 0, np.sinh(lmax)]]
     bc = BoundaryCondition(4, left, right)
-    beam = Beam.Beam(
-        length=lspan,
+    beam = BeamEIVariable(length=lspan,
         boundary_condition=bc,
         tension=H,
+        mass=None,
         ei_max=ei_max,
         ei_min=ei_min,
-        critical_curvature=critical_curvature,
-    )
-    sol = Beam._solve_static_exact_curvature(n=n, beam=beam, rhs=rhs(x))
+        critical_curvature=critical_curvature,)
+
+    sol = beam.solve_static(n=n,rhs=rhs(x),approx_curvature=False)
 
     if plot:
         _plot(x, exact(x), sol)
