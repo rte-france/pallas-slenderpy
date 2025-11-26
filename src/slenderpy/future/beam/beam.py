@@ -142,11 +142,11 @@ class Beam:
         B = M - dt2**2 * K
 
         current_time = parameters.t0 + dt
-        lov = ["y"]
+        lov = ["y", "v"]
         res = simtools.Results(
             lot=parameters.time_vector_output().tolist(), lov=lov, los=parameters.los
         )
-        res.update(0, x / lspan, lov, [y_old])
+        res.update(0, x / lspan, lov, [y_old, v_old])
 
         for k in range(parameters.nt):
 
@@ -192,7 +192,7 @@ class Beam:
             y_old = y_new
 
             if (k + 1) % parameters.rr == 0:
-                res.update((k // parameters.rr) + 1, x / lspan, lov, [y_new])
+                res.update((k // parameters.rr) + 1, x / lspan, lov, [y_new, v_new])
 
         return res
 

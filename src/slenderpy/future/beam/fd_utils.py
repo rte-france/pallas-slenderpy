@@ -252,6 +252,6 @@ def rot_none(y_left=0, y_right=0, d2y_left=0, d2y_right=0):
     """Get boundary condition with free curvature and constrained value and derivative."""
     return BoundaryCondition(
         4,
-        left=((1.0, 0.0, 0.0, y_left), (0.0, 0.0, 1.0, d2y_left)),
-        right=((1.0, 0.0, 0.0, y_right), (0.0, 0.0, 1.0, d2y_right)),
+        left=((1.0, 0.0, 0.0, y_left), (0.0, 1.0, 0.0, d2y_left)),
+        right=((1.0, 0.0, 0.0, y_right), (0.0, 1.0, 0.0, d2y_right)),
     )
