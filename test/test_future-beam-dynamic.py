@@ -7,7 +7,7 @@ from slenderpy.future.beam.fd_utils import BoundaryCondition
 from slenderpy import simtools
 
 
-def _plot_animation(x, exact, sol, ymin, ymax, nb_time, final_time):
+def _plot_animation(x, x_border, exact, sol, ymin, ymax, nb_time, final_time):
     """Animation to plot the analytical and the numerical solution."""
 
     fig = plt.figure()
@@ -21,7 +21,7 @@ def _plot_animation(x, exact, sol, ymin, ymax, nb_time, final_time):
 
     def animate(i):
         t = i * dt
-        analytical = exact(x, t)
+        analytical = exact(x_border, t)
         approx = sol[i]
         line_exact.set_data(x, analytical)
         line_approx.set_data(x, approx)
@@ -38,7 +38,6 @@ def _plot_animation(x, exact, sol, ymin, ymax, nb_time, final_time):
         blit=True,
         repeat=True,
     )
-    # ani.save("exact_curvature_picard.mp4", writer="ffmpeg", fps=30)
     plt.show()
 
 
@@ -52,6 +51,7 @@ def test_solve_approx_curvature_bending_moment_constant_static_BC(plot=False):
     lspan = 3.0
 
     x = np.linspace(0, lspan, nb_space)
+    x_border = np.linspace(0, lspan, nb_space + 2)[1:-1]
 
     def f(t):
         return np.cos(t)
@@ -91,14 +91,14 @@ def test_solve_approx_curvature_bending_moment_constant_static_BC(plot=False):
     y = sol.data["y"]
 
     if plot:
-        _plot_animation(x, exact, y, -7, 7, parameters.nr, final_time)
+        _plot_animation(x, x_border, exact, y, -7, 7, parameters.nr, final_time)
 
     analitical_results = np.array(
-        [exact(x, i * (final_time / parameters.nr)) for i in range(parameters.nr + 1)]
+        [exact(x_border, i * (final_time / parameters.nr)) for i in range(parameters.nr + 1)]
     )
 
     atol = 1.0e-06
-    rtol = 1.0e-01
+    rtol = 1.0e-02
 
     assert np.allclose(analitical_results, y, atol=atol, rtol=rtol)
 
@@ -115,12 +115,13 @@ def test_solve_approx_curvature_bending_moment_constant_dynamic_BC(plot=False):
     lspan = lmax - lmin
 
     x = np.linspace(lmin, lmax, nb_space)
+    x_border = np.linspace(lmin, lmax, nb_space + 2)[1:-1]
 
     def exact(x, t):
         return np.cosh(x - 2) * np.sin(2 * np.pi * t)
-
-    def exact_space_derivative(x, t):
-        return np.sinh(x - 2) * np.sin(2 * np.pi * t)
+    
+    def exact_time_space_derivative(x, t):
+        return 2 * np.pi * np.sinh(x - 2) * np.cos(2 * np.pi * t)
 
     def exact_time_derivative(x, t):
         return 2 * np.pi * np.cosh(x - 2) * np.cos(2 * np.pi * t)
@@ -132,9 +133,9 @@ def test_solve_approx_curvature_bending_moment_constant_dynamic_BC(plot=False):
             - tension * exact(x, t)
         )
 
-    left = [[1, 0, 0, exact(lmin, 0)], [0, 1, 0, exact_space_derivative(lmin, 0)]]
-    right = [[1, 0, 0, exact(lmax, 0)], [0, 1, 0, exact_space_derivative(lmax, 0)]]
-    dynamic_values = [exact, exact_space_derivative, exact_space_derivative, exact]
+    left = [[1, 0, 0, exact_time_derivative(lmin, 0)], [0, 1, 0, exact_time_space_derivative(lmin, 0)]]
+    right = [[1, 0, 0, exact_time_derivative(lmax, 0)], [0, 1, 0, exact_time_space_derivative(lmax, 0)]]
+    dynamic_values = [exact_time_derivative, exact_time_space_derivative, exact_time_space_derivative, exact_time_derivative]
     bc = BoundaryCondition(4, left, right, dynamic_values)
 
     beam = Beam(
@@ -154,13 +155,13 @@ def test_solve_approx_curvature_bending_moment_constant_dynamic_BC(plot=False):
     y = sol.data["y"]
 
     if plot:
-        _plot_animation(x, exact, y, -5, 5, parameters.nr, final_time)
+        _plot_animation(x, x_border, exact, y, -5, 5, parameters.nr, final_time)
 
     analitical_results = np.array(
-        [exact(x, i * (final_time / parameters.nr)) for i in range(parameters.nr + 1)]
+        [exact(x_border, i * (final_time / parameters.nr)) for i in range(parameters.nr + 1)]
     )
     atol = 1.0e-01
-    rtol = 1.0e-03
+    rtol = 1.0e-06
 
     assert np.allclose(analitical_results, y, atol=atol, rtol=rtol)
 
@@ -176,7 +177,7 @@ def test_solve_exact_curvature_bending_moment_constant(plot=False):
     lmax = 2.0
     lspan = lmax - lmin
     x_border = np.linspace(lmin, lmax, nb_space + 2)[1:-1]
-    x = np.linspace(lmin, lmax, nb_space + 2)[1:-1]
+    x = np.linspace(lmin, lmax, nb_space)
 
     def force(x, t, y, v):
         return (
@@ -192,15 +193,15 @@ def test_solve_exact_curvature_bending_moment_constant(plot=False):
     def exact(x, t):
         return np.cosh(x + t)
 
-    def exact_space_derivative(x, t):
-        return np.sinh(x + t)
-
     def exact_time_derivative(x, t):
         return np.sinh(x + t)
+    
+    def exact_time_space_derivative(x, t):
+        return np.cosh(x + t)
 
-    left = [[1, 0, 0, exact(lmin, 0)], [0, 1, 0, exact_space_derivative(lmin, 0)]]
-    right = [[1, 0, 0, exact(lmax, 0)], [0, 1, 0, exact_space_derivative(lmax, 0)]]
-    dynamic_values = [exact, exact_space_derivative, exact_space_derivative, exact]
+    left = [[1, 0, 0, exact_time_derivative(lmin, 0)], [0, 1, 0, exact_time_space_derivative(lmin, 0)]]
+    right = [[1, 0, 0, exact_time_derivative(lmax, 0)], [0, 1, 0, exact_time_space_derivative(lmax, 0)]]
+    dynamic_values = [exact_time_derivative, exact_time_space_derivative, exact_time_space_derivative, exact_time_derivative]
     bc = BoundaryCondition(4, left, right, dynamic_values)
 
     beam = Beam(
@@ -216,12 +217,12 @@ def test_solve_exact_curvature_bending_moment_constant(plot=False):
         force=force,
         approx_curvature=False,
         it_picard=10,
-        tol_picard=1e-3,
+        tol_picard=1e-4,
     )
     y = sol.data["y"]
 
     if plot:
-        _plot_animation(x, exact, y, 1, 7, parameters.nr, final_time)
+        _plot_animation(x, x_border, exact, y, 1, 7, parameters.nr, final_time)
 
     analitical_results = np.array(
         [
@@ -229,11 +230,10 @@ def test_solve_exact_curvature_bending_moment_constant(plot=False):
             for i in range(parameters.nr + 1)
         ]
     )
-    atol = 1.0e-1
-    rtol = 1.0e-1
+    atol = 1.0e-6
+    rtol = 1.0e-3
 
     assert np.allclose(analitical_results, y, atol=atol, rtol=rtol)
-
 
 def test_solve_approx_curvature_bending_moment_variable(plot=False):
     nb_space = 100
@@ -258,18 +258,18 @@ def test_solve_approx_curvature_bending_moment_variable(plot=False):
     def exact(x, t):
         return np.cosh(x + t)
 
-    def exact_space_derivative(x, t):
-        return np.sinh(x + t)
-
     def exact_time_derivative(x, t):
         return np.sinh(x + t)
 
     def curvature(x, t):
         return 1 / np.cosh(x + t) ** 2
+    
+    def exact_time_space_derivative(x, t):
+        return np.cosh(x + t)
 
-    left = [[1, 0, 0, exact(lmin, 0)], [0, 1, 0, exact_space_derivative(lmin, 0)]]
-    right = [[1, 0, 0, exact(lmax, 0)], [0, 1, 0, exact_space_derivative(lmax, 0)]]
-    dynamic_values = [exact, exact_space_derivative, exact_space_derivative, exact]
+    left = [[1, 0, 0, exact_time_derivative(lmin, 0)], [0, 1, 0, exact_time_space_derivative(lmin, 0)]]
+    right = [[1, 0, 0, exact_time_derivative(lmax, 0)], [0, 1, 0, exact_time_space_derivative(lmax, 0)]]
+    dynamic_values = [exact_time_derivative, exact_time_space_derivative, exact_time_space_derivative, exact_time_derivative]
     bc = BoundaryCondition(4, left, right, dynamic_values)
 
     beam = BeamEIVariable(
@@ -296,7 +296,7 @@ def test_solve_approx_curvature_bending_moment_variable(plot=False):
     y = sol.data["y"]
 
     if plot:
-        _plot_animation(x, exact, y, 1, 7, parameters.nr, final_time)
+        _plot_animation(x, x_border, exact, y, 1, 7, parameters.nr, final_time)
 
     analitical_results = np.array(
         [
@@ -304,7 +304,7 @@ def test_solve_approx_curvature_bending_moment_variable(plot=False):
             for i in range(parameters.nr + 1)
         ]
     )
-    atol = 1.0e-2
+    atol = 1.0e-6
     rtol = 1.0e-2
 
     assert np.allclose(analitical_results, y, atol=atol, rtol=rtol)
@@ -339,18 +339,18 @@ def test_solve_exact_curvature_bending_moment_variable(plot=False):
     def exact(x, t):
         return np.cosh(x + t)
 
-    def exact_space_derivative(x, t):
-        return np.sinh(x + t)
-
     def exact_time_derivative(x, t):
         return np.sinh(x + t)
+    
+    def exact_time_space_derivative(x, t):
+        return np.cosh(x + t)
 
     def curvature(x, t):
         return 1 / np.cosh(x + t) ** 2
 
-    left = [[1, 0, 0, exact(lmin, 0)], [0, 1, 0, exact_space_derivative(lmin, 0)]]
-    right = [[1, 0, 0, exact(lmax, 0)], [0, 1, 0, exact_space_derivative(lmax, 0)]]
-    dynamic_values = [exact, exact_space_derivative, exact_space_derivative, exact]
+    left = [[1, 0, 0, exact_time_derivative(lmin, 0)], [0, 1, 0, exact_time_space_derivative(lmin, 0)]]
+    right = [[1, 0, 0, exact_time_derivative(lmax, 0)], [0, 1, 0, exact_time_space_derivative(lmax, 0)]]
+    dynamic_values = [exact_time_derivative, exact_time_space_derivative, exact_time_space_derivative, exact_time_derivative]
     bc = BoundaryCondition(4, left, right, dynamic_values)
 
     beam = BeamEIVariable(
@@ -377,7 +377,7 @@ def test_solve_exact_curvature_bending_moment_variable(plot=False):
     y = sol.data["y"]
 
     if plot:
-        _plot_animation(x, exact, y, 1, 7, parameters.nr, final_time)
+        _plot_animation(x, x_border, exact, y, 1, 7, parameters.nr, final_time)
 
     analitical_results = np.array(
         [
@@ -385,11 +385,10 @@ def test_solve_exact_curvature_bending_moment_variable(plot=False):
             for i in range(parameters.nr + 1)
         ]
     )
-    atol = 1.0e-2
-    rtol = 1.0e-2
+    atol = 1.0e-6
+    rtol = 1.0e-3
 
     assert np.allclose(analitical_results, y, atol=atol, rtol=rtol)
 
-
 if __name__ == "__main__":
-    test_solve_exact_curvature_bending_moment_variable()
+    test_solve_approx_curvature_bending_moment_constant_static_BC()

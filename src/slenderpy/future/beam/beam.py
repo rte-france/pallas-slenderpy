@@ -102,9 +102,10 @@ class Beam:
         order = self.bc.order
         D2_border = FD.second_derivative(nb_space, ds)
         D2 = FD.clean_matrix(order, D2_border)
-        BC, rhs_bc = self.bc.compute(ds, nb_space)
+        BC, _ = self.bc.compute(ds, nb_space)
         Id = sp.sparse.identity(nb_space)
         Id = FD.clean_matrix(order, Id)
+        rhs_bc = np.zeros(nb_space)
 
         if approx_curvature:
             D4 = FD.fourth_derivative(nb_space, ds)
@@ -181,8 +182,6 @@ class Beam:
                 v_new = sp.sparse.linalg.spsolve(A, rhs)
                 y_new = y_old + dt2 * (v_old + v_new)
 
-                y_new[0:2] = v_new[0:2]
-                y_new[-2:] = v_new[-2:]
                 error = np.linalg.norm(y_picard - y_new)
                 y_picard = y_new
                 it += 1
@@ -247,9 +246,10 @@ class BeamEIVariable(Beam):
         order = self.bc.order
         D2_border = FD.second_derivative(nb_space, ds)
         D2 = FD.clean_matrix(order, D2_border)
-        BC, rhs_bc = self.bc.compute(ds, nb_space)
+        BC, _ = self.bc.compute(ds, nb_space)
         Id = sp.sparse.identity(nb_space)
         Id = FD.clean_matrix(order, Id)
+        rhs_bc = np.zeros(nb_space)
 
         if approx_curvature:
             D4 = FD.fourth_derivative(nb_space, ds)
@@ -316,8 +316,6 @@ class BeamEIVariable(Beam):
                 v_new = sp.sparse.linalg.spsolve(A, rhs)
                 y_new = y_old + dt2 * (v_old + v_new)
 
-                y_new[0:2] = v_new[0:2]
-                y_new[-2:] = v_new[-2:]
                 error = np.linalg.norm(y_picard - y_new)
                 y_picard = y_new
 
