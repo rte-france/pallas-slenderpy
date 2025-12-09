@@ -166,6 +166,7 @@ class Results:
         self,
         lot: Optional[List[float]] = None,
         lov: Optional[List[str]] = None,
+        lov_dims: Optional[List[int]] = None, 
         los: Optional[List[float]] = None,
         filename: Optional[str] = None,
     ) -> None:
@@ -197,14 +198,21 @@ class Results:
         if filename is not None:
             self.load(filename)
         else:
-            self._from_args(lot, lov, los)
+            self._from_args(lot, lov, lov_dims, los)
 
-    def _from_args(self, lot, lov, los):
+    def _from_args(self, lot, lov, lov_dims, los):
         """Build zero dataset from input lists."""
         crd = {__stime__: lot, __scabs__: los}
         dct = {}
-        for v in lov:
-            dct[v] = ([__stime__, __scabs__], np.nan * np.zeros((len(lot), len(los))))
+        self.lov_dims = {}
+        for index, v in enumerate(lov):
+            if lov_dims[index] == 2:
+                dct[v] = ([__stime__, __scabs__], np.nan * np.zeros((len(lot), len(los))))
+            elif lov_dims[index] == 1:
+                dct[v] = ([__stime__], np.nan * np.zeros(len(lot)))
+            else:
+                raise ValueError(f"lov_dims[{v}] must be 1 (scalar) or 2 (vectorial).")
+            self.lov_dims[v] = lov_dims[index]
         self.data = xr.Dataset(dct, coords=crd)
 
     def los(self):
@@ -231,7 +239,10 @@ class Results:
         """Record a snapshot. Internal or expert use only."""
         los = self.los()
         for i, v in enumerate(lov):
-            self.data[v][k, :] = np.interp(los, s, lod[i])
+            if self.lov_dims[v] == 2:
+                self.data[v][k, :] = np.interp(los, s, lod[i])
+            else:
+                self.data[v][k] = lod[i]
 
     def set_state(self, state):
         """Record State. Internal or expert use only."""
@@ -301,9 +312,14 @@ class Results:
         crd = {__stime__: aot[ttk], __scabs__: vtk}
         dct = {}
         for v in self.lov():
-            tmp = self.data[v].values[ttk, :][:, itk]
-            dct[v] = ([__stime__, __scabs__], tmp)
-
+            tmp = self.data[v].values
+            if self.lov_dims[v] == 2:
+                tmp = tmp[ttk, :][:, itk]
+                dct[v] = ([__stime__, __scabs__], tmp)
+            else:
+                tmp = tmp[ttk]
+                dct[v] = ([__stime__], tmp)
+            
         self.data = xr.Dataset(dct, coords=crd)
 
     def to_netcdf(self, **kwargs):
@@ -317,10 +333,13 @@ class Results:
             __scabs__: self.data[__scabs__].values.tolist(),
         }
         for v in self.lov():
-            tmp = []
-            for i, s in enumerate(self.los()):
-                tmp.append(self.data[v][:, i].values.tolist())
-            out[v] = tmp
+            if self.lov_dims[v] == 2:
+                tmp = []
+                for i, s in enumerate(self.los()):
+                    tmp.append(self.data[v][:, i].values.tolist())
+                out[v] = tmp
+            else:out[v] = self.data[v].values.tolist()
+
         return json.dumps(out)
 
 

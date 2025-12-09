@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from slenderpy.future.beam.beam import Beam, BeamEIVariable
+from slenderpy.future.beam.beam import Beam, BeamBW
 from slenderpy.future.beam.fd_utils import BoundaryCondition
 
 
@@ -31,7 +31,7 @@ def test_solve_approx_curvature_bending_moment_constant(plot=False):
     right = [[1, 0, 0, 0], [0, 0, 1, 0]]
     bc = BoundaryCondition(4, left, right)
     rhs = np.zeros(n)
-    beam = Beam(length=1, boundary_condition=bc, tension=1, mass=None, ei_max=1)
+    beam = Beam(length=1, boundary_condition=bc, tension=1, mass=None, ei_min=1)
     sol = beam.solve_static(n=n, rhs=rhs, approx_curvature=True)
 
     def exact(x):
@@ -74,7 +74,7 @@ def test_solve_exact_curvature_bending_moment_constant(plot=False):
     left = [[1, 0, 0, lmin**2], [0, 1, 0, 2 * lmin]]
     right = [[1, 0, 0, lmax**2], [0, 1, 0, 2 * lmax]]
     bc = BoundaryCondition(4, left, right)
-    beam = Beam(length=lspan, boundary_condition=bc, tension=-5, mass=None, ei_max=8.3)
+    beam = Beam(length=lspan, boundary_condition=bc, tension=-5, mass=None, ei_min=8.3)
     sol = beam.solve_static(n=n, rhs=rhs(x), approx_curvature=False)
 
     def exact(x):
@@ -130,7 +130,7 @@ def test_solve_approx_curvature_bending_moment_variable(plot=False):
     left = [[1, 0, 0, exact(lmin)], [0, 1, 0, np.cos(lmin)]]
     right = [[1, 0, 0, exact(lmax)], [0, 1, 0, np.cos(lmax)]]
     bc = BoundaryCondition(4, left, right)
-    beam = BeamEIVariable(
+    beam = BeamBW(
         length=lspan,
         boundary_condition=bc,
         tension=H,
@@ -162,7 +162,7 @@ def test_solve_exact_curvature_bending_moment_variable(plot=False):
     ei_max = 1234.9
     critical_curvature = 12.4
     chi_bar = (1 - ei_min / ei_max) * critical_curvature
-    H = 3.2
+    H = 1587.2
 
     def curvature(x):
         return 1.0 / np.cosh(x) ** 2
@@ -192,13 +192,13 @@ def test_solve_exact_curvature_bending_moment_variable(plot=False):
     left = [[1, 0, 0, np.cosh(lmin)], [0, 1, 0, np.sinh(lmin)]]
     right = [[1, 0, 0, np.cosh(lmax)], [0, 1, 0, np.sinh(lmax)]]
     bc = BoundaryCondition(4, left, right)
-    beam = BeamEIVariable(
+    beam = BeamBW(
         length=lspan,
         boundary_condition=bc,
         tension=H,
         mass=None,
-        ei_max=ei_max,
         ei_min=ei_min,
+        ei_max=ei_max,
         critical_curvature=critical_curvature,
     )
 
@@ -211,3 +211,6 @@ def test_solve_exact_curvature_bending_moment_variable(plot=False):
     rtol = 1.0e-03
 
     assert np.allclose(exact(x), sol, atol=atol, rtol=rtol)
+
+if __name__ == "__main__":
+    test_solve_exact_curvature_bending_moment_variable(True)

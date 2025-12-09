@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-from slenderpy.future.beam.beam import Beam, BeamEIVariable
+from slenderpy.future.beam.beam import Beam, BeamBW
 from slenderpy.future.beam.fd_utils import BoundaryCondition
 from slenderpy import simtools
 
@@ -47,7 +47,7 @@ def test_solve_approx_curvature_bending_moment_constant_static_BC(plot=False):
     final_time = 1.0
     mass = 14.3
     tension = 125.78
-    ei_max = 1484.75
+    ei_min = 1484.75
     lspan = 3.0
 
     x = np.linspace(0, lspan, nb_space)
@@ -65,7 +65,7 @@ def test_solve_approx_curvature_bending_moment_constant_static_BC(plot=False):
     def force(x, t, y, v):
         return (
             -mass * np.cos(t) * x**2 * (x - lspan) ** 2
-            + ei_max * 24.0 * f(t)
+            + ei_min * 24.0 * f(t)
             - tension * f(t) * (12 * x**2 - 12 * lspan * x + 2 * lspan**2)
         )
 
@@ -74,7 +74,7 @@ def test_solve_approx_curvature_bending_moment_constant_static_BC(plot=False):
     bc = BoundaryCondition(4, left, right)
 
     beam = Beam(
-        length=lspan, boundary_condition=bc, tension=tension, ei_max=ei_max, mass=mass
+        length=lspan, boundary_condition=bc, tension=tension, ei_min=ei_min, mass=mass
     )
     parameters = simtools.Parameters(
         ns=nb_space, tf=final_time, dt=dt, dr=1e-3, los=nb_space
@@ -109,7 +109,7 @@ def test_solve_approx_curvature_bending_moment_constant_dynamic_BC(plot=False):
     final_time = 1.2
     mass = 1.45
     tension = 12.36
-    ei_max = 147.89
+    ei_min = 147.89
     lmin = 0.0
     lmax = 4.0
     lspan = lmax - lmin
@@ -129,7 +129,7 @@ def test_solve_approx_curvature_bending_moment_constant_dynamic_BC(plot=False):
     def force(x, t, y, v):
         return (
             -4 * np.pi**2 * mass * exact(x, t)
-            + ei_max * exact(x, t)
+            + ei_min * exact(x, t)
             - tension * exact(x, t)
         )
 
@@ -139,7 +139,7 @@ def test_solve_approx_curvature_bending_moment_constant_dynamic_BC(plot=False):
     bc = BoundaryCondition(4, left, right, dynamic_values)
 
     beam = Beam(
-        length=lspan, boundary_condition=bc, tension=tension, ei_max=ei_max, mass=mass
+        length=lspan, boundary_condition=bc, tension=tension, ei_min=ei_min, mass=mass
     )
     parameters = simtools.Parameters(
         ns=nb_space, tf=final_time, dt=dt, dr=1e-3, los=nb_space
@@ -172,7 +172,7 @@ def test_solve_exact_curvature_bending_moment_constant(plot=False):
     final_time = 0.1
     mass = 9.8
     tension = 256.12
-    ei_max = 2698.23
+    ei_min = 2698.23
     lmin = 0.0
     lmax = 2.0
     lspan = lmax - lmin
@@ -182,7 +182,7 @@ def test_solve_exact_curvature_bending_moment_constant(plot=False):
     def force(x, t, y, v):
         return (
             mass * np.cosh(x + t)
-            + ei_max
+            + ei_min
             * (
                 -2 / np.cosh(x + t) ** 2
                 + 6.0 * np.sinh(x + t) ** 2 / np.cosh(x + t) ** 4
@@ -205,7 +205,7 @@ def test_solve_exact_curvature_bending_moment_constant(plot=False):
     bc = BoundaryCondition(4, left, right, dynamic_values)
 
     beam = Beam(
-        length=lspan, boundary_condition=bc, tension=tension, ei_max=ei_max, mass=mass
+        length=lspan, boundary_condition=bc, tension=tension, ei_min=ei_min, mass=mass
     )
     parameters = simtools.Parameters(
         ns=nb_space, tf=final_time, dt=dt, dr=1e-3, los=nb_space
@@ -272,7 +272,7 @@ def test_solve_approx_curvature_bending_moment_variable(plot=False):
     dynamic_values = [exact_time_derivative, exact_time_space_derivative, exact_time_space_derivative, exact_time_derivative]
     bc = BoundaryCondition(4, left, right, dynamic_values)
 
-    beam = BeamEIVariable(
+    beam = BeamBW(
         length=lspan,
         boundary_condition=bc,
         tension=tension,
@@ -353,7 +353,7 @@ def test_solve_exact_curvature_bending_moment_variable(plot=False):
     dynamic_values = [exact_time_derivative, exact_time_space_derivative, exact_time_space_derivative, exact_time_derivative]
     bc = BoundaryCondition(4, left, right, dynamic_values)
 
-    beam = BeamEIVariable(
+    beam = BeamBW(
         length=lspan,
         boundary_condition=bc,
         tension=tension,
@@ -389,6 +389,3 @@ def test_solve_exact_curvature_bending_moment_variable(plot=False):
     rtol = 1.0e-3
 
     assert np.allclose(analitical_results, y, atol=atol, rtol=rtol)
-
-if __name__ == "__main__":
-    test_solve_approx_curvature_bending_moment_constant_static_BC()
