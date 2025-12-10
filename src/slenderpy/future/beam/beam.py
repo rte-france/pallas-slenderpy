@@ -147,8 +147,8 @@ class Beam:
         B = M - dt2**2 * K
 
         current_time = parameters.t0 + dt
-        powers_name = ["p_kin", "p_bend", "p_tens", "p_grav", "p_ext"]
-        energies_name = ["e_kin", "e_bend", "e_tens", "e_grav", "e_ext"]
+        powers_name = ["p_kin", "p_bend", "p_tens", "p_ext"]
+        energies_name = ["e_kin", "e_bend", "e_tens", "e_ext"]
         lov = ["y", "v"]
         all_lov = lov + powers_name + energies_name
         res = simtools.Results(
@@ -213,8 +213,7 @@ class Beam:
         power.append(self.mass*sp.integrate.simpson(v_new*(v_new - v_old)/dt,x))
         power.append(self.ei_min*sp.integrate.simpson((D2@curvature_new)*v_new,x))
         power.append(-self.tension*sp.integrate.simpson((D2@y_new)*v_new,x))
-        power.append(self.mass*_GRAVITY*sp.integrate.simpson(v_new,x))
-        power.append(sp.integrate.trapezoid((force + self.mass*_GRAVITY)*v_new, x))
+        power.append(sp.integrate.trapezoid(-force*v_new, x))
 
         return power 
 
@@ -302,8 +301,8 @@ class BeamBW(Beam):
         )
 
         current_time = parameters.t0 + dt
-        powers_name = ["p_kin", "p_bend", "p_tens", "p_grav", "p_ext", "p_dissip"]
-        energies_name = ["e_kin", "e_bend", "e_tens", "e_grav", "e_ext", "e_dissip"]
+        powers_name = ["p_kin", "p_bend", "p_tens", "p_ext", "p_dissip"]
+        energies_name = ["e_kin", "e_bend", "e_tens", "e_ext", "e_dissip"]
         lov = ["y", "v", "c", "M"]
         all_lov = lov + powers_name + energies_name
         res = simtools.Results(

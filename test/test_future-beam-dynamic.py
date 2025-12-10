@@ -88,7 +88,7 @@ def test_solve_approx_curvature_bending_moment_constant_static_BC(plot=False):
         approx_curvature=True,
     )
 
-    y = sol.data["y"]
+    y = sol["y"]
 
     if plot:
         _plot_animation(x, x_border, exact, y, -7, 7, parameters.nr, final_time)
@@ -152,7 +152,7 @@ def test_solve_approx_curvature_bending_moment_constant_dynamic_BC(plot=False):
         approx_curvature=True,
     )
 
-    y = sol.data["y"]
+    y = sol["y"]
 
     if plot:
         _plot_animation(x, x_border, exact, y, -5, 5, parameters.nr, final_time)
@@ -219,7 +219,7 @@ def test_solve_exact_curvature_bending_moment_constant(plot=False):
         it_picard=10,
         tol_picard=1e-4,
     )
-    y = sol.data["y"]
+    y = sol["y"]
 
     if plot:
         _plot_animation(x, x_border, exact, y, 1, 7, parameters.nr, final_time)
@@ -293,7 +293,7 @@ def test_solve_approx_curvature_bending_moment_variable(plot=False):
         approx_curvature=True,
     )
 
-    y = sol.data["y"]
+    y = sol["y"]
 
     if plot:
         _plot_animation(x, x_border, exact, y, 1, 7, parameters.nr, final_time)
@@ -374,7 +374,7 @@ def test_solve_exact_curvature_bending_moment_variable(plot=False):
         approx_curvature=False,
     )
 
-    y = sol.data["y"]
+    y = sol["y"]
 
     if plot:
         _plot_animation(x, x_border, exact, y, 1, 7, parameters.nr, final_time)

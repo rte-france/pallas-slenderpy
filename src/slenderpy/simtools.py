@@ -166,7 +166,7 @@ class Results:
         self,
         lot: Optional[List[float]] = None,
         lov: Optional[List[str]] = None,
-        lov_dims: Optional[List[int]] = None, 
+        lov_dims: Optional[Tuple[int]] = None, 
         los: Optional[List[float]] = None,
         filename: Optional[str] = None,
     ) -> None:
@@ -243,6 +243,9 @@ class Results:
                 self.data[v][k, :] = np.interp(los, s, lod[i])
             else:
                 self.data[v][k] = lod[i]
+
+    def __getitem__(self, key):
+        return self.data[key]
 
     def set_state(self, state):
         """Record State. Internal or expert use only."""
