@@ -174,7 +174,7 @@ def energy():
 
     bc = FD.rot_free(0,0,0,0)
     rhs = -10*np.ones(nb_space)*mass
-    beam = BeamBW(length=lspan, boundary_condition=bc, tension=tension, mass=mass, ei_max=ei_max, ei_min=ei_min, critical_curvature=chi0)
+    beam = BeamBW(length=lspan, boundary_condition=bc, tension=tension, mass=mass, ei_min=ei_min, ei_max=ei_max, critical_curvature=chi0)
 
     sol_static = beam.solve_static(n=nb_space, rhs=rhs, approx_curvature=False)
 
@@ -210,7 +210,7 @@ def energy():
     e_ext = res["e_ext"]
 
     times = parameters.time_vector_output()
-    labels = ["kinetic", "bending", "dissip", "tension", "exterior"]
+    labels = ["kinetic", "bending", "e_dissip", "tension", "exterior"]
 
     plt.figure()
     plt.plot(times, res["p_kin"], label = "kinetic")
@@ -241,31 +241,31 @@ def bretelle():
     lspan = 1.53
     nb_space = 100
     x = np.linspace(0, lspan, nb_space)
-    final_time = 1.
-    dt = 1e-5
-    dr = 1e-2
+    final_time = 0.2
+    dt = 1e-6
+    dr = 1e-3
 
     tension = 20.
     mass = 2.879
     ei_max = 5089.
     ei_min = 67.7
-    chi0 = 1e-5
+    chi0 = 1.e-5
 
     def force(x,t,y,v):
         return -_GRAVITY*np.ones(nb_space)*mass 
 
     bc = FD.rot_free(0,0,0,0)
-    rhs = -_GRAVITY*np.ones(nb_space)*mass
-    beam = BeamBW(length=lspan, boundary_condition=bc, tension=tension, mass=mass, ei_max=ei_max, ei_min=ei_min, critical_curvature=chi0)
+    rhs = force(None,None,None,None)
+    beam = BeamBW(length=lspan, boundary_condition=bc, tension=tension, mass=mass, ei_min=ei_min, ei_max=ei_max, critical_curvature=chi0)
     sol_static = beam.solve_static(n=nb_space, rhs=rhs, approx_curvature=False)
-    
+
     ds = lspan / (nb_space - 1)
     D1 = FD.first_derivative(nb_space, ds)
     D2 = FD.second_derivative(nb_space, ds)
     def curvature(y):
         return D2 @ y / np.sqrt((np.ones(nb_space) + ((D1 @ y) ** 2)) ** 3)
     initial_curvature = curvature(sol_static)
-    initial_moment = np.sign(initial_curvature)*beam._bending_moment(np.abs(initial_curvature))
+    initial_moment = beam._bending_moment(initial_curvature)
 
     parameters = simtools.Parameters(
         ns=nb_space, tf=final_time, dt=dt, dr=dr, los=nb_space, pp=True
@@ -274,16 +274,16 @@ def bretelle():
     res = beam.solve_dynamic(
         parameters=parameters,
         initial_position=sol_static,
-        initial_velocity=np.zeros(nb_space),
+        initial_velocity=0.8*np.sin(2*np.pi*x/lspan),
         initial_bending_moment=initial_moment,
         force=force,
         approx_curvature=False,
-        it_picard=15,
+        it_picard=30,
         tol_picard=1e-5
     )
 
     y = res["y"]
-
+    c = res["c"]
     e_kin = res["e_kin"]
     e_bend = res["e_bend"]
     e_dissip = res["e_dissip"]
@@ -294,32 +294,20 @@ def bretelle():
     labels = ["kinetic", "bending", "dissip", "tension", "exterior"]
 
     plt.figure()
-    plt.plot(times, res["p_kin"], label = "kinetic")
-    plt.plot(times, res["p_bend"], label = "bending")
-    plt.plot(times, res["p_dissip"], label = "dissip")
-    plt.plot(times, res["p_tens"], label = "tension")
-    plt.plot(times, res["p_ext"], label  = "exterior")
-    plt.legend()
-    plt.title("power")
-
-    plt.figure()
-    plt.plot(times, e_kin, label = "kinetic")
-    plt.plot(times, e_bend, label = "bending")
-    plt.plot(times, e_dissip, label = "dissip")
-    plt.plot(times, e_tens, label = "tension")
-    plt.plot(times, e_ext, label  = "exterior")
-    plt.legend()
-    plt.title("energy")
-
-    plt.figure()
     plt.stackplot(times, [e_kin, e_bend, e_dissip, e_tens, e_ext], labels = labels)
     plt.legend()
+    plt.title("Global energy balance")
 
-    _plot_animation(x, sol_static, y, -3e-2, 3e-2, parameters.nr, dr)
+    pos = nb_space//4
+    plt.figure()
+    plt.plot(times, c[:,pos], label = "curvature")
+    plt.title("Curvature in function of time")
+
+    _plot_animation(x, sol_static, y, -4e-2, 3e-2, parameters.nr, dr)
 
 
 if __name__ == "__main__":
-    static_gravity()
-    hyteresis()
-    energy()
+    # static_gravity()
+    # hyteresis()
+    # energy()
     bretelle()
