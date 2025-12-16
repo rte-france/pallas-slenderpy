@@ -88,7 +88,7 @@ class Beam:
         approx_curvature: bool,
         it_picard: int = 1,
         tol_picard: float = 1e-3,
-    ) -> np.ndarray[float]:
+    ) -> simtools.Results:
         """Solve equation of the form : m*(d^2/dt^2)*y + (d^2/dx^2)*M - tension*(d^2/dx^2)*y = rhs,
         where M depends on the exact curvature.
         """
@@ -122,17 +122,7 @@ class Beam:
             K = -self.tension * D2
 
             def compute_rhs(forces, y_picard, bendig_moment_old):
-                curvature_picard = (
-                    D2_border
-                    @ y_picard
-                    / np.sqrt(
-                        (
-                            np.ones(nb_space)
-                            + ((D1) @ y_picard) ** 2
-                        )
-                        ** (3)
-                    )
-                )
+                curvature_picard = (D2_border@ y_picard/ np.sqrt((np.ones(nb_space) + (D1 @ y_picard) ** 2)** 3))
                 bending_moment_picard = self._bending_moment(curvature_picard)
                 return (
                     B @ v_old
@@ -180,6 +170,7 @@ class Beam:
             )
             bending_moment_old = self._bending_moment(curvature_old)
             y_picard = y_old
+            v_picard = v_old
 
             it = 0
             error = 100
@@ -190,12 +181,13 @@ class Beam:
                 v_new = sp.sparse.linalg.spsolve(A, rhs)
                 y_new = y_old + dt2 * (v_old + v_new)
 
-                error = np.linalg.norm(y_picard - y_new)
+                error = np.linalg.norm(v_picard - v_new)
+                v_picard = v_new
                 y_picard = y_new
                 it += 1
 
             if (k + 1) % parameters.rr == 0:
-                values = [y_new,v_new] + self.compute_power(D2, curvature_new, v_old, v_new, y_new, force_current, dt, x)
+                values = [y_new,v_new] + list(self.compute_power(D2, curvature_new, v_old, v_new, y_new, force_current, dt, x).values())
                 res.update((k // parameters.rr) + 1, x / lspan, lov + powers_name, values)
                 pb.update(parameters.rr)
 
@@ -208,14 +200,24 @@ class Beam:
         res.set_state({"y": y_new, "v": v_new})
         return res
     
-    def compute_power(self, D2, curvature_new, v_old, v_new, y_new, force, dt, x):
-        power = []
-        power.append(self.mass*sp.integrate.simpson(v_new*(v_new - v_old)/dt,x))
-        power.append(self.ei_min*sp.integrate.simpson((D2@curvature_new)*v_new,x))
-        power.append(-self.tension*sp.integrate.simpson((D2@y_new)*v_new,x))
-        power.append(sp.integrate.trapezoid(-force*v_new, x))
+    def compute_power(
+        self, 
+        D2: sp.sparse.spmatrix, 
+        curvature_new: np.ndarray[float], 
+        v_old: np.ndarray[float], 
+        v_new: np.ndarray[float], 
+        y_new: np.ndarray[float], 
+        force: callable, 
+        dt: float, 
+        x: np.ndarray[float]) -> dict:
 
-        return power 
+        power = {}
+        power["p_kin"] = (self.mass*sp.integrate.simpson(v_new*(v_new - v_old)/dt,x))
+        power["p_bend"] = (self.ei_min*sp.integrate.simpson((D2@curvature_new)*v_new,x))
+        power["p_tens"] = (-self.tension*sp.integrate.simpson((D2@y_new)*v_new,x))
+        power["p_ext"] = (sp.integrate.trapezoid(-force*v_new, x))
+
+        return power
 
 
 class BeamBW(Beam):
@@ -236,11 +238,12 @@ class BeamBW(Beam):
         self.chi_bar = (1 - self.ei_min / self.ei_max) * self.critical_curvature
 
     def _bending_moment(self, curvature: np.ndarray[float]) -> np.ndarray[float]:
-        return (self.ei_max * self.chi_bar + self.ei_min * curvature) * (
-            1 - np.exp(-curvature / self.chi_bar)
-        )
+        c = np.abs(curvature)
+        return (self.ei_max * self.chi_bar + self.ei_min * c) * (
+            1 - np.exp(-c / self.chi_bar)
+        )*np.sign(curvature)
 
-    def _bending_moment_dynamic(self, curvature: np.ndarray[float], eta):
+    def _bending_moment_dynamic(self, curvature: np.ndarray[float], eta: np.ndarray[float]) -> np.ndarray[float]:
         return (
             self.ei_min * curvature
             + (self.ei_max - self.ei_min) * self.critical_curvature * eta
@@ -256,7 +259,7 @@ class BeamBW(Beam):
         approx_curvature: bool,
         it_picard: int = 15,
         tol_picard: float = 1e-4,
-    ) -> np.ndarray[float]:
+    ) -> simtools.Results:
 
         lspan = self.length
         nb_space = parameters.ns
@@ -276,7 +279,7 @@ class BeamBW(Beam):
 
         if approx_curvature:
             D4 = FD.fourth_derivative(nb_space, ds)
-            K = self.ei_max * D4 - self.tension * D2
+            K = self.ei_min * D4 - self.tension * D2
 
             def curvature(y):
                 return D2 @ y
@@ -321,6 +324,7 @@ class BeamBW(Beam):
             force_current = FD.clean_rhs(order, force(x, current_time, y_old, v_old))
 
             y_picard = y_old
+            v_picard = v_old
             eta_picard = eta_old
 
             it = 0
@@ -328,36 +332,52 @@ class BeamBW(Beam):
             while it < it_picard and error > tol_picard:
                 curvature_picard = curvature(y_picard)
                 bending_moment_picard = self._bending_moment_dynamic(
-                    curvature_picard, eta_picard
-                )
-                rhs = (
-                    B @ v_old
-                    + dt2 * (force_previsous + force_current)
-                    - dt2 * D2 @ (bending_moment_old + bending_moment_picard)
-                    - dt * K @ y_old
-                    + rhs_bc
-                )
+                        curvature_picard, eta_picard)
+                
+                if approx_curvature:
+                    rhs = (
+                        B @ v_old
+                        + dt2 * (force_previsous + force_current)
+                        - dt2 * (self.ei_max - self.ei_min)*self.critical_curvature*D2@(eta_old + eta_picard)
+                        - dt * K @ y_old
+                        + rhs_bc
+                    )
+                
+                else:
+                    rhs = (
+                        B @ v_old
+                        + dt2 * (force_previsous + force_current)
+                        - dt2 * D2 @ (bending_moment_old + bending_moment_picard)
+                        - dt * K @ y_old
+                        + rhs_bc
+                    )
+
                 v_new = sp.sparse.linalg.spsolve(A, rhs)
                 y_new = y_old + dt2 * (v_old + v_new)
 
-                error = np.linalg.norm(y_picard - y_new)
+                error = np.linalg.norm(v_picard - v_new)
                 y_picard = y_new
+                v_picard = v_new
 
-                curvature_picard = curvature(y_picard)
-                diff = curvature_picard - curvature_old
-                eta_new = (
-                    eta_old
-                    + (diff - 0.5 * diff * np.abs(eta_picard)) / self.critical_curvature
-                ) / (1 + 0.5 * np.abs(diff) / self.critical_curvature)
+                if approx_curvature:
+                    eta_new = (self.critical_curvature*eta_old + dt*D2@v_new - dt2*D2@v_new*np.abs(eta_picard)) / (self.critical_curvature + dt2*np.abs(D2@v_new))
+
+                else:
+                    curvature_picard = curvature(y_picard)
+                    diff = curvature_picard - curvature_old
+                    eta_new = (
+                        eta_old
+                        + (diff - 0.5 * diff * np.abs(eta_picard)) / self.critical_curvature
+                    ) / (1 + 0.5 * np.abs(diff) / self.critical_curvature)
+
                 eta_picard = eta_new
                 it += 1
 
-            
             curvature_new = curvature_picard
             bending_moment_new = self._bending_moment_dynamic(curvature_new, eta_new)
 
             if (k + 1) % parameters.rr == 0:
-                values = [y_new, v_new, curvature_new, bending_moment_new] + self.compute_power(D2, curvature_new, v_old, v_new, y_new, eta_new,force_current, dt, x)
+                values = [y_new, v_new, curvature_new, bending_moment_new] + list(self.compute_power(D2, curvature_new, v_old, v_new, y_new, eta_new,force_current, dt, x).values())
                 res.update((k // parameters.rr) + 1, x / lspan, lov + powers_name, values)
                 pb.update(parameters.rr)
 
@@ -373,18 +393,35 @@ class BeamBW(Beam):
         res.set_state({"y": y_new, "v": v_new, "c":curvature_new, "M": bending_moment_new})
         return res
     
-    def compute_power(self, D2, curvature_new, v_old, v_new, y_new, eta_new, force, dt, x):
+    
+    def compute_power(
+        self, 
+        D2: sp.sparse.spmatrix, 
+        curvature_new: np.ndarray[float], 
+        v_old: np.ndarray[float], 
+        v_new: np.ndarray[float], 
+        y_new: np.ndarray[float], 
+        eta_new: np.ndarray[float],
+        force: callable, 
+        dt: float, 
+        x: np.ndarray[float]) -> dict:
+
         power = super().compute_power(D2, curvature_new, v_old, v_new, y_new, force, dt, x)
-        power.append((self.ei_max - self.ei_min)*self.critical_curvature*sp.integrate.simpson((D2@eta_new)*v_new,x))
+        power["dissip"] = (self.ei_max - self.ei_min)*self.critical_curvature*sp.integrate.simpson((D2@eta_new)*v_new,x)
         return power
     
 
-def update_energies(res, powers_name, energies_name, dr, nr):
+def update_energies(
+    res: simtools.Results, 
+    powers_name: list, 
+    energies_name: list, 
+    dr: float, 
+    nr) -> None:
 
     for k in range(1,nr):
         energies = []
         for powers in powers_name:
-            energies.append(sp.integrate.trapezoid(res.data[powers][1:k+1], dx = dr))
+            energies.append(sp.integrate.trapezoid(res[powers][1:k+1], dx = dr))
         
         res.update(k, None, energies_name, energies)
     

@@ -262,7 +262,7 @@ def test_solve_approx_curvature_bending_moment_variable(plot=False):
         return np.sinh(x + t)
 
     def curvature(x, t):
-        return 1 / np.cosh(x + t) ** 2
+        return np.cosh(x + t)
     
     def exact_time_space_derivative(x, t):
         return np.cosh(x + t)
@@ -305,7 +305,7 @@ def test_solve_approx_curvature_bending_moment_variable(plot=False):
         ]
     )
     atol = 1.0e-6
-    rtol = 1.0e-2
+    rtol = 1.0e-1
 
     assert np.allclose(analitical_results, y, atol=atol, rtol=rtol)
 

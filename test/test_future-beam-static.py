@@ -115,12 +115,13 @@ def test_solve_approx_curvature_bending_moment_variable(plot=False):
         C = curvature(x)
         C1 = curvature_first_derivative(x)
         C2 = curvature_second_derivative(x)
-        E = np.exp(-C / chi_bar)
+        s = np.sign(C)
+        E = np.exp(-np.abs(C) / chi_bar)
         return (
-            ei_min * C2 * (1 - E)
-            + 2 * ei_min * C1**2 * E / chi_bar
+            s*ei_min * C2 * (1 - E)
+            + 2* ei_min * C1**2 * E / chi_bar
             + (ei_max * chi_bar + ei_min * C)
-            * (C2 * E / chi_bar - C1**2 * E / chi_bar**2)
+            * (C2 * E / chi_bar - s*C1**2 * E / chi_bar**2)
             - H * curvature(x)
         )
 
@@ -211,6 +212,3 @@ def test_solve_exact_curvature_bending_moment_variable(plot=False):
     rtol = 1.0e-03
 
     assert np.allclose(exact(x), sol, atol=atol, rtol=rtol)
-
-if __name__ == "__main__":
-    test_solve_exact_curvature_bending_moment_variable(True)
