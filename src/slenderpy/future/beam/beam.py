@@ -32,6 +32,12 @@ class Beam:
         curvature: np.ndarray[float],
     ) -> np.ndarray[float]:
         return self.ei_min * curvature
+    
+    def natural_frequencies(self, n: int = 1) -> np.ndarray:
+        return 0.5 * np.linspace(1, n, n) / self.length * np.sqrt(self.tension / self.mass)
+
+    def natural_frequency(self):
+        return self.natural_frequencies(n=1)[0]
 
     def solve_static(
         self,
@@ -86,6 +92,7 @@ class Beam:
         initial_velocity: np.ndarray[float],
         force: callable,
         approx_curvature: bool,
+        zeta: float = 0,
         it_picard: int = 1,
         tol_picard: float = 1e-3,
     ) -> simtools.Results:
@@ -132,17 +139,18 @@ class Beam:
                     + rhs_bc
                 ), curvature_picard
 
-        M = self.mass * Id
+        M = self.mass * (1 + dt*2*self.natural_frequency()*zeta) * Id
         A = M + dt2**2 * K + BC
         B = M - dt2**2 * K
 
         current_time = parameters.t0 + dt
         powers_name = ["p_kin", "p_bend", "p_tens", "p_ext"]
         energies_name = ["e_kin", "e_bend", "e_tens", "e_ext"]
+        picard = ["it_picard"]
         lov = ["y", "v"]
-        all_lov = lov + powers_name + energies_name
+        all_lov = lov + powers_name + energies_name + picard
         res = simtools.Results(
-            lot=parameters.time_vector_output().tolist(), lov=all_lov, lov_dims = [2,2,1,1,1,1,1,1,1,1,1,1], los=parameters.los
+            lot=parameters.time_vector_output().tolist(), lov=all_lov, lov_dims = [2,2,1,1,1,1,1,1,1,1,1,1,1], los=parameters.los
         )
         res.update(0, x / lspan, ["y", "v"], [y_old, v_old])
         pb = spb.generate(parameters.pp, parameters.nt, desc=__name__)
@@ -187,8 +195,8 @@ class Beam:
                 it += 1
 
             if (k + 1) % parameters.rr == 0:
-                values = [y_new,v_new] + list(self.compute_power(D2, curvature_new, v_old, v_new, y_new, force_current, dt, x).values())
-                res.update((k // parameters.rr) + 1, x / lspan, lov + powers_name, values)
+                values = [y_new,v_new] + list(self.compute_power(D2, curvature_new, v_old, v_new, y_new, force_current, dt, x).values()) + [it]
+                res.update((k // parameters.rr) + 1, x / lspan, lov + powers_name + picard, values)
                 pb.update(parameters.rr)
 
             current_time += dt
@@ -254,9 +262,10 @@ class BeamBW(Beam):
         parameters: simtools.Parameters,
         initial_position: np.ndarray[float],
         initial_velocity: np.ndarray[float],
-        initial_bending_moment: np.ndarray[float],
         force: callable,
         approx_curvature: bool,
+        initial_bending_moment: np.ndarray[float] = None,
+        zeta: float = 0,
         it_picard: int = 15,
         tol_picard: float = 1e-4,
     ) -> simtools.Results:
@@ -291,12 +300,14 @@ class BeamBW(Beam):
                     D2_border @ y / np.sqrt((np.ones(nb_space) + ((D1 @ y) ** 2)) ** 3)
                 )
 
-        M = self.mass * Id
+        M = self.mass * (1 + dt*2*self.natural_frequency()*zeta) * Id
         A = M + dt2**2 * K + BC
         B = M - dt2**2 * K
 
         y_old = initial_position
         v_old = initial_velocity
+        if initial_bending_moment is None:
+                initial_bending_moment = self._bending_moment(curvature(initial_position))
         bending_moment_old = initial_bending_moment
         curvature_old = curvature(y_old)
         eta_old = (initial_bending_moment - self.ei_min * curvature_old) / (
@@ -306,10 +317,11 @@ class BeamBW(Beam):
         current_time = parameters.t0 + dt
         powers_name = ["p_kin", "p_bend", "p_tens", "p_ext", "p_dissip"]
         energies_name = ["e_kin", "e_bend", "e_tens", "e_ext", "e_dissip"]
+        picard = ["it_picard"]
         lov = ["y", "v", "c", "M"]
-        all_lov = lov + powers_name + energies_name
+        all_lov = lov + powers_name + energies_name + picard
         res = simtools.Results(
-            lot=parameters.time_vector_output().tolist(), lov=all_lov, lov_dims = [2,2,2,2,1,1,1,1,1,1,1,1,1,1,1,1], los=parameters.los
+            lot=parameters.time_vector_output().tolist(), lov=all_lov, lov_dims = [2,2,2,2,1,1,1,1,1,1,1,1,1,1,1,1,1], los=parameters.los
         )
         res.update(0, x / lspan, lov, [y_old, v_old, curvature_old, bending_moment_old])
         pb = spb.generate(parameters.pp, parameters.nt, desc=__name__)
@@ -377,8 +389,8 @@ class BeamBW(Beam):
             bending_moment_new = self._bending_moment_dynamic(curvature_new, eta_new)
 
             if (k + 1) % parameters.rr == 0:
-                values = [y_new, v_new, curvature_new, bending_moment_new] + list(self.compute_power(D2, curvature_new, v_old, v_new, y_new, eta_new,force_current, dt, x).values())
-                res.update((k // parameters.rr) + 1, x / lspan, lov + powers_name, values)
+                values = [y_new, v_new, curvature_new, bending_moment_new] + list(self.compute_power(D2, curvature_new, v_old, v_new, y_new, eta_new,force_current, dt, x).values()) + [it]
+                res.update((k // parameters.rr) + 1, x / lspan, lov + powers_name + picard, values)
                 pb.update(parameters.rr)
 
             current_time += dt

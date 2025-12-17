@@ -260,9 +260,6 @@ def test_solve_approx_curvature_bending_moment_variable(plot=False):
 
     def exact_time_derivative(x, t):
         return np.sinh(x + t)
-
-    def curvature(x, t):
-        return np.cosh(x + t)
     
     def exact_time_space_derivative(x, t):
         return np.cosh(x + t)
@@ -288,7 +285,6 @@ def test_solve_approx_curvature_bending_moment_variable(plot=False):
         parameters=parameters,
         initial_position=exact(x, 0),
         initial_velocity=exact_time_derivative(x, 0),
-        initial_bending_moment=ei_max * curvature(x, 0),
         force=force,
         approx_curvature=True,
     )
@@ -345,9 +341,6 @@ def test_solve_exact_curvature_bending_moment_variable(plot=False):
     def exact_time_space_derivative(x, t):
         return np.cosh(x + t)
 
-    def curvature(x, t):
-        return 1 / np.cosh(x + t) ** 2
-
     left = [[1, 0, 0, exact_time_derivative(lmin, 0)], [0, 1, 0, exact_time_space_derivative(lmin, 0)]]
     right = [[1, 0, 0, exact_time_derivative(lmax, 0)], [0, 1, 0, exact_time_space_derivative(lmax, 0)]]
     dynamic_values = [exact_time_derivative, exact_time_space_derivative, exact_time_space_derivative, exact_time_derivative]
@@ -369,7 +362,6 @@ def test_solve_exact_curvature_bending_moment_variable(plot=False):
         parameters=parameters,
         initial_position=exact(x, 0),
         initial_velocity=exact_time_derivative(x, 0),
-        initial_bending_moment=ei_max * curvature(x, 0),
         force=force,
         approx_curvature=False,
     )
