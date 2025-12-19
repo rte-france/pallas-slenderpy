@@ -5,7 +5,6 @@ import matplotlib.animation as animation
 from slenderpy.future.beam.beam import Beam, BeamBW
 import slenderpy.future.beam.fd_utils as FD
 from slenderpy import simtools 
-from slenderpy.future.cable.static.catenary import shape
 from slenderpy.future._constant import _GRAVITY
 
 def _plot_animation(x, sol_static, sol_dynamic, ymin, ymax, nb_time, dt):
@@ -35,7 +34,7 @@ def _plot_animation(x, sol_static, sol_dynamic, ymin, ymax, nb_time, dt):
         blit=False,
         repeat=True,
     )
-    # ani.save('free_vibration.mp4', writer='ffmpeg', fps=50)
+    # ani.save('test_case__bretelle.mp4', writer='ffmpeg', fps=50)
     plt.show()
 
 
@@ -61,14 +60,6 @@ def static_gravity():
     beam = BeamBW(length=lspan, boundary_condition=bc, tension=tension, mass=mass, ei_max=ei_max, ei_min=ei_min, critical_curvature=chi0)
     sol_static = beam.solve_static(n=nb_space, rhs=rhs, approx_curvature=False)
 
-    ds = lspan / (nb_space - 1)
-    D1 = FD.first_derivative(nb_space, ds)
-    D2 = FD.second_derivative(nb_space, ds)
-    def curvature(y):
-        return D2 @ y / np.sqrt((np.ones(nb_space) + ((D1 @ y) ** 2)) ** 3)
-    initial_curvature = curvature(sol_static)
-    initial_moment = np.sign(initial_curvature)*beam._bending_moment(np.abs(initial_curvature))
-
     parameters = simtools.Parameters(
         ns=nb_space, tf=final_time, dt=dt, dr=dr, los=nb_space, pp=True
     )
@@ -77,7 +68,6 @@ def static_gravity():
         parameters=parameters,
         initial_position=sol_static,
         initial_velocity=np.zeros(nb_space),
-        initial_bending_moment=initial_moment,
         force=force,
         approx_curvature=False,
         it_picard=3,
@@ -132,7 +122,6 @@ def hyteresis():
         parameters=parameters,
         initial_position=y_initial,
         initial_velocity=np.zeros(nb_space),
-        initial_bending_moment=initial_moment,
         force=force,
         approx_curvature=False,
         it_picard=3,
@@ -178,14 +167,6 @@ def energy():
 
     sol_static = beam.solve_static(n=nb_space, rhs=rhs, approx_curvature=False)
 
-    ds = lspan / (nb_space - 1)
-    D1 = FD.first_derivative(nb_space, ds)
-    D2 = FD.second_derivative(nb_space, ds)
-    def curvature(y):
-        return D2 @ y / np.sqrt((np.ones(nb_space) + ((D1 @ y) ** 2)) ** 3)
-    initial_curvature = curvature(sol_static)
-    initial_moment = np.sign(initial_curvature)*beam._bending_moment(np.abs(initial_curvature))
-
     parameters = simtools.Parameters(
         ns=nb_space, tf=final_time, dt=dt, dr=dr, los=nb_space, pp=True
     )
@@ -194,7 +175,6 @@ def energy():
         parameters=parameters,
         initial_position=sol_static,
         initial_velocity=np.zeros(nb_space),
-        initial_bending_moment=initial_moment,
         force=force,
         approx_curvature=False,
         it_picard=10,
@@ -249,7 +229,7 @@ def bretelle():
     mass = 2.879
     ei_max = 5089.
     ei_min = 67.7
-    chi0 = 1.e-5
+    chi0 = 2.e-5
 
     def force(x,t,y,v):
         return -_GRAVITY*np.ones(nb_space)*mass 
@@ -259,14 +239,6 @@ def bretelle():
     beam = BeamBW(length=lspan, boundary_condition=bc, tension=tension, mass=mass, ei_min=ei_min, ei_max=ei_max, critical_curvature=chi0)
     sol_static = beam.solve_static(n=nb_space, rhs=rhs, approx_curvature=False)
 
-    ds = lspan / (nb_space - 1)
-    D1 = FD.first_derivative(nb_space, ds)
-    D2 = FD.second_derivative(nb_space, ds)
-    def curvature(y):
-        return D2 @ y / np.sqrt((np.ones(nb_space) + ((D1 @ y) ** 2)) ** 3)
-    initial_curvature = curvature(sol_static)
-    initial_moment = beam._bending_moment(initial_curvature)
-
     parameters = simtools.Parameters(
         ns=nb_space, tf=final_time, dt=dt, dr=dr, los=nb_space, pp=True
     )
@@ -275,7 +247,6 @@ def bretelle():
         parameters=parameters,
         initial_position=sol_static,
         initial_velocity=0.8*np.sin(2*np.pi*x/lspan),
-        initial_bending_moment=initial_moment,
         force=force,
         approx_curvature=False,
         it_picard=30,
@@ -306,8 +277,54 @@ def bretelle():
     _plot_animation(x, sol_static, y, -4e-2, 3e-2, parameters.nr, dr)
 
 
+def amortissement():
+    lspan = 440
+    nb_space = 500
+    x = np.linspace(0, 440, nb_space)
+    final_time = 30.
+    dt = 1e-2
+    dr = 1e-1
+
+    tension = 39e3
+    mass = 1.57
+    ei_max = 2155.07
+    ei_min = 28.28
+    chi0 = 0.03
+
+    def force(x,t,y,v):
+        return -_GRAVITY*np.ones(nb_space)*mass
+
+    bc = FD.rot_free(0,0,0,0)
+    rhs = -10*np.ones(nb_space)*mass
+    beam = BeamBW(length=lspan, boundary_condition=bc, tension=tension, mass=mass, ei_min=ei_min, ei_max=ei_max, critical_curvature=chi0)
+    sol_static = beam.solve_static(n=nb_space, rhs=rhs, approx_curvature=False)
+
+    parameters = simtools.Parameters(
+        ns=nb_space, tf=final_time, dt=dt, dr=dr, los=nb_space, pp=True
+    )
+
+    w0 = beam.natural_frequencies_rot_free(100, ei_min)[-1]
+
+    sol_dynamic = beam.solve_dynamic(
+        parameters=parameters,
+        initial_position=sol_static,
+        initial_velocity=np.zeros(nb_space),
+        force=force,
+        approx_curvature=False,
+        w0 = w0,
+        zeta = 0.5,
+        it_picard=3,
+        tol_picard=1e-3
+    )
+
+    y = sol_dynamic["y"]
+
+    _plot_animation(x, sol_static, y, -10, 2, parameters.nr, dr)
+
+
 if __name__ == "__main__":
-    # static_gravity()
-    # hyteresis()
-    # energy()
+    static_gravity()
+    hyteresis()
+    energy()
     bretelle()
+    amortissement()

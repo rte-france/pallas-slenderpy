@@ -1,4 +1,5 @@
 from typing import Optional
+from abc import ABC
 
 import numpy as np
 import scipy as sp
@@ -6,10 +7,9 @@ import scipy as sp
 import slenderpy.future.beam.fd_utils as FD
 from slenderpy import simtools
 from slenderpy import _progress_bar as spb
-from slenderpy.future._constant import _GRAVITY
 
 
-class Beam:
+class Beam(ABC):
     """A Beam object."""
 
     def __init__(
@@ -18,27 +18,24 @@ class Beam:
         boundary_condition: FD.BoundaryCondition,
         tension: float,
         mass: float,
-        ei_min: float,
     ) -> None:
-
         self.length = length
         self.bc = boundary_condition
         self.tension = tension
         self.mass = mass
-        self.ei_min = ei_min
-
-    def _bending_moment(
-        self,
-        curvature: np.ndarray[float],
-    ) -> np.ndarray[float]:
-        return self.ei_min * curvature
     
-    def natural_frequencies(self, n: int = 1) -> np.ndarray:
+    def natural_frequencies(self, n) -> np.ndarray:
         return 0.5 * np.linspace(1, n, n) / self.length * np.sqrt(self.tension / self.mass)
 
     def natural_frequency(self):
         return self.natural_frequencies(n=1)[0]
-
+    
+    def natural_frequencies_rot_free(self, n, ei) -> np.ndarray:
+        ep = ei / (self.tension * self.length**2)
+        nn = np.linspace(1, n, n)
+        Wn = nn * np.sqrt(1.0 + ep * (np.pi * nn) ** 2)
+        return Wn * self.natural_frequency()
+    
     def solve_static(
         self,
         n: int,
@@ -51,9 +48,9 @@ class Beam:
         order = self.bc.order
         D2_border = FD.second_derivative(n, ds)
         D2 = FD.clean_matrix(order, D2_border)
-        BC, rhs_bc = self.bc.compute(ds, n)
+        BC, rhs_bc = self.bc.compute(n, ds)
         D4 = FD.fourth_derivative(n, ds)
-        K = self.ei_min * D4 - self.tension * D2
+        K = self.get_ei() * D4 - self.tension * D2
         A = K + BC
         rhs = FD.clean_rhs(order, rhs)
         rhs_tot = rhs + rhs_bc
@@ -84,6 +81,51 @@ class Beam:
             print(result.message)
 
         return result.x
+    
+    def compute_power(
+        self, 
+        D2: sp.sparse.spmatrix, 
+        curvature_new: np.ndarray[float], 
+        v_old: np.ndarray[float], 
+        v_new: np.ndarray[float], 
+        y_new: np.ndarray[float], 
+        force: callable, 
+        dt: float, 
+        x: np.ndarray[float]) -> dict:
+
+        power = {}
+        power["p_kin"] = (self.mass*sp.integrate.simpson(v_new*(v_new - v_old)/dt,x))
+        power["p_bend"] = (self.get_ei()*sp.integrate.simpson((D2@curvature_new)*v_new,x))
+        power["p_tens"] = (-self.tension*sp.integrate.simpson((D2@y_new)*v_new,x))
+        power["p_ext"] = (sp.integrate.trapezoid(-force*v_new, x))
+
+        return power
+
+
+class BeamConst(Beam):
+
+    def  __init__(
+        self,
+        length: float,
+        boundary_condition: FD.BoundaryCondition,
+        tension: float,
+        mass: float,
+        ei: float
+    ) -> None:
+        self.length = length
+        self.bc = boundary_condition
+        self.tension = tension
+        self.mass = mass
+        self.ei = ei 
+
+    def get_ei(self):
+        return self.ei
+
+    def _bending_moment(
+        self,
+        curvature: np.ndarray[float],
+    ) -> np.ndarray[float]:
+        return self.ei * curvature
 
     def solve_dynamic(
         self,
@@ -92,9 +134,10 @@ class Beam:
         initial_velocity: np.ndarray[float],
         force: callable,
         approx_curvature: bool,
-        zeta: float = 0,
-        it_picard: int = 1,
-        tol_picard: float = 1e-3,
+        zeta: Optional[float] = 0,
+        w0: Optional[float] = None, 
+        it_picard: Optional[int] = 1,
+        tol_picard: Optional[float] = 1e-3,
     ) -> simtools.Results:
         """Solve equation of the form : m*(d^2/dt^2)*y + (d^2/dx^2)*M - tension*(d^2/dx^2)*y = rhs,
         where M depends on the exact curvature.
@@ -111,19 +154,22 @@ class Beam:
         order = self.bc.order
         D2_border = FD.second_derivative(nb_space, ds)
         D2 = FD.clean_matrix(order, D2_border)
-        BC, _ = self.bc.compute(ds, nb_space)
+        BC, _ = self.bc.compute(nb_space, ds)
         Id = sp.sparse.identity(nb_space)
         Id = FD.clean_matrix(order, Id)
         rhs_bc = np.zeros(nb_space)
         D1 = FD.first_derivative(nb_space, ds)
         D4 = FD.fourth_derivative(nb_space,ds)
 
+        if w0 is None:
+            w0 = self.natural_frequency()
+
         if approx_curvature:
             D4 = FD.fourth_derivative(nb_space, ds)
-            K = self.ei_min * D4 - self.tension * D2
+            K = self.ei * D4 - self.tension * D2
 
             def compute_rhs(forces, y_picard, bending_moment_old):
-                return B @ v_old + dt2 * forces - dt * K @ y_old + rhs_bc, D2 @ y_picard
+                return B @ v_old + dt2 * forces - dt * K @ y_old - dt2 * 2*self.mass*w0*zeta * v_old + rhs_bc, D2 @ y_picard
 
         else:
             K = -self.tension * D2
@@ -136,10 +182,11 @@ class Beam:
                     + dt2 * forces
                     - dt2 * D2 @ (bendig_moment_old + bending_moment_picard)
                     - dt * K @ y_old
+                    - dt2 * 2*self.mass*w0*zeta * v_old
                     + rhs_bc
                 ), curvature_picard
 
-        M = self.mass * (1 + dt*2*self.natural_frequency()*zeta) * Id
+        M = self.mass * (1 + dt2*2*w0*zeta) * Id
         A = M + dt2**2 * K + BC
         B = M - dt2**2 * K
 
@@ -207,25 +254,6 @@ class Beam:
         pb.close()
         res.set_state({"y": y_new, "v": v_new})
         return res
-    
-    def compute_power(
-        self, 
-        D2: sp.sparse.spmatrix, 
-        curvature_new: np.ndarray[float], 
-        v_old: np.ndarray[float], 
-        v_new: np.ndarray[float], 
-        y_new: np.ndarray[float], 
-        force: callable, 
-        dt: float, 
-        x: np.ndarray[float]) -> dict:
-
-        power = {}
-        power["p_kin"] = (self.mass*sp.integrate.simpson(v_new*(v_new - v_old)/dt,x))
-        power["p_bend"] = (self.ei_min*sp.integrate.simpson((D2@curvature_new)*v_new,x))
-        power["p_tens"] = (-self.tension*sp.integrate.simpson((D2@y_new)*v_new,x))
-        power["p_ext"] = (sp.integrate.trapezoid(-force*v_new, x))
-
-        return power
 
 
 class BeamBW(Beam):
@@ -240,10 +268,14 @@ class BeamBW(Beam):
         critical_curvature: float,
     ) -> None:
 
-        super().__init__(length, boundary_condition, tension, mass, ei_min)
+        super().__init__(length, boundary_condition, tension, mass)
+        self.ei_min = ei_min
         self.ei_max = ei_max
         self.critical_curvature = critical_curvature
         self.chi_bar = (1 - self.ei_min / self.ei_max) * self.critical_curvature
+
+    def get_ei(self):
+        return self.ei_min
 
     def _bending_moment(self, curvature: np.ndarray[float]) -> np.ndarray[float]:
         c = np.abs(curvature)
@@ -264,10 +296,11 @@ class BeamBW(Beam):
         initial_velocity: np.ndarray[float],
         force: callable,
         approx_curvature: bool,
-        initial_bending_moment: np.ndarray[float] = None,
-        zeta: float = 0,
-        it_picard: int = 15,
-        tol_picard: float = 1e-4,
+        initial_bending_moment: Optional[np.ndarray[float]] = None,
+        zeta: Optional[float] = 0,
+        w0: Optional[float] = None,
+        it_picard: Optional[int] = 15,
+        tol_picard: Optional[float] = 1e-4,
     ) -> simtools.Results:
 
         lspan = self.length
@@ -280,11 +313,14 @@ class BeamBW(Beam):
         order = self.bc.order
         D2_border = FD.second_derivative(nb_space, ds)
         D2 = FD.clean_matrix(order, D2_border)
-        BC, _ = self.bc.compute(ds, nb_space)
+        BC, _ = self.bc.compute(nb_space, ds)
         Id = sp.sparse.identity(nb_space)
         Id = FD.clean_matrix(order, Id)
         rhs_bc = np.zeros(nb_space)
         D1 = FD.first_derivative(nb_space, ds)
+
+        if w0 is None:
+            w0 = self.natural_frequency()
 
         if approx_curvature:
             D4 = FD.fourth_derivative(nb_space, ds)
@@ -300,7 +336,7 @@ class BeamBW(Beam):
                     D2_border @ y / np.sqrt((np.ones(nb_space) + ((D1 @ y) ** 2)) ** 3)
                 )
 
-        M = self.mass * (1 + dt*2*self.natural_frequency()*zeta) * Id
+        M = self.mass * (1 + dt2*2*w0*zeta) * Id
         A = M + dt2**2 * K + BC
         B = M - dt2**2 * K
 
@@ -352,6 +388,7 @@ class BeamBW(Beam):
                         + dt2 * (force_previsous + force_current)
                         - dt2 * (self.ei_max - self.ei_min)*self.critical_curvature*D2@(eta_old + eta_picard)
                         - dt * K @ y_old
+                        - dt2 * 2*self.mass*w0*zeta * v_old 
                         + rhs_bc
                     )
                 
@@ -361,6 +398,7 @@ class BeamBW(Beam):
                         + dt2 * (force_previsous + force_current)
                         - dt2 * D2 @ (bending_moment_old + bending_moment_picard)
                         - dt * K @ y_old
+                        - dt2 * 2*self.mass*w0*zeta * v_old 
                         + rhs_bc
                     )
 

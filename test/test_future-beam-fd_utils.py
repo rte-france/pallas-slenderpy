@@ -102,7 +102,7 @@ def test_boundary_condition_order2(plot=False):
     left = [[1, 0, 0, 1]]
     right = [[0, 1, 0, 2]]
     bc = FD.BoundaryCondition(order, left, right)
-    BC, rhs = bc.compute(ds, n)
+    BC, rhs = bc.compute(n, ds)
     A = FD.second_derivative(n, ds)
 
     sol = sp.sparse.linalg.spsolve(A + BC, rhs)
@@ -183,7 +183,7 @@ def test_boundary_condition_order4(plot=False):
     left = [[1, 0, 0, 0], [0, 1, 0, 1]]
     right = [[1, 0, 0, 1], [0, 1, 0, 2]]
     bc = FD.BoundaryCondition(order, left, right)
-    BC, rhs = bc.compute(ds, n)
+    BC, rhs = bc.compute(n, ds)
     A = FD.fourth_derivative(n, ds)
 
     sol = sp.sparse.linalg.spsolve(A + BC, rhs)

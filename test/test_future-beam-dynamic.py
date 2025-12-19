@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-from slenderpy.future.beam.beam import Beam, BeamBW
+from slenderpy.future.beam.beam import BeamConst, BeamBW
 from slenderpy.future.beam.fd_utils import BoundaryCondition
 from slenderpy import simtools
 
@@ -73,8 +73,8 @@ def test_solve_approx_curvature_bending_moment_constant_static_BC(plot=False):
     right = [[1, 0, 0, 1], [0, 1, 0, 0]]
     bc = BoundaryCondition(4, left, right)
 
-    beam = Beam(
-        length=lspan, boundary_condition=bc, tension=tension, ei_min=ei_min, mass=mass
+    beam = BeamConst(
+        length=lspan, boundary_condition=bc, tension=tension, ei=ei_min, mass=mass
     )
     parameters = simtools.Parameters(
         ns=nb_space, tf=final_time, dt=dt, dr=1e-3, los=nb_space
@@ -138,8 +138,8 @@ def test_solve_approx_curvature_bending_moment_constant_dynamic_BC(plot=False):
     dynamic_values = [exact_time_derivative, exact_time_space_derivative, exact_time_space_derivative, exact_time_derivative]
     bc = BoundaryCondition(4, left, right, dynamic_values)
 
-    beam = Beam(
-        length=lspan, boundary_condition=bc, tension=tension, ei_min=ei_min, mass=mass
+    beam = BeamConst(
+        length=lspan, boundary_condition=bc, tension=tension, ei=ei_min, mass=mass
     )
     parameters = simtools.Parameters(
         ns=nb_space, tf=final_time, dt=dt, dr=1e-3, los=nb_space
@@ -204,8 +204,8 @@ def test_solve_exact_curvature_bending_moment_constant(plot=False):
     dynamic_values = [exact_time_derivative, exact_time_space_derivative, exact_time_space_derivative, exact_time_derivative]
     bc = BoundaryCondition(4, left, right, dynamic_values)
 
-    beam = Beam(
-        length=lspan, boundary_condition=bc, tension=tension, ei_min=ei_min, mass=mass
+    beam = BeamConst(
+        length=lspan, boundary_condition=bc, tension=tension, ei=ei_min, mass=mass
     )
     parameters = simtools.Parameters(
         ns=nb_space, tf=final_time, dt=dt, dr=1e-3, los=nb_space
