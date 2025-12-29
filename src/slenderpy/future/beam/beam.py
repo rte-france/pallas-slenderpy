@@ -44,7 +44,6 @@ class Beam(ABC):
     ) -> np.ndarray[float]:
 
         ds = self.length / (n - 1)
-
         order = self.bc.order
         D2_border = FD.second_derivative(n, ds)
         D2 = FD.clean_matrix(order, D2_border)
@@ -62,14 +61,9 @@ class Beam(ABC):
                 return D2_border @ y
 
         else:
+            D1 = FD.first_derivative(n, ds)
             def curvature(y):
-                return (
-                    D2_border
-                    @ y
-                    / np.sqrt(
-                        (np.ones(n) + ((FD.first_derivative(n, ds)) @ y) ** 2) ** (3)
-                    )
-                )
+                return D2_border @ y / np.sqrt((1 + (D1 @ y) ** 2) ** (3))
 
         def equation(y):
             bending_moment = self._bending_moment(curvature(y))
@@ -143,54 +137,47 @@ class BeamConst(Beam):
         where M depends on the exact curvature.
         """
         lspan = self.length
-        nb_space = parameters.ns
-        ds = lspan / (nb_space - 1)
+        ns = parameters.ns
+        ds = lspan / (ns - 1)
         dt = parameters.tf / parameters.nt
         dt2 = dt * 0.5
-        x = np.linspace(0.0, lspan, nb_space)
-        y_old = initial_position
-        v_old = initial_velocity
+        x = np.linspace(0.0, lspan, ns)
+        current_time = parameters.t0 + dt
 
         order = self.bc.order
-        D2_border = FD.second_derivative(nb_space, ds)
+        D1 = FD.first_derivative(ns, ds)
+        D2_border = FD.second_derivative(ns, ds)
         D2 = FD.clean_matrix(order, D2_border)
-        BC, _ = self.bc.compute(nb_space, ds)
-        Id = sp.sparse.identity(nb_space)
-        Id = FD.clean_matrix(order, Id)
-        rhs_bc = np.zeros(nb_space)
-        D1 = FD.first_derivative(nb_space, ds)
-        D4 = FD.fourth_derivative(nb_space,ds)
+        D4 = FD.fourth_derivative(ns,ds)
 
+        y_old = initial_position
+        v_old = initial_velocity
+        
         if w0 is None:
             w0 = self.natural_frequency()
 
-        if approx_curvature:
-            D4 = FD.fourth_derivative(nb_space, ds)
-            K = self.ei * D4 - self.tension * D2
+        damp = w0*zeta 
 
-            def compute_rhs(forces, y_picard, bending_moment_old):
-                return B @ v_old + dt2 * forces - dt * K @ y_old - dt2 * 2*self.mass*w0*zeta * v_old + rhs_bc, D2 @ y_picard
+        if approx_curvature:
+            K = self.ei * D4 - self.tension * D2
+            def curvature(y):
+                return D2 @ y
 
         else:
             K = -self.tension * D2
-
-            def compute_rhs(forces, y_picard, bendig_moment_old):
-                curvature_picard = (D2_border@ y_picard/ np.sqrt((np.ones(nb_space) + (D1 @ y_picard) ** 2)** 3))
-                bending_moment_picard = self._bending_moment(curvature_picard)
-                return (
-                    B @ v_old
-                    + dt2 * forces
-                    - dt2 * D2 @ (bendig_moment_old + bending_moment_picard)
-                    - dt * K @ y_old
-                    - dt2 * 2*self.mass*w0*zeta * v_old
-                    + rhs_bc
-                ), curvature_picard
-
-        M = self.mass * (1 + dt2*2*w0*zeta) * Id
+            def curvature(y):
+                return D2_border @ y / np.sqrt((1 + ((D1 @ y) ** 2)) ** 3)
+            
+        order = self.bc.order
+        BC, _ = self.bc.compute(ns, ds)
+        Id = sp.sparse.identity(ns)
+        Id = FD.clean_matrix(order, Id)
+        rhs_bc = np.zeros(ns)
+            
+        M = self.mass * (1 + dt2*damp) * Id
         A = M + dt2**2 * K + BC
         B = M - dt2**2 * K
 
-        current_time = parameters.t0 + dt
         powers_name = ["p_kin", "p_bend", "p_tens", "p_ext"]
         energies_name = ["e_kin", "e_bend", "e_tens", "e_ext"]
         picard = ["it_picard"]
@@ -203,43 +190,12 @@ class BeamConst(Beam):
         pb = spb.generate(parameters.pp, parameters.nt, desc=__name__)
 
         for k in range(parameters.nt):
-            
-            if self.bc.dynamic_values is not None:
-                rhs_bc = self.bc.update_rhs(nb_space, x, current_time)
-
             force_previous = FD.clean_rhs(
                 order, force(x, current_time - dt, y_old, v_old)
             )
             force_current = FD.clean_rhs(order, force(x, current_time, y_old, v_old))
 
-            curvature_old = (
-                D2_border
-                @ y_old
-                / np.sqrt(
-                    (
-                        np.ones(nb_space)
-                        + ((FD.first_derivative(nb_space, ds)) @ y_old) ** 2
-                    )
-                    ** (3)
-                )
-            )
-            bending_moment_old = self._bending_moment(curvature_old)
-            y_picard = y_old
-            v_picard = v_old
-
-            it = 0
-            error = 100
-            while it < it_picard and error > tol_picard:
-                rhs, curvature_new = compute_rhs(
-                    force_previous + force_current, y_picard, bending_moment_old
-                )
-                v_new = sp.sparse.linalg.spsolve(A, rhs)
-                y_new = y_old + dt2 * (v_old + v_new)
-
-                error = np.linalg.norm(v_picard - v_new)
-                v_picard = v_new
-                y_picard = y_new
-                it += 1
+            v_new, y_new, curvature_new, it = self.picard_process(parameters, dt, dt2, A, B, K, D2, rhs_bc, v_old, y_old, curvature, approx_curvature, force_current + force_previous, w0*zeta, current_time, it_picard, tol_picard)
 
             if (k + 1) % parameters.rr == 0:
                 values = [y_new,v_new] + list(self.compute_power(D2, curvature_new, v_old, v_new, y_new, force_current, dt, x).values()) + [it]
@@ -254,6 +210,53 @@ class BeamConst(Beam):
         pb.close()
         res.set_state({"y": y_new, "v": v_new})
         return res
+    
+    def picard_process(self, parameters, dt, dt2, A, B, K, D2, rhs_bc, v_old, y_old, curvature, approx_curvature, forces, damp, current_time, it_picard, tol_picard):
+
+        if self.bc.dynamic_values is not None:
+                ns = parameters.ns
+                x = np.linspace(0.0, self.length, ns)
+                rhs_bc = self.bc.update_rhs(ns, x, current_time)
+
+        if not approx_curvature:
+            curvature_old = curvature(y_old)
+            bending_moment_old = self._bending_moment(curvature_old)
+
+        y_picard = y_old 
+        v_picard = v_old
+        it = 0
+        error = 100
+        while it < it_picard and error > tol_picard:
+            
+            if approx_curvature:
+                rhs = (
+                    B @ v_old 
+                    + dt2 * forces 
+                    - dt * K @ y_old 
+                    - dt *self.mass*damp * v_old 
+                    + rhs_bc)
+
+            else:
+                curvature_picard = curvature(y_picard)
+                bending_moment_picard = self._bending_moment(curvature_picard)
+                rhs = (
+                    B @ v_old
+                    + dt2 * forces
+                    - dt2 * D2 @ (bending_moment_old + bending_moment_picard)
+                    - dt * K @ y_old
+                    - dt*self.mass*damp * v_old
+                    + rhs_bc
+                )
+
+            v_new = sp.sparse.linalg.spsolve(A,rhs)
+            y_new = y_old + dt2 * (v_old + v_new)
+
+            error = np.linalg.norm(v_picard - v_new)
+            v_picard = v_new
+            y_picard = y_new
+            it += 1
+        
+        return v_new, y_new, curvature(y_new), it
 
 
 class BeamBW(Beam):
@@ -318,14 +321,14 @@ class BeamBW(Beam):
         Id = FD.clean_matrix(order, Id)
         rhs_bc = np.zeros(nb_space)
         D1 = FD.first_derivative(nb_space, ds)
+        D4 = FD.fourth_derivative(nb_space, ds)
+
 
         if w0 is None:
             w0 = self.natural_frequency()
 
         if approx_curvature:
-            D4 = FD.fourth_derivative(nb_space, ds)
             K = self.ei_min * D4 - self.tension * D2
-
             def curvature(y):
                 return D2 @ y
 
@@ -333,7 +336,7 @@ class BeamBW(Beam):
             K = -self.tension * D2
             def curvature(y):
                 return (
-                    D2_border @ y / np.sqrt((np.ones(nb_space) + ((D1 @ y) ** 2)) ** 3)
+                    D2_border @ y / np.sqrt((1 + ((D1 @ y) ** 2)) ** 3)
                 )
 
         M = self.mass * (1 + dt2*2*w0*zeta) * Id
@@ -366,7 +369,7 @@ class BeamBW(Beam):
             if self.bc.dynamic_values is not None:
                 rhs_bc = self.bc.update_rhs(nb_space, x, current_time)
 
-            force_previsous = FD.clean_rhs(
+            force_previous = FD.clean_rhs(
                 order, force(x, current_time - dt, y_old, v_old)
             )
             force_current = FD.clean_rhs(order, force(x, current_time, y_old, v_old))
@@ -385,7 +388,7 @@ class BeamBW(Beam):
                 if approx_curvature:
                     rhs = (
                         B @ v_old
-                        + dt2 * (force_previsous + force_current)
+                        + dt2 * (force_previous + force_current)
                         - dt2 * (self.ei_max - self.ei_min)*self.critical_curvature*D2@(eta_old + eta_picard)
                         - dt * K @ y_old
                         - dt2 * 2*self.mass*w0*zeta * v_old 
@@ -395,7 +398,7 @@ class BeamBW(Beam):
                 else:
                     rhs = (
                         B @ v_old
-                        + dt2 * (force_previsous + force_current)
+                        + dt2 * (force_previous + force_current)
                         - dt2 * D2 @ (bending_moment_old + bending_moment_picard)
                         - dt * K @ y_old
                         - dt2 * 2*self.mass*w0*zeta * v_old 
