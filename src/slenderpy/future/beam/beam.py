@@ -304,7 +304,7 @@ class BeamConst(Beam):
             v_new = sp.sparse.linalg.spsolve(A,rhs)
             y_new = y_old + dt2 * (v_old + v_new)
 
-            error = np.linalg.norm(v_picard - v_new)
+            error = np.linalg.norm((v_picard - v_new)/np.linalg.norm(v_new) + (y_picard - y_new)/np.linalg.norm(y_new))
             v_picard = v_new
             y_picard = y_new
             it += 1
@@ -395,7 +395,7 @@ class BeamBW(Beam):
             v_new = sp.sparse.linalg.spsolve(A,rhs)
             y_new = y_old + dt2 * (v_old + v_new)
 
-            error = np.linalg.norm(v_picard - v_new)
+            error = np.linalg.norm((v_picard - v_new)/np.linalg.norm(v_new) + (y_picard - y_new)/np.linalg.norm(y_new))
             v_picard = v_new
             y_picard = y_new
 
