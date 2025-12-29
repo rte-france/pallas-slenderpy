@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-from slenderpy.future.beam.beam import Beam, BeamBW
+from slenderpy.future.beam.beam import BeamBW
 import slenderpy.future.beam.fd_utils as FD
 from slenderpy import simtools 
 from slenderpy.future._constant import _GRAVITY
