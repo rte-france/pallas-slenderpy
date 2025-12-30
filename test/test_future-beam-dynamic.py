@@ -74,7 +74,7 @@ def test_solve_approx_curvature_bending_moment_constant_static_BC(plot=False):
     bc = BoundaryCondition(4, left, right)
 
     beam = BeamConst(
-        length=lspan, boundary_condition=bc, tension=tension, ei=ei_min, mass=mass
+        length=lspan, boundary_conditions=bc, tension=tension, ei=ei_min, mass=mass
     )
     parameters = simtools.Parameters(
         ns=nb_space, tf=final_time, dt=dt, dr=1e-3, los=nb_space
@@ -139,7 +139,7 @@ def test_solve_approx_curvature_bending_moment_constant_dynamic_BC(plot=False):
     bc = BoundaryCondition(4, left, right, dynamic_values)
 
     beam = BeamConst(
-        length=lspan, boundary_condition=bc, tension=tension, ei=ei_min, mass=mass
+        length=lspan, boundary_conditions=bc, tension=tension, ei=ei_min, mass=mass
     )
     parameters = simtools.Parameters(
         ns=nb_space, tf=final_time, dt=dt, dr=1e-3, los=nb_space
@@ -205,7 +205,7 @@ def test_solve_exact_curvature_bending_moment_constant(plot=False):
     bc = BoundaryCondition(4, left, right, dynamic_values)
 
     beam = BeamConst(
-        length=lspan, boundary_condition=bc, tension=tension, ei=ei_min, mass=mass
+        length=lspan, boundary_conditions=bc, tension=tension, ei=ei_min, mass=mass
     )
     parameters = simtools.Parameters(
         ns=nb_space, tf=final_time, dt=dt, dr=1e-3, los=nb_space
@@ -271,7 +271,7 @@ def test_solve_approx_curvature_bending_moment_variable(plot=False):
 
     beam = BeamBW(
         length=lspan,
-        boundary_condition=bc,
+        boundary_conditions=bc,
         tension=tension,
         ei_max=ei_max,
         ei_min=ei_min,
@@ -348,7 +348,7 @@ def test_solve_exact_curvature_bending_moment_variable(plot=False):
 
     beam = BeamBW(
         length=lspan,
-        boundary_condition=bc,
+        boundary_conditions=bc,
         tension=tension,
         ei_max=ei_max,
         ei_min=ei_min,
