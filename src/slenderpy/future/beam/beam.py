@@ -10,7 +10,7 @@ from slenderpy import _progress_bar as spb
 
 
 class Beam(ABC):
-    """A Beam object. This is an abstract class since the user need to specify 
+    """A Beam object. This is an abstract class since the user need to specify
     wether the bending stiffness is constant or not."""
 
     def __init__(
@@ -41,7 +41,7 @@ class Beam(ABC):
         self.bc = boundary_conditions
         self.tension = tension
         self.mass = mass
-    
+
     def natural_frequencies(self, n: int) -> np.ndarray:
         """Compute the n first modes of the vibrating string.
 
@@ -55,21 +55,23 @@ class Beam(ABC):
         numpy.ndarray
             Array of frequencies (in Hz).
         """
-        return 0.5 * np.linspace(1, n, n) / self.length * np.sqrt(self.tension / self.mass)
+        return (
+            0.5 * np.linspace(1, n, n) / self.length * np.sqrt(self.tension / self.mass)
+        )
 
     def natural_frequency(self) -> float:
         """Compute the natural frequency of the vibrating string."""
         return self.natural_frequencies(n=1)[0]
-    
+
     def natural_frequencies_rot_free(self, n: int, ei: float) -> np.ndarray:
         """Compute natural frequencies for pinned-beam.
 
         Parameters
         ----------
         n : int
-            Number of frequencies to compute. 
+            Number of frequencies to compute.
         c : float
-            Bending stiffness. 
+            Bending stiffness.
 
         Returns
         -------
@@ -80,7 +82,7 @@ class Beam(ABC):
         nn = np.linspace(1, n, n)
         Wn = nn * np.sqrt(1.0 + ep * (np.pi * nn) ** 2)
         return Wn * self.natural_frequency()
-    
+
     def solve_static(
         self,
         n: int,
@@ -102,7 +104,7 @@ class Beam(ABC):
         Returns
         -------
         np.ndarray[float]
-            Displacement. 
+            Displacement.
         """
 
         ds = self.length / (n - 1)
@@ -119,11 +121,13 @@ class Beam(ABC):
         sol = sp.sparse.linalg.spsolve(A, rhs_tot)
 
         if approx_curvature:
+
             def curvature(y):
                 return D2_border @ y
 
         else:
             D1 = FD.first_derivative(n, ds)
+
             def curvature(y):
                 return D2_border @ y / np.sqrt((1 + (D1 @ y) ** 2) ** (3))
 
@@ -137,7 +141,7 @@ class Beam(ABC):
             print(result.message)
 
         return result.x
-    
+
     def solve_dynamic(
         self,
         parameters: simtools.Parameters,
@@ -147,7 +151,7 @@ class Beam(ABC):
         approx_curvature: bool,
         initial_bending_moment: Optional[np.ndarray[float]] = None,
         zeta: Optional[float] = 0,
-        w0: Optional[float] = None, 
+        f0: Optional[float] = None,
         it_picard: Optional[int] = 15,
         tol_picard: Optional[float] = 1e-4,
     ) -> simtools.Results:
@@ -161,16 +165,16 @@ class Beam(ABC):
         initial_position : np.ndarray[float]
             Initial position.
         initial_velocity : np.ndarray[float]
-            Initial velocity. 
+            Initial velocity.
         force : callable
             Function of (x,t,y,v) returning the external force per unit length.
         approx_curvature : bool
             True to use approximate curvature, False to use exact curvature.
         initial_bending_moment : Optional[np.ndarray[float]], optional
-            Initial bending moment, by default None. If set toNone, it is computed from the initial curvature. 
+            Initial bending moment, by default None. If set toNone, it is computed from the initial curvature.
         zeta : Optional[float], optional
-            Fluid-friction coefficient, by default 0
-        w0 : Optional[float], optional
+            Damping ratio, by default 0
+        f0 : Optional[float], optional
             Natural frequency, by default None
         it_picard : Optional[int], optional
             Maximal number of Picard iterations, by default 15
@@ -180,7 +184,7 @@ class Beam(ABC):
         Returns
         -------
         simtools.Results
-            Simulation output with displacement, velocity, curvature, bending moment 
+            Simulation output with displacement, velocity, curvature, bending moment
         and energies for the positions and times specified in input parameters.
         """
         lspan = self.length
@@ -199,34 +203,39 @@ class Beam(ABC):
 
         if approx_curvature:
             K = self.get_ei() * D4 - self.tension * D2
+
             def curvature(y):
                 return D2 @ y
 
         else:
             K = -self.tension * D2
+
             def curvature(y):
                 return D2_border @ y / np.sqrt((1 + (D1 @ y) ** 2) ** 3)
-            
+
         y_old = initial_position
         v_old = initial_velocity
         curvature_old = curvature(y_old)
         if initial_bending_moment is None:
-                initial_bending_moment = self._bending_moment(curvature_old)
+            initial_bending_moment = self._bending_moment(curvature_old)
         bending_moment_old = initial_bending_moment
-        eta_old = self._init_eta(bending_moment_old,curvature_old)
-        
-        if w0 is None:
-            w0 = self.natural_frequency()
-        damp = w0 * zeta
+        eta_old = self._init_eta(bending_moment_old, curvature_old)
 
-        toolbox = self.build_dict(parameters, damp, K, D2)
+        if f0 is None:
+            f0 = self.natural_frequency()
+        damp = 2 * self.mass * 2 * np.pi * f0 * zeta
+
+        toolbox = self._build_dict(parameters, damp, K, D2)
         powers_name = ["p_kin", "p_bend", "p_tens", "p_ext", "p_dissip"]
         energies_name = ["e_kin", "e_bend", "e_tens", "e_ext", "e_dissip"]
         picard = ["it_picard"]
         lov = ["y", "v", "c", "M"]
         all_lov = lov + powers_name + energies_name + picard
         res = simtools.Results(
-            lot=parameters.time_vector_output().tolist(), lov=all_lov, lov_dims = [2,2,2,2,1,1,1,1,1,1,1,1,1,1,1,1,1], los=parameters.los
+            lot=parameters.time_vector_output().tolist(),
+            lov=all_lov,
+            lov_dims=[2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            los=parameters.los,
         )
         res.update(0, x / lspan, lov, [y_old, v_old, curvature_old, bending_moment_old])
         pb = spb.generate(parameters.pp, parameters.nt, desc=__name__)
@@ -239,14 +248,46 @@ class Beam(ABC):
                 order, force(x, current_time - dt, y_old, v_old)
             )
             force_current = FD.clean_rhs(order, force(x, current_time, y_old, v_old))
-                
-            v_new, y_new, eta_new, curvature_new, bending_moment_new, it = self.picard_process(
-                toolbox, v_old, y_old, eta_old, rhs_bc, curvature, approx_curvature, force_current + force_previous, it_picard, tol_picard
+
+            v_new, y_new, eta_new, curvature_new, bending_moment_new, it = (
+                self.picard_process(
+                    toolbox,
+                    v_old,
+                    y_old,
+                    eta_old,
+                    rhs_bc,
+                    curvature,
+                    approx_curvature,
+                    force_current + force_previous,
+                    it_picard,
+                    tol_picard,
                 )
+            )
 
             if (k + 1) % parameters.rr == 0:
-                values = [y_new, v_new, curvature_new, bending_moment_new] + list(self.compute_power(D2, curvature_new, v_old, v_new, y_new, eta_new, force_current, dt, x).values()) + [it]
-                res.update((k // parameters.rr) + 1, x / lspan, lov + powers_name + picard, values)
+                values = (
+                    [y_new, v_new, curvature_new, bending_moment_new]
+                    + list(
+                        self.compute_power(
+                            D2,
+                            curvature_new,
+                            v_old,
+                            v_new,
+                            y_new,
+                            eta_new,
+                            force_current,
+                            dt,
+                            x,
+                        ).values()
+                    )
+                    + [it]
+                )
+                res.update(
+                    (k // parameters.rr) + 1,
+                    x / lspan,
+                    lov + powers_name + picard,
+                    values,
+                )
                 pb.update(parameters.rr)
 
             current_time += dt
@@ -256,22 +297,31 @@ class Beam(ABC):
             curvature_old = curvature_new
             bending_moment_old = bending_moment_new
 
-        self.update_energies(res, powers_name, energies_name, parameters.tf / parameters.nr , parameters.nr)
+        self.update_energies(
+            res,
+            powers_name,
+            energies_name,
+            parameters.tf / parameters.nr,
+            parameters.nr,
+        )
         pb.close()
-        res.set_state({"y": y_new, "v": v_new, "c":curvature_new, "M": bending_moment_new})
+        res.set_state(
+            {"y": y_new, "v": v_new, "c": curvature_new, "M": bending_moment_new}
+        )
         return res
-    
+
     def compute_power(
-        self, 
-        D2: sp.sparse.csr_matrix, 
-        curvature_new: np.ndarray[float], 
-        v_old: np.ndarray[float], 
-        v_new: np.ndarray[float], 
-        y_new: np.ndarray[float], 
+        self,
+        D2: sp.sparse.csr_matrix,
+        curvature_new: np.ndarray[float],
+        v_old: np.ndarray[float],
+        v_new: np.ndarray[float],
+        y_new: np.ndarray[float],
         eta_new: np.ndarray[float],
-        force: callable, 
-        dt: float, 
-        x: np.ndarray[float]) -> dict:
+        force: callable,
+        dt: float,
+        x: np.ndarray[float],
+    ) -> dict:
         """Compute power contributions at current time step.
 
         Parameters
@@ -301,21 +351,26 @@ class Beam(ABC):
             Dictionary with power contributions.
         """
         power = {}
-        power["p_kin"] = (self.mass*sp.integrate.simpson(v_new*(v_new - v_old)/dt,x))
-        power["p_bend"] = (self.get_ei()*sp.integrate.simpson((D2@curvature_new)*v_new,x))
-        power["p_tens"] = (-self.tension*sp.integrate.simpson((D2@y_new)*v_new,x))
-        power["p_ext"] = (sp.integrate.trapezoid(-force*v_new, x))
+        power["p_kin"] = self.mass * sp.integrate.simpson(
+            v_new * (v_new - v_old) / dt, x
+        )
+        power["p_bend"] = self.get_ei() * sp.integrate.simpson(
+            (D2 @ curvature_new) * v_new, x
+        )
+        power["p_tens"] = -self.tension * sp.integrate.simpson((D2 @ y_new) * v_new, x)
+        power["p_ext"] = sp.integrate.trapezoid(-force * v_new, x)
         power["p_dissip"] = np.nan
 
         return power
-    
+
     @staticmethod
     def update_energies(
-        res: simtools.Results, 
-        powers_name: list, 
-        energies_name: list, 
-        dr: float, 
-        nr: int) -> None:
+        res: simtools.Results,
+        powers_name: list,
+        energies_name: list,
+        dr: float,
+        nr: int,
+    ) -> None:
         """_summary_
 
         Parameters
@@ -335,23 +390,23 @@ class Beam(ABC):
         -------
         None.
         """
-        for k in range(1,nr):
+        for k in range(1, nr):
             energies = []
             for powers in powers_name:
-                energies.append(sp.integrate.trapezoid(res[powers][1:k+1], dx = dr))
-            
+                energies.append(sp.integrate.trapezoid(res[powers][1 : k + 1], dx=dr))
+
             res.update(k, None, energies_name, energies)
-        
+
         for energy in energies_name:
             res.data[energy] -= res.data[energy].min()
-    
-    def build_dict(
-        self, 
-        parameters: simtools.Parameters, 
-        damp: float, 
-        K: sp.sparse.csr_matrix, 
-        D2: sp.sparse.csr_matrix
-        ) -> dict:
+
+    def _build_dict(
+        self,
+        parameters: simtools.Parameters,
+        damp: float,
+        K: sp.sparse.csr_matrix,
+        D2: sp.sparse.csr_matrix,
+    ) -> dict:
         """Make dictionary of matrices and parameters for dynamic resolution.
 
         Parameters
@@ -380,14 +435,13 @@ class Beam(ABC):
         BC, _ = self.bc.compute(ns, ds)
         Id = sp.sparse.identity(ns)
         Id = FD.clean_matrix(order, Id)
-            
-        M = self.mass * (1 + dt2*damp) * Id
-        res["A"] = M + dt2**2 * K + BC
-        res["B"] = M - dt2**2 * K
+
+        M = self.mass * Id
+        res["A"] = M + dt2**2 * K + dt2 * damp * Id + BC
+        res["B"] = M - dt2**2 * K - dt2 * damp * Id
 
         res["K"] = K
-        res["D2"] = D2 
-        res["damp"] = damp
+        res["D2"] = D2
         res["dt"] = dt
         res["dt2"] = dt2
 
@@ -397,16 +451,16 @@ class Beam(ABC):
 class BeamConst(Beam):
     """A Beam object with constant bending stiffness."""
 
-    def  __init__(
+    def __init__(
         self,
         length: float,
         boundary_conditions: FD.BoundaryCondition,
         tension: float,
         mass: float,
-        ei: float
+        ei: float,
     ) -> None:
         """Init with args.
-            
+
         Parameters
         ----------
         length : float
@@ -425,7 +479,7 @@ class BeamConst(Beam):
         None.
         """
         super().__init__(length, boundary_conditions, tension, mass)
-        self.ei = ei 
+        self.ei = ei
 
     def get_ei(self) -> float:
         """Get the bending stiffness value.
@@ -436,12 +490,12 @@ class BeamConst(Beam):
             Bending stiffness value.
         """
         return self.ei
-    
+
     def _init_eta(
-        self, 
-        initial_bending_moment: np.ndarray[float], 
-        initial_curvature: np.ndarray[float]
-        ) -> np.ndarray[float]:
+        self,
+        initial_bending_moment: np.ndarray[float],
+        initial_curvature: np.ndarray[float],
+    ) -> np.ndarray[float]:
         """Initialize the hysteresis variable (not used for constant bending stiffness, enable consistency).
 
         Parameters
@@ -474,20 +528,20 @@ class BeamConst(Beam):
             Array of bending moments.
         """
         return self.ei * curvature
-    
+
     def picard_process(
-        self, 
-        toolbox: dict, 
-        v_old: np.ndarray[float], 
-        y_old: np.ndarray[float], 
-        eta_old: np.ndarray[float], 
-        rhs_bc: np.ndarray[float], 
-        curvature: callable, 
-        approx_curvature: bool, 
-        forces: np.ndarray[float], 
-        it_picard: float, 
-        tol_picard: float
-        ) -> tuple:
+        self,
+        toolbox: dict,
+        v_old: np.ndarray[float],
+        y_old: np.ndarray[float],
+        eta_old: np.ndarray[float],
+        rhs_bc: np.ndarray[float],
+        curvature: callable,
+        approx_curvature: bool,
+        forces: np.ndarray[float],
+        it_picard: float,
+        tol_picard: float,
+    ) -> tuple:
         """Perform Picard iterations during a time step to solve the dynamic beam equation.
 
         Parameters
@@ -511,38 +565,32 @@ class BeamConst(Beam):
         it_picard : float
             Number of Picard iterations.
         tol_picard : float
-            Tolerance for Picard iterations. 
+            Tolerance for Picard iterations.
 
         Returns
         -------
         tuple
-            Velocity, position, hysteresis variable, curvature, bending moment at current time step 
+            Velocity, position, hysteresis variable, curvature, bending moment at current time step
         and number of Picard iterations performed.
         """
         A = toolbox["A"]
         B = toolbox["B"]
         K = toolbox["K"]
         D2 = toolbox["D2"]
-        damp = toolbox["damp"]
         dt = toolbox["dt"]
         dt2 = toolbox["dt2"]
         if not approx_curvature:
             curvature_old = curvature(y_old)
             bending_moment_old = self._bending_moment(curvature_old)
 
-        y_picard = y_old 
+        y_picard = y_old
         v_picard = v_old
         it = 0
         error = 100
         while it < it_picard and error > tol_picard:
-            
+
             if approx_curvature:
-                rhs = (
-                    B @ v_old 
-                    + dt2 * forces 
-                    - dt * K @ y_old 
-                    - dt *self.mass*damp * v_old 
-                    + rhs_bc)
+                rhs = B @ v_old + dt2 * forces - dt * K @ y_old + rhs_bc
 
             else:
                 curvature_picard = curvature(y_picard)
@@ -552,18 +600,20 @@ class BeamConst(Beam):
                     + dt2 * forces
                     - dt2 * D2 @ (bending_moment_old + bending_moment_picard)
                     - dt * K @ y_old
-                    - dt*self.mass*damp * v_old
                     + rhs_bc
                 )
 
-            v_new = sp.sparse.linalg.spsolve(A,rhs)
+            v_new = sp.sparse.linalg.spsolve(A, rhs)
             y_new = y_old + dt2 * (v_old + v_new)
 
-            error = np.linalg.norm((v_picard - v_new)/np.linalg.norm(v_new) + (y_picard - y_new)/np.linalg.norm(y_new))
+            error = np.linalg.norm(
+                (v_picard - v_new) / np.linalg.norm(v_new)
+                + (y_picard - y_new) / np.linalg.norm(y_new)
+            )
             v_picard = v_new
             y_picard = y_new
             it += 1
-        
+
         curvature_new = curvature(y_new)
         bending_moment_new = self._bending_moment(curvature_new)
         return v_new, y_new, eta_old, curvature_new, bending_moment_new, it
@@ -599,7 +649,7 @@ class BeamBW(Beam):
         ei_max : float
             Maximum bending stiffness.
         critical_curvature : float
-            Critical curvature below which the bending moment is close the ei_max 
+            Critical curvature below which the bending moment is close the ei_max
             and above which it is close to ei_min.
 
         Returns
@@ -621,12 +671,12 @@ class BeamBW(Beam):
             Minimum bending stiffness value.
         """
         return self.ei_min
-    
+
     def _init_eta(
-        self, 
+        self,
         initial_bending_moment: np.ndarray[float],
-        initial_curvature: np.ndarray[float]
-        ) -> np.ndarray[float]:
+        initial_curvature: np.ndarray[float],
+    ) -> np.ndarray[float]:
         """Compute the initial hysteresis variable from initial bending moment and curvature.
 
         Parameters
@@ -659,11 +709,15 @@ class BeamBW(Beam):
             Bending moment values.
         """
         c = np.abs(curvature)
-        return (self.ei_max * self.chi_bar + self.ei_min * c) * (
-            1 - np.exp(-c / self.chi_bar)
-        )*np.sign(curvature)
+        return (
+            (self.ei_max * self.chi_bar + self.ei_min * c)
+            * (1 - np.exp(-c / self.chi_bar))
+            * np.sign(curvature)
+        )
 
-    def _bending_moment_dynamic(self, curvature: np.ndarray[float], eta: np.ndarray[float]) -> np.ndarray[float]:
+    def _bending_moment_dynamic(
+        self, curvature: np.ndarray[float], eta: np.ndarray[float]
+    ) -> np.ndarray[float]:
         """Bending moment in the dynamic case according to the Bouc-Wen model.
 
         Parameters
@@ -682,20 +736,20 @@ class BeamBW(Beam):
             self.ei_min * curvature
             + (self.ei_max - self.ei_min) * self.critical_curvature * eta
         )
-    
+
     def picard_process(
-        self, 
-        toolbox: dict, 
-        v_old: np.ndarray[float], 
-        y_old: np.ndarray[float], 
-        eta_old: np.ndarray[float], 
-        rhs_bc: np.ndarray[float], 
-        curvature: callable, 
-        approx_curvature: bool, 
-        forces: np.ndarray[float], 
-        it_picard: float, 
-        tol_picard: float
-        ) -> tuple:
+        self,
+        toolbox: dict,
+        v_old: np.ndarray[float],
+        y_old: np.ndarray[float],
+        eta_old: np.ndarray[float],
+        rhs_bc: np.ndarray[float],
+        curvature: callable,
+        approx_curvature: bool,
+        forces: np.ndarray[float],
+        it_picard: float,
+        tol_picard: float,
+    ) -> tuple:
         """Perform Picard iterations during a time step to solve the dynamic beam equation.
 
         Parameters
@@ -719,19 +773,18 @@ class BeamBW(Beam):
         it_picard : float
             Number of Picard iterations.
         tol_picard : float
-            Tolerance for Picard iterations. 
+            Tolerance for Picard iterations.
 
         Returns
         -------
         tuple
-            Velocity, position, hysteresis variable, curvature, bending moment at current time step 
+            Velocity, position, hysteresis variable, curvature, bending moment at current time step
         and number of Picard iterations performed.
         """
         A = toolbox["A"]
         B = toolbox["B"]
         K = toolbox["K"]
         D2 = toolbox["D2"]
-        damp = toolbox["damp"]
         dt = toolbox["dt"]
         dt2 = toolbox["dt2"]
 
@@ -739,42 +792,54 @@ class BeamBW(Beam):
             curvature_old = curvature(y_old)
             bending_moment_old = self._bending_moment_dynamic(curvature_old, eta_old)
 
-        y_picard = y_old 
+        y_picard = y_old
         v_picard = v_old
         eta_picard = eta_old
         it = 0
         error = 100
         while it < it_picard and error > tol_picard:
-            
+
             if approx_curvature:
                 rhs = (
-                    B @ v_old 
-                    + dt2 * forces 
-                    - dt2 * (self.ei_max - self.ei_min)*self.critical_curvature*D2@(eta_old + eta_picard)
-                    - dt * K @ y_old 
-                    - dt *self.mass*damp * v_old 
-                    + rhs_bc)
+                    B @ v_old
+                    + dt2 * forces
+                    - dt2
+                    * (self.ei_max - self.ei_min)
+                    * self.critical_curvature
+                    * D2
+                    @ (eta_old + eta_picard)
+                    - dt * K @ y_old
+                    + rhs_bc
+                )
 
             else:
-                bending_moment_picard = self._bending_moment_dynamic(curvature(y_picard), eta_picard)
+                bending_moment_picard = self._bending_moment_dynamic(
+                    curvature(y_picard), eta_picard
+                )
                 rhs = (
                     B @ v_old
                     + dt2 * forces
                     - dt2 * D2 @ (bending_moment_old + bending_moment_picard)
                     - dt * K @ y_old
-                    - dt*self.mass*damp * v_old
                     + rhs_bc
                 )
 
-            v_new = sp.sparse.linalg.spsolve(A,rhs)
+            v_new = sp.sparse.linalg.spsolve(A, rhs)
             y_new = y_old + dt2 * (v_old + v_new)
 
-            error = np.linalg.norm((v_picard - v_new)/np.linalg.norm(v_new) + (y_picard - y_new)/np.linalg.norm(y_new))
+            error = np.linalg.norm(
+                (v_picard - v_new) / np.linalg.norm(v_new)
+                + (y_picard - y_new) / np.linalg.norm(y_new)
+            )
             v_picard = v_new
             y_picard = y_new
 
             if approx_curvature:
-                    eta_new = (self.critical_curvature*eta_old + dt*D2@v_new - dt2*D2@v_new*np.abs(eta_picard)) / (self.critical_curvature + dt2*np.abs(D2@v_new))
+                eta_new = (
+                    self.critical_curvature * eta_old
+                    + dt * D2 @ v_new
+                    - dt2 * D2 @ v_new * np.abs(eta_picard)
+                ) / (self.critical_curvature + dt2 * np.abs(D2 @ v_new))
 
             else:
                 diff = curvature(y_picard) - curvature_old
@@ -785,23 +850,23 @@ class BeamBW(Beam):
 
             eta_picard = eta_new
             it += 1
-        
+
         curvature_new = curvature(y_new)
         bending_moment_new = self._bending_moment_dynamic(curvature_new, eta_new)
         return v_new, y_new, eta_new, curvature_new, bending_moment_new, it
-    
-    
+
     def compute_power(
-        self, 
-        D2: sp.sparse.spmatrix, 
-        curvature_new: np.ndarray[float], 
-        v_old: np.ndarray[float], 
-        v_new: np.ndarray[float], 
-        y_new: np.ndarray[float], 
+        self,
+        D2: sp.sparse.spmatrix,
+        curvature_new: np.ndarray[float],
+        v_old: np.ndarray[float],
+        v_new: np.ndarray[float],
+        y_new: np.ndarray[float],
         eta_new: np.ndarray[float],
-        force: callable, 
-        dt: float, 
-        x: np.ndarray[float]) -> dict:
+        force: callable,
+        dt: float,
+        x: np.ndarray[float],
+    ) -> dict:
         """Compute power contributions at current time step.
 
         Parameters
@@ -830,6 +895,12 @@ class BeamBW(Beam):
         dict
             Dictionary with power contributions.
         """
-        power = super().compute_power(D2, curvature_new, v_old, v_new, y_new, eta_new,force, dt, x)
-        power["p_dissip"] = (self.ei_max - self.ei_min)*self.critical_curvature*sp.integrate.simpson((D2@eta_new)*v_new,x)
+        power = super().compute_power(
+            D2, curvature_new, v_old, v_new, y_new, eta_new, force, dt, x
+        )
+        power["p_dissip"] = (
+            (self.ei_max - self.ei_min)
+            * self.critical_curvature
+            * sp.integrate.simpson((D2 @ eta_new) * v_new, x)
+        )
         return power
