@@ -49,6 +49,13 @@ Related Work
 
    modules
 
+.. toctree::
+   :hidden:
+   :maxdepth: 2
+   :caption: Numerical schemes for beams
+
+   beam
+
 
 Indices and tables
 ==================
