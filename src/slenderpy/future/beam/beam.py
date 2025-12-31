@@ -152,8 +152,8 @@ class Beam(ABC):
         initial_bending_moment: Optional[np.ndarray[float]] = None,
         zeta: Optional[float] = 0,
         f0: Optional[float] = None,
-        it_picard: Optional[int] = 15,
-        tol_picard: Optional[float] = 1e-4,
+        it_picard: Optional[int] = 1,
+        tol_picard: Optional[float] = 1e-3,
     ) -> simtools.Results:
         """Dynamic solver for beam equation: mass*(d^2/dt^2)*y + 2*mass*w0*zeta*(d/dt)*y + (d^2/dx^2)*M - tension*(d^2/dx^2)*y = force,
         where M is the bending moment depending either on the approximate curvature or on the exact curvature.
@@ -177,9 +177,9 @@ class Beam(ABC):
         f0 : Optional[float], optional
             Natural frequency, by default None
         it_picard : Optional[int], optional
-            Maximal number of Picard iterations, by default 15
+            Maximal number of Picard iterations, by default 1
         tol_picard : Optional[float], optional
-            Tolerance for Picard iterations, by default 1e-4
+            Tolerance for Picard iterations, by default 1e-3
 
         Returns
         -------

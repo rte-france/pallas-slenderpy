@@ -327,6 +327,8 @@ def test_solve_approx_curvature_bending_moment_variable(plot=False):
         initial_velocity=exact_time_derivative(x, 0),
         force=force,
         approx_curvature=True,
+        it_picard=15,
+        tol_picard=1e-4,
     )
 
     y = sol["y"]
@@ -415,6 +417,8 @@ def test_solve_exact_curvature_bending_moment_variable(plot=False):
         initial_velocity=exact_time_derivative(x, 0),
         force=force,
         approx_curvature=False,
+        it_picard=15,
+        tol_picard=1e-4,
     )
 
     y = sol["y"]
