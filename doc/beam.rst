@@ -2,7 +2,7 @@ This document describes the beam solvers available in SlenderPy. More precisly t
 
 We have the following notations:
 
-* :math:`EI`: the bending stiffness of the beam, if it is constant along the beam, :math:`E` is the Young modulus and :math:`I` the second moment of area.
+* :math:`EI`: the bending stiffness of the beam, if it is constant along the beam. :math:`E` is the Young modulus and :math:`I` the second moment of area.
 * :math:`EI_{max}`: the maximum bending stiffness of the beam (when the bending stiffness is not constant along the beam).
 * :math:`EI_{min}`: the minimum bending stiffness of the beam (when the bending stiffness is not constant along the beam).
 * :math:`M`: the bending moment. 
@@ -82,7 +82,7 @@ with :math:`D_2` the second order space derivative operator.
 The two unknows at each time step :math:`n` are the velocity :math:`v^n` and the displacement :math:`y^n`,
 which are two vectors of size the number of nodes along the beam. 
 The external force :math:`F^n` is also a vector of the same size and the operator :math:`D_2` is a matrix.
-The bending moment :math:`M^n` is also a vector of the same size and is computed from the displacement :math:`y^n` using the curvature formula.
+The bending moment :math:`M^n` is also a vector of the same size and it is computed from the displacement :math:`y^n` using the curvature formula.
 The Crank-Nicolson scheme applied to this equation reads:
 
 .. math::
@@ -92,11 +92,11 @@ The Crank-Nicolson scheme applied to this equation reads:
 We substitute :math:`y^{n+1}` in the first equation and we introduce :math:`K = - H D_2` to get:
 
 .. math::
-    v^{n+1}(I_d (m + m\omega_0 \zeta \Delta t) + \frac{\Delta t^2}{4}K) = &v^n(I_d (m - m\omega_0 \zeta \Delta t) - \frac{\Delta t^2}{4}K) \\
-    &+ \frac{\Delta t}{2}(F^{n+1} + F^n) \\
-    &- \frac{\Delta t}{2} D_2 (M^{n+1} - M^n) \\
-    &-\Delta t K y^n \\
-    y^{n+1} = y^n + \frac{\Delta t}{2} (v^{n+1} + v^n)
+    &v^{n+1}(I_d (m + m\omega_0 \zeta \Delta t) + \frac{\Delta t^2}{4}K) = v^n(I_d (m - m\omega_0 \zeta \Delta t) - \frac{\Delta t^2}{4}K) \\
+    & \hspace{15em} + \frac{\Delta t}{2}(F^{n+1} + F^n) \\
+    & \hspace{15em} - \frac{\Delta t}{2} D_2 (M^{n+1} + M^n) \\
+    & \hspace{15em} -\Delta t K y^n \\
+    &y^{n+1} = y^n + \frac{\Delta t}{2} (v^{n+1} + v^n)
     :label: eq:beam_dynamic_const_cn
 
 with :math:`I_d` the identity matrix.
@@ -106,10 +106,10 @@ In the case where the curvature is approximated, we have :math:`M^{n+1} = EI D_2
 We can thus rewrite :eq:`eq:beam_dynamic_const_cn` as:
 
 .. math::
-    v^{n+1}(I_d (m + m\omega_0 \zeta \Delta t) + \frac{\Delta t^2}{4}K) = &v^n(I_d (m - m\omega_0 \zeta \Delta t) - \frac{\Delta t^2}{4}K) \\
-    &+ \frac{\Delta t}{2}(F^{n+1} + F^n) \\
-    &-\Delta t K y^n \\
-    y^{n+1} = y^n + \frac{\Delta t}{2} (v^{n+1} + v^n)
+    &v^{n+1}(I_d (m + m\omega_0 \zeta \Delta t) + \frac{\Delta t^2}{4}K) = v^n(I_d (m - m\omega_0 \zeta \Delta t) - \frac{\Delta t^2}{4}K) \\
+    & \hspace{15em} + \frac{\Delta t}{2}(F^{n+1} + F^n) \\
+    & \hspace{15em} -\Delta t K y^n \\
+    &y^{n+1} = y^n + \frac{\Delta t}{2} (v^{n+1} + v^n)
     :label: eq:beam_dynamic_const_cn_approx
 
 with :math:`K = EI D_4 - H D_2` where :math:`D_4` is the fourth order space derivative operator.
@@ -121,15 +121,15 @@ Thus we use Picard iterations to solve the non-linear problem at each time step.
 * Initialize :math:`y^p = y^n`
 * Iterate until convergence:
   
-  * Compute :math:`M^p` from :math:`y^p`
-  * Solve the linear problem:
+  * Compute :math:`M^p = EI \chi_{exact}(y^p)`
+  * Compute :math:`v^{n+1}` and :math:`y^{n+1}`
   
   .. math::
-      v^{n+1}(I_d (m + m\omega_0 \zeta \Delta t) + \frac{\Delta t^2}{4}K) = &v^n(I_d (m - m\omega_0 \zeta \Delta t) - \frac{\Delta t^2}{4}K) \\
-      &+ \frac{\Delta t}{2}(F^{n+1} + F^n) \\
-      &- \frac{\Delta t}{2} D_2 (M^p - M^n) \\
-      &-\Delta t K y^n \\
-      y^{n+1} = y^n + \frac{\Delta t}{2} (v^{n+1} + v^n)
+      &v^{n+1}(I_d (m + m\omega_0 \zeta \Delta t) + \frac{\Delta t^2}{4}K) = v^n(I_d (m - m\omega_0 \zeta \Delta t) - \frac{\Delta t^2}{4}K) \\
+      & \hspace{15em} + \frac{\Delta t}{2}(F^{n+1} + F^n) \\
+      & \hspace{15em} - \frac{\Delta t}{2} D_2 (M^p + M^n) \\
+      & \hspace{15em} -\Delta t K y^n \\
+      &y^{n+1} = y^n + \frac{\Delta t}{2} (v^{n+1} + v^n)
   
   * Update :math:`y^p = y^{n+1}`
 
@@ -148,12 +148,12 @@ The equations solved in the dynamic case are:
 For the case of the approximated curvature, we choose a Crank-Nicolson scheme for the velocity and the displacement and an Euler implicit scheme for the hysteresis variable:
 
 .. math::
-    v^{n+1}(I_d (m + m\omega_0 \zeta \Delta t) + \frac{\Delta t^2}{4}K) = &v^n(I_d (m - m\omega_0 \zeta \Delta t) - \frac{\Delta t^2}{4}K) \\
-    &+ \frac{\Delta t}{2}(F^{n+1} + F^n) \\
-    &+ \frac{\Delta t}{2}(EI_{max} - EI_{min}) \chi_0 D_2 (\eta^{n+1} + \eta^n)\\
-    &-\Delta t K y^n \\
-    y^{n+1} = y^n + \frac{\Delta t}{2} (v^{n+1} + v^n) \\
-    \eta^{n+1}( \chi_0 + \frac{\Delta t}{2} |D_2 v^{n+1}|) = \chi_0 \eta^n + \Delta t D_2 v^{n+1} - \frac{\Delta t}{2} D_2 v^{n+1} |\eta^{n+1|}
+    &v^{n+1}(I_d (m + m\omega_0 \zeta \Delta t) + \frac{\Delta t^2}{4}K) = v^n(I_d (m - m\omega_0 \zeta \Delta t) - \frac{\Delta t^2}{4}K) \\
+    & \hspace{15em} + \frac{\Delta t}{2}(F^{n+1} + F^n) \\
+    & \hspace{15em} + \frac{\Delta t}{2}(EI_{max} - EI_{min}) \chi_0 D_2 (\eta^{n+1} + \eta^n)\\
+    & \hspace{15em} -\Delta t K y^n \\
+    &y^{n+1} = y^n + \frac{\Delta t}{2} (v^{n+1} + v^n) \\
+    &\eta^{n+1}( \chi_0 + \frac{\Delta t}{2} |D_2 v^{n+1}|) = \chi_0 \eta^n + \Delta t D_2 v^{n+1} - \frac{\Delta t}{2} D_2 v^{n+1} |\eta^{n+1|}
 
 with :math:`K = EI_{min} D_4 - H D_2`.
 
@@ -163,14 +163,14 @@ The term :math:`|\eta^{n+1}|` makes the problem non linear thus we use Picard it
 * Initialize :math:`\eta^p = \eta^n`
 * Iterate until convergence:
   
-  * Solve the linear problem:
+  * Compute :math:`v^{n+1}` and :math:`\eta^{n+1}`:
   
   .. math::
-    v^{n+1}(I_d (m + m\omega_0 \zeta \Delta t) + \frac{\Delta t^2}{4}K) = &v^n(I_d (m - m\omega_0 \zeta \Delta t) - \frac{\Delta t^2}{4}K) \\
-    &+ \frac{\Delta t}{2}(F^{n+1} + F^n) \\
-    &+ \frac{\Delta t}{2}(EI_{max} - EI_{min}) \chi_0 D_2 (\eta^p + \eta^n)\\
-    &-\Delta t K y^n \\  
-    \eta^{n+1}( \chi_0 + \frac{\Delta t}{2} |D_2 v^{n+1}|) = (\chi_0 \eta^n + \Delta t D_2 v^{n+1} - \frac{\Delta t}{2} D_2 v^{n+1} |\eta^p|) 
+    &v^{n+1}(I_d (m + m\omega_0 \zeta \Delta t) + \frac{\Delta t^2}{4}K) = v^n(I_d (m - m\omega_0 \zeta \Delta t) - \frac{\Delta t^2}{4}K) \\
+    & \hspace{15em} + \frac{\Delta t}{2}(F^{n+1} + F^n) \\
+    & \hspace{15em} + \frac{\Delta t}{2}(EI_{max} - EI_{min}) \chi_0 D_2 (\eta^p + \eta^n)\\
+    & \hspace{15em} -\Delta t K y^n \\  
+    &\eta^{n+1}( \chi_0 + \frac{\Delta t}{2} |D_2 v^{n+1}|) = (\chi_0 \eta^n + \Delta t D_2 v^{n+1} - \frac{\Delta t}{2} D_2 v^{n+1} |\eta^p|) 
 
   * Update :math:`\eta^p = \eta^{n+1}`
 
@@ -180,12 +180,12 @@ The term :math:`|\eta^{n+1}|` makes the problem non linear thus we use Picard it
 For the case of the exact curvature formula, we choose a Crank-Nicolson scheme for the velocity and the displacement and an Euler implicit scheme for the hysteresis variable:
 
 .. math::
-    v^{n+1}(I_d (m + m\omega_0 \zeta \Delta t) + \frac{\Delta t^2}{4}K) = &v^n(I_d (m - m\omega_0 \zeta \Delta t) - \frac{\Delta t^2}{4}K) \\
-    &+ \frac{\Delta t}{2}(F^{n+1} + F^n) \\
-    &- \frac{\Delta t}{2} D_2 (M^{n+1} - M^n) \\
-    &-\Delta t K y^n \\
-    y^{n+1} = y^n + \frac{\Delta t}{2} (v^{n+1} + v^n) \\
-    \eta^{n+1}( \chi_0 + \frac{1}{2} |\chi^{n+1} - \chi^n|) = \chi_0 \eta^n + \chi^{n+1} - \chi^n - \frac{1}{2} (\chi^{n+1} - \chi^n) |\eta^{n+1|}
+    &v^{n+1}(I_d (m + m\omega_0 \zeta \Delta t) + \frac{\Delta t^2}{4}K) = v^n(I_d (m - m\omega_0 \zeta \Delta t) - \frac{\Delta t^2}{4}K) \\
+    & \hspace{15em} + \frac{\Delta t}{2}(F^{n+1} + F^n) \\
+    & \hspace{15em} - \frac{\Delta t}{2} D_2 (M^{n+1} + M^n) \\
+    & \hspace{15em} -\Delta t K y^n \\
+    &y^{n+1} = y^n + \frac{\Delta t}{2} (v^{n+1} + v^n) \\
+    &\eta^{n+1}( \chi_0 + \frac{1}{2} |\chi^{n+1} - \chi^n|) = \chi_0 \eta^n + \chi^{n+1} - \chi^n - \frac{1}{2} (\chi^{n+1} - \chi^n) |\eta^{n+1}|
 
 with :math:`K = - H D_2`.
 
@@ -194,20 +194,20 @@ Again the term :math:`D_2 M^{n+1}` is non-linear. We thus use Picard iterations 
 * Initialize :math:`y^p = y^n, \eta^p = \eta^n`
 * Iterate until convergence:
   
-  * Compute :math:`M^p` from :math:`y^p` and :math:`\eta^p`
-  * Solve the linear problem:
+  * Compute :math:`M^p = EI_{min} \chi(y^p) + (EI_{max} - EI_{min})\chi_0 \eta_p` 
+  * Compute :math:`v^{n+1}` and :math:`y^{n+1}`:
   
   .. math::
-      v^{n+1}(I_d (m + m\omega_0 \zeta \Delta t) + \frac{\Delta t^2}{4}K) = &v^n(I_d (m - m\omega_0 \zeta \Delta t) - \frac{\Delta t^2}{4}K) \\
-      &+ \frac{\Delta t}{2}(F^{n+1} + F^n) \\
-      &- \frac{\Delta t}{2} D_2 (M^p - M^n) \\
-      &-\Delta t K y^n \\
-      y^{n+1} = y^n + \frac{\Delta t}{2} (v^{n+1} + v^n)
+      &v^{n+1}(I_d (m + m\omega_0 \zeta \Delta t) + \frac{\Delta t^2}{4}K) = v^n(I_d (m - m\omega_0 \zeta \Delta t) - \frac{\Delta t^2}{4}K) \\
+      & \hspace{15em} + \frac{\Delta t}{2}(F^{n+1} + F^n) \\
+      & \hspace{15em} - \frac{\Delta t}{2} D_2 (M^p + M^n) \\
+      & \hspace{15em} -\Delta t K y^n \\
+      &y^{n+1} = y^n + \frac{\Delta t}{2} (v^{n+1} + v^n)
   
   * Update :math:`y^p = y^{n+1}`
 
   * Compute :math:`\chi^p` from :math:`y^p`
-  * Solve 
+  * Compute :math:`\eta^{n+1}`
   .. math::
       \eta^{n+1}( \chi_0 + \frac{1}{2} |\chi^p - \chi^n|) = \chi_0 \eta^n + \chi^p - \chi^n - \frac{1}{2} (\chi^p - \chi^n) |\eta^p|
 
@@ -216,3 +216,52 @@ Again the term :math:`D_2 M^{n+1}` is non-linear. We thus use Picard iterations 
 
 Boundary Conditions
 ===================
+
+For all the previsous resolutions, there are always four boundary conditions. Two for each side of the beam.
+Considereing the left side of the beam at :math:`x=0` and the right side at :math:`x=L`, the boundary conditions supported are under the form:
+
+.. math::
+    a_1 y(0,t) + b_1 \frac{\partial y}{\partial x}(0,t) + c_1 \frac{\partial^2 y}{\partial x^2}(0,t) = d_1(t) \\
+    a_2 y(0,t) + b_2 \frac{\partial y}{\partial x}(0,t) + c_2 \frac{\partial^2 y}{\partial x^2}(0,t) = d_2(t) \\
+    a_3 y(L,t) + b_3 \frac{\partial y}{\partial x}(L,t) + c_3 \frac{\partial^2 y}{\partial x^2}(L,t) = d_3(t) \\
+    a_4 y(L,t) + b_4 \frac{\partial y}{\partial x}(L,t) + c_4 \frac{\partial^2 y}{\partial x^2}(L,t) = d_4(t) 
+
+Where :math:`a_i, b_i, c_i \in \mathbb{R} \forall i \in \left\{1,2,3,4\right\}` and :math:`d_i(t) \forall i \in \left\{1,2,3,4\right\}` can be function of time for the dynamic case and simply constant in the static case. 
+We denote by :math:`y_0` the displacement at :math:`x=0` and by :math:`y_N` the displacement at :math:`x=L` where :math:`N` is the number of nodes along the beam.
+Similarly :math:`y_i` is the displacement at the node :math:`i`.
+To take into account properly these boundary conditions in the finite difference schemes, we discretize them:
+
+.. math::
+    a_1 y_0 + b_1 \frac{y_1 - y_0}{\Delta x} + c_1 \frac{y_0 - 2y_1 + y_2}{\Delta x^2} = d_1 \\
+    a_2 y_0 + b_2 \frac{y_1 - y_0}{\Delta x} + c_2 \frac{y_0 - 2y_1 + y_2}{\Delta x^2} = d_2 \\
+    a_3 y_N + b_3 \frac{y_N - y_{N-1}}{\Delta x} + c_3 \frac{y_N - 2y_{N-1} + y_{N-2}}{\Delta x^2} = d_3 \\
+    a_4 y_N + b_4 \frac{y_N - y_{N-1}}{\Delta x} + c_4 \frac{y_N - 2y_{N-1} + y_{N-2}}{\Delta x^2} = d_4 
+    :label: eq:bc
+
+Thus the corresponding matrix and vector of :eq:`eq:bc` are:
+
+.. math::
+    A &= \begin{pmatrix}
+        a_1 - \frac{b_1}{\Delta x} + \frac{c_1}{\Delta x^2} & \frac{b_1}{\Delta x} - \frac{2c_1}{\Delta x^2}  & \frac{c_1}{\Delta x^2} & 0 & \cdots & \cdots & 0 \\
+        a_2 - \frac{b_2}{\Delta x} + \frac{c_2}{\Delta x^2} & \frac{b_2}{\Delta x} - \frac{2c_2}{\Delta x^2}  & \frac{c_2}{\Delta x^2} & 0 & \cdots & \cdots  & 0 \\
+        0 &\ddots & \ddots &  \ddots &  \ddots &  \ddots & 0 \\
+        0 & \cdots & \cdots & 0 & \frac{c_3}{\Delta x^2} & - \frac{b_3}{\Delta x} - \frac{2c_3}{\Delta x^2} & a_3 + \frac{b_3}{\Delta x} + \frac{c_3}{\Delta x^2} \\
+        0 & \cdots & \cdots & 0 & \frac{c_4}{\Delta x^2} & - \frac{b_4}{\Delta x} - \frac{2c_4}{\Delta x^2} & a_4 + \frac{b_4}{\Delta x} + \frac{c_4}{\Delta x^2} 
+        \end{pmatrix} \\
+    b &= \begin{pmatrix}
+    d_1\\
+    d_2\\
+    0 \\
+    \vdots \\
+    0 \\
+    d_3 \\
+    d_4
+    \end{pmatrix}
+    :label: eq:matrix_bc
+
+The matrix and vector :eq:`eq:matrix_bc` are used for the static resolution. For the dynamic resolution the first linear system to solve in on the velocity, 
+we thus derivate with respect to time :eq:`eq:bc` obtaining the same matrix :math:`A` than :eq:`eq:matrix_bc`, since :math:`\frac{\partial y}{\partial t} = v`,  and the vector :math:`b` contains the time derivative of 
+:math:`d_i(t) \forall i \in \left\{1,2,3,4\right\}`. 
+
+Thus when using the method :code:`solve_dynamic` the user should set the attribute :code:`dynamic_values` with :math:`\frac{\partial d_i}{\partial t} \forall i \in \left\{1,2,3,4\right\}` 
+in the :class:`~slenderpy.future.beam.fd_utils.BoundaryCondition` constructor. 
