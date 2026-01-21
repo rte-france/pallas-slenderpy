@@ -1,16 +1,37 @@
 #!/bin/bash
+set -euo pipefail
+# set -x
+
+DEF_NAME=pallas-slenderpy-uv
+
+PYTHON_VERSION="--python-preference=system"
+# PYTHON_VERSION="--python 3.11"
+# PYTHON_VERSION="--python 3.12"
+# PYTHON_VERSION="--python 3.13"
+# PYTHON_VERSION="--python 3.14"
+
+# -----------------------------------------------------------------------------
 
 # -- dir for all envs
-ENV_DIR=/home/${USER}/ENV
+ENV_DIR=${ENV_DIR:-$HOME/ENV}
 mkdir -p $ENV_DIR
 
+# -- check uv install, update if necessary
+if ! command -v uv &> /dev/null; then
+    echo "uv not found; installing ..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    source $HOME/.cargo/env
+else
+    # uv self update
+    echo "uv already installed ($(uv --version))"
+fi
+
 # -- current env with link
-VENV=${ENV_DIR}/pallas-slenderpy-uv
-VLNK=.venv
+VENV=${ENV_DIR}/${DEF_NAME}
+VLNK=.uvenv
 ln -sf $VENV $VLNK
-uv venv $VENV --python-preference=system # --python 3.11
+uv venv --clear $VENV ${PYTHON_VERSION}
 source $VENV/bin/activate
-# .venv\Scripts\activate
 
 # -- upgrade pip
 uv pip install --upgrade pip
