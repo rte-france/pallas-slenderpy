@@ -69,7 +69,9 @@ class Excitation:
         t0: float = 0.0,
         tf: float = np.inf,
         gravity: bool = False,
+        wind_friction: bool = False,
         g: float = 9.81,
+        cd: float = 1.0,
     ) -> None:
         """Init with args.
 
@@ -93,8 +95,12 @@ class Excitation:
             End time of excitations (s). The default is np.inf.
         gravity : bool, optional
             Add (or not) gravity forces. The default is False.
+        wind_friction : bool, optional
+            Add (or not) wind friction forces. The default is False.
         g : float, optional
             Gravitationnal acceleration. The default is 9.81.
+        cd : float, optional
+            Drag coefficient for wind friction. The default is 1.
 
         Raises
         ------
@@ -114,6 +120,8 @@ class Excitation:
                 raise TypeError(f"input {vrn[i]} must be a float")
         if not isinstance(gravity, bool):
             raise TypeError("input gravity must be a bool")
+        if not isinstance(wind_friction, bool):
+            raise TypeError("input wind_friction must be a bool")
         if t0 >= tf:
             raise ValueError("input t0 must be less than tf")
         if L <= 0.0:
@@ -129,11 +137,18 @@ class Excitation:
         self.t0 = t0
         self.tf = tf
         self.gravity = gravity
+        self.wind_friction = wind_friction
         self.g = g
+        self.cd = cd
 
     def _gravity(self, s):
         if self.gravity:
             return -self.g * self.m * np.ones_like(s)
+        return np.zeros_like(s)
+
+    def _wind_friction(self, s, vn):
+        if self.wind_friction:
+            return 0.5 * air_volumic_mass() * self.cd * vn**2 
         return np.zeros_like(s)
 
     def __call__(
@@ -187,7 +202,7 @@ class Excitation:
         if not isinstance(t, float):
             raise TypeError("input t must be a float")
 
-        p = self._gravity(s)
+        p = self._gravity(s) + self._wind_friction(s, vn)
 
         if self.t0 <= t <= self.tf:
             n = len(s)

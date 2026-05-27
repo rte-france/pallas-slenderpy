@@ -235,7 +235,7 @@ class Beam(ABC):
             lot=parameters.time_vector_output().tolist(),
             lov=all_lov,
             lov_dims=[2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            los=parameters.los,
+            los=np.linspace(0,1, ns),
         )
         res.update(0, x / lspan, lov, [y_old, v_old, curvature_old, bending_moment_old])
         pb = spb.generate(parameters.pp, parameters.nt, desc=__name__)
