@@ -10,7 +10,7 @@ We have the following notations:
 * :math:`F`: the external forces per unit length applied on the beam.  
 * :math:`m`: the mass per unit length of the beam. 
 * :math:`\chi(y)`: the curvature of the beam which is a function of the displacement :math:`y`. 
-* :math:`\chi_0`: the critical curvature below which the bending moment is close the :math:`EI_{max}` and above which it is close to :math:`EI_{min}`. 
+* :math:`\chi_0`: the critical curvature below which the bending moment is close to :math:`EI_{max}` and above which it is close to :math:`EI_{min}`. 
 * :math:`\omega_0`: the natural pulsation of the beam (:math:`= 2 \pi f_0` with :math:`f_0` the natural frequency of the beam).
 * :math:`\zeta`: the damping ratio of the beam (if equal to 1: critical damping, if less than 1: underdamped, if greater than 1: overdamped).
 * :math:`\eta` : the hysteresis variable. 
@@ -153,7 +153,7 @@ For the case of the approximated curvature, we choose a Crank-Nicolson scheme fo
     & \hspace{15em} + \frac{\Delta t}{2}(EI_{max} - EI_{min}) \chi_0 D_2 (\eta^{n+1} + \eta^n)\\
     & \hspace{15em} -\Delta t K y^n \\
     &y^{n+1} = y^n + \frac{\Delta t}{2} (v^{n+1} + v^n) \\
-    &\eta^{n+1}( \chi_0 + \frac{\Delta t}{2} |D_2 v^{n+1}|) = \chi_0 \eta^n + \Delta t D_2 v^{n+1} - \frac{\Delta t}{2} D_2 v^{n+1} |\eta^{n+1|}
+    &\eta^{n+1}( \chi_0 + \frac{\Delta t}{2} |D_2 v^{n+1}|) = \chi_0 \eta^n + \Delta t D_2 v^{n+1} - \frac{\Delta t}{2} D_2 v^{n+1} |\eta^{n+1}|
 
 with :math:`K = EI_{min} D_4 - H D_2`.
 

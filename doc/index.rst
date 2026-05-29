@@ -52,9 +52,16 @@ Related Work
 .. toctree::
    :hidden:
    :maxdepth: 2
-   :caption: Numerical schemes for beams
+   :caption: Beam solvers
 
    beam
+
+.. toctree::
+   :hidden:
+   :maxdepth: 2
+   :caption: Stockbridge solvers
+
+   stockbridge
 
 
 Indices and tables
