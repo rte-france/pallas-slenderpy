@@ -1,3 +1,8 @@
+# Performance Tips
+
+**Warning**
+On some NumPy versions (observed with 2.4.6), setting the environment variable `OPENBLAS_CORETYPE=HASWELL` can significantly improve performance (e.g. `np.linalg.solve`).
+
 # Build the documentation with Sphinx
 ## On Windows 10
 If your Python distribution is Anaconda, you can build the documentation with the following steps:

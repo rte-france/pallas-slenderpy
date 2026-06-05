@@ -200,8 +200,10 @@ class Results:
         else:
             self._from_args(lot, lov, lov_dims, los)
 
-    def _from_args(self, lot, lov, lov_dims, los):
+    def _from_args(self, lot, lov, lov_dims=None, los=None):
         """Build zero dataset from input lists."""
+        if lov_dims is None:
+            lov_dims = 2*np.ones(len(lov))
         crd = {__stime__: lot, __scabs__: los}
         dct = {}
         self.lov_dims = {}
@@ -217,7 +219,10 @@ class Results:
 
     def los(self):
         """Get a list of positions of interest."""
-        return list(self.data[__scabs__].values)
+        val = self.data[__scabs__].values
+        if val.ndim == 0:
+            return []
+        return list(val)
 
     def lot(self):
         """Get a list of output times."""
