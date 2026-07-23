@@ -214,6 +214,7 @@ def energy():
     e_dissip = res["e_dissip"]
     e_tens = res["e_tens"]
     e_ext = res["e_ext"]
+    e_bound_tens = res["e_bound_tens"]
 
     times = parameters.time_vector_output()
     labels = ["kinetic", "bending", "e_dissip", "tension", "exterior"]
@@ -233,11 +234,13 @@ def energy():
     plt.plot(times, e_dissip, label="dissip")
     plt.plot(times, e_tens, label="tension")
     plt.plot(times, e_ext, label="exterior")
+    plt.plot(times, e_bound_tens, label="bound tension")
+    plt.plot(times, e_kin + e_bend + e_dissip + e_tens - e_ext - e_bound_tens, label="total")
     plt.legend()
     plt.title("energy")
 
     plt.figure()
-    plt.stackplot(times, [e_kin, e_bend, e_dissip, e_tens, e_ext], labels=labels)
+    plt.stackplot(times, [e_kin, e_bend, e_dissip, e_tens, -e_ext], labels=labels)
     plt.legend()
 
     _plot_animation(x, sol_static, y, -10, 1, parameters.nr, dr)
@@ -294,12 +297,35 @@ def bretelle():
     e_dissip = res["e_dissip"]
     e_tens = res["e_tens"]
     e_ext = res["e_ext"]
+    e_bound_tens = res["e_bound_tens"]
 
     times = parameters.time_vector_output()
     labels = ["kinetic", "bending", "dissip", "tension", "exterior"]
 
     plt.figure()
-    plt.stackplot(times, [e_kin, e_bend, e_dissip, e_tens, e_ext], labels=labels)
+    plt.plot(times, res["p_kin"], label="kinetic")
+    plt.plot(times, res["p_bend"], label="bending")
+    plt.plot(times, res["p_dissip"], label="dissip")
+    plt.plot(times, res["p_tens"], label="tension")
+    plt.plot(times, res["p_ext"], label="exterior")
+    plt.plot(times, res["p_bound_tens"], label="boud, tension")
+    plt.plot(times, res["p_kin"] + res['p_bend'] + res['p_tens'] + res['p_dissip'] - res['p_ext'] - res["p_bound_tens"], label="total")
+    plt.legend()
+    plt.title("power")
+
+    plt.figure()
+    plt.plot(times, e_kin, label="kinetic")
+    plt.plot(times, e_bend, label="bending")
+    plt.plot(times, e_dissip, label="dissip")
+    plt.plot(times, e_tens, label="tension")
+    plt.plot(times, e_ext, label="exterior")
+    plt.plot(times, e_bound_tens, label="boud, tension")
+    plt.plot(times, e_kin + e_dissip + e_bend + e_tens - e_ext - e_bound_tens, label ="total")
+    plt.legend()
+    plt.title("energy")
+
+    plt.figure()
+    plt.stackplot(times, [e_kin, e_bend, e_dissip, e_tens, -e_ext], labels=labels)
     plt.legend()
     plt.title("Global energy balance")
 
@@ -314,7 +340,6 @@ def bretelle():
 def damping():
     lspan = 440
     nb_space = 500
-    x = np.linspace(0, 440, nb_space)
     final_time = 30.0
     dt = 1e-2
     dr = 1e-1
@@ -331,7 +356,6 @@ def damping():
     beam = BeamConst(
         length=lspan, boundary_conditions=bc, tension=tension, mass=mass, ei=ei
     )
-    f0 = beam.natural_frequency()
     sol_static_more_gravity = beam.solve_static(
         n=nb_space, rhs=rhs, approx_curvature=False
     )

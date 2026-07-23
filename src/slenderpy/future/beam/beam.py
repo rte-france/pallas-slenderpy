@@ -70,7 +70,7 @@ class Beam(ABC):
         ----------
         n : int
             Number of frequencies to compute.
-        c : float
+        ei : float
             Bending stiffness.
 
         Returns
@@ -82,6 +82,57 @@ class Beam(ABC):
         nn = np.linspace(1, n, n)
         Wn = nn * np.sqrt(1.0 + ep * (np.pi * nn) ** 2)
         return Wn * self.natural_frequency()
+    
+    def natural_frequencies_rot_none(self, n: int, ei: float) -> np.ndarray:
+        """Compute natural frequencies for clamped-beam.
+
+        Parameters
+        ----------
+        n : int
+            Number of frequencies to compute. 
+        ei : float
+            Bending stiffness.
+
+        Returns
+        -------
+        numpy.ndarray
+            Array of frequencies (in Hz).
+        """
+        ep = ei / (self.tension * self.length**2)
+        f0 = self.natural_frequency()
+        nn = np.linspace(1, n, n)
+
+        Wg = 1.0 + np.sqrt(ep) + (1.0 + 0.5 * (np.pi * nn) ** 2) * ep
+        rs = np.zeros_like(nn)
+
+        def sqe(x):
+            return np.sqrt(0.25 / ep**2 + np.pi**2 * x**2 / ep)
+
+        def k1L(x):
+            return np.sqrt(sqe(x) + 0.5 / ep)
+
+        def k2L(x):
+            return np.sqrt(sqe(x) - 0.5 / ep)
+
+        def fun(x):
+            return np.tan(k2L(x)) - k2L(x) / k1L(x)
+
+        def dk1(x):
+            return x * np.pi**2 / (ep * sqe(x) * 2 * k1L(x))
+
+        def dk2(x):
+            return x * np.pi**2 / (ep * sqe(x) * 2 * k2L(x))
+
+        def dfn(x):
+            return (
+                dk2(x) / np.cos(k2L(x)) ** 2
+                + (dk2(x) * k1L(x) - dk1(x) * k2L(x)) / k1L(x) ** 2
+            )
+
+        for k in range(n):
+            rs[k] = sp.optimize.newton(fun, Wg[k], fprime=dfn)
+
+        return f0 * nn * rs
 
     def solve_static(
         self,
@@ -205,7 +256,7 @@ class Beam(ABC):
             K = self.get_ei() * D4 - self.tension * D2
 
             def curvature(y):
-                return D2 @ y
+                return D2_border @ y
 
         else:
             K = -self.tension * D2
@@ -226,18 +277,24 @@ class Beam(ABC):
         damp = 2 * self.mass * 2 * np.pi * f0 * zeta
 
         toolbox = self._build_dict(parameters, damp, K, D2)
-        powers_name = ["p_kin", "p_bend", "p_tens", "p_ext", "p_dissip"]
-        energies_name = ["e_kin", "e_bend", "e_tens", "e_ext", "e_dissip"]
+        powers_name = ["p_kin", "p_bend", "p_tens", "p_ext", "p_dissip", "p_bound_tens"]
+        energies_name = ["e_kin", "e_bend", "e_tens", "e_ext", "e_dissip", "e_bound_tens"]
         picard = ["it_picard"]
-        lov = ["y", "v", "c", "M"]
+        lov = ["y", "v", "c", "M", "eta"]
         all_lov = lov + powers_name + energies_name + picard
         res = simtools.Results(
             lot=parameters.time_vector_output().tolist(),
             lov=all_lov,
-            lov_dims=[2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            lov_dims=[2, 2, 2, 2, 2, 
+                      1, 1, 1, 1, 1, 1, 
+                      1, 1, 1, 1, 1, 1, 1, 
+                      1,],
             los=np.linspace(0,1, ns),
         )
-        res.update(0, x / lspan, lov, [y_old, v_old, curvature_old, bending_moment_old])
+        forces = FD.clean_rhs(order, force(x, current_time, y_old, v_old))
+        res.update(0, x / lspan, lov + powers_name, 
+                   [y_old, v_old, curvature_old, bending_moment_old, eta_old] 
+                   + list(self.compute_power(ds, D2, curvature_old, v_old, v_old, y_old, eta_old, forces, dt, x).values()))
         pb = spb.generate(parameters.pp, parameters.nt, desc=__name__)
 
         for k in range(parameters.nt):
@@ -266,9 +323,10 @@ class Beam(ABC):
 
             if (k + 1) % parameters.rr == 0:
                 values = (
-                    [y_new, v_new, curvature_new, bending_moment_new]
+                    [y_new, v_new, curvature_new, bending_moment_new, eta_new]
                     + list(
                         self.compute_power(
+                            ds,
                             D2,
                             curvature_new,
                             v_old,
@@ -298,9 +356,9 @@ class Beam(ABC):
             bending_moment_old = bending_moment_new
 
         self.update_energies(
+            x,
+            ds,
             res,
-            powers_name,
-            energies_name,
             parameters.tf / parameters.nr,
             parameters.nr,
         )
@@ -312,13 +370,14 @@ class Beam(ABC):
 
     def compute_power(
         self,
+        ds : float,
         D2: sp.sparse.csr_matrix,
         curvature_new: np.ndarray[float],
         v_old: np.ndarray[float],
         v_new: np.ndarray[float],
         y_new: np.ndarray[float],
         eta_new: np.ndarray[float],
-        force: callable,
+        force: np.ndarray[float],
         dt: float,
         x: np.ndarray[float],
     ) -> dict:
@@ -326,6 +385,8 @@ class Beam(ABC):
 
         Parameters
         ----------
+        ds : float
+            Space step. 
         D2 : sp.sparse.csr_matrix
             Matrix scheme for second derivative.
         curvature_new : np.ndarray[float]
@@ -338,7 +399,7 @@ class Beam(ABC):
             Position at current time step.
         eta_new : np.ndarray[float]
             Hysteresis variable at current time step.
-        force : callable
+        force : np.ndarray[float]
             External force function.
         dt : float
             Time step.
@@ -351,6 +412,7 @@ class Beam(ABC):
             Dictionary with power contributions.
         """
         power = {}
+        dy = np.gradient(y_new, ds)
         power["p_kin"] = self.mass * sp.integrate.simpson(
             v_new * (v_new - v_old) / dt, x
         )
@@ -358,47 +420,48 @@ class Beam(ABC):
             (D2 @ curvature_new) * v_new, x
         )
         power["p_tens"] = -self.tension * sp.integrate.simpson((D2 @ y_new) * v_new, x)
-        power["p_ext"] = sp.integrate.trapezoid(-force * v_new, x)
+        power["p_ext"] = sp.integrate.simpson(force * v_new, x)
         power["p_dissip"] = np.nan
+        power["p_bound_tens"] = -self.tension * (dy[-1]*v_new[-1] - dy[0]*v_new[0])
 
         return power
 
-    @staticmethod
     def update_energies(
+        self,
+        x: np.ndarray[float], 
+        ds: float,
         res: simtools.Results,
-        powers_name: list,
-        energies_name: list,
         dr: float,
         nr: int,
     ) -> None:
-        """_summary_
+        """Compute energies contributions for all time steps.
 
         Parameters
         ----------
+        x : np.ndarray[float]
+            Nodes positions.
+        ds : float
+            Space step.
         res : simtools.Results
             Object containing simulation results on which to add energies values.
-        powers_name : list
-            Names of power contributions.
-        energies_name : list
-            Names of energy contributions.
         dr : float
-            Simulation time step.
+            Output time step.
         nr : int
-            Number of simulation time steps.
-
-        Returns
-        -------
-        None.
+            Number of output time simulation. 
         """
-        for k in range(1, nr):
-            energies = []
-            for powers in powers_name:
-                energies.append(sp.integrate.trapezoid(res[powers][1 : k + 1], dx=dr))
+        t = np.linspace(0, dr * (nr + 1), nr+1)
+        dy = np.gradient(res['y'], ds, axis=1)
+        e_kin = sp.integrate.simpson(1/2*self.mass*res['v']**2, x)
+        e_tens = sp.integrate.simpson(1/2*self.tension*(dy**2), x)
+        e_bend = sp.integrate.cumulative_simpson(res["p_bend"], x=t, initial=0) + sp.integrate.simpson(1/2*self.get_ei()*(res['c'][0,:]**2), x)
+        e_dissip = sp.integrate.cumulative_simpson(res["p_dissip"], x=t, initial=0)
+        e_ext = sp.integrate.cumulative_simpson(res["p_ext"], x=t, initial=0)
+        e_bound_tens = sp.integrate.cumulative_simpson(res["p_bound_tens"], x=t, initial=0)
 
-            res.update(k, None, energies_name, energies)
+        for k in range(nr+1):
+            res.update(k, None, ['e_kin', 'e_tens', 'e_bend', 'e_dissip', 'e_ext', 'e_bound_tens'], 
+                       [e_kin[k], e_tens[k], e_bend[k], e_dissip[k], e_ext[k], e_bound_tens[k]])
 
-        for energy in energies_name:
-            res.data[energy] -= res.data[energy].min()
 
     def _build_dict(
         self,
@@ -509,7 +572,7 @@ class BeamConst(Beam):
         -------
         Array of NaN values.
         """
-        return np.nan * np.zeros_like(initial_bending_moment)
+        return np.zeros_like(initial_bending_moment)
 
     def _bending_moment(
         self,
@@ -857,13 +920,14 @@ class BeamBW(Beam):
 
     def compute_power(
         self,
-        D2: sp.sparse.spmatrix,
+        ds : float,
+        D2: sp.sparse.csr_matrix,
         curvature_new: np.ndarray[float],
         v_old: np.ndarray[float],
         v_new: np.ndarray[float],
         y_new: np.ndarray[float],
         eta_new: np.ndarray[float],
-        force: callable,
+        force: np.ndarray[float],
         dt: float,
         x: np.ndarray[float],
     ) -> dict:
@@ -871,6 +935,8 @@ class BeamBW(Beam):
 
         Parameters
         ----------
+        ds : float
+            Space step. 
         D2 : sp.sparse.csr_matrix
             Matrix scheme for second derivative.
         curvature_new : np.ndarray[float]
@@ -883,7 +949,7 @@ class BeamBW(Beam):
             Position at current time step.
         eta_new : np.ndarray[float]
             Hysteresis variable at current time step.
-        force : callable
+        force : np.ndarray[float]
             External force function.
         dt : float
             Time step.
@@ -896,7 +962,7 @@ class BeamBW(Beam):
             Dictionary with power contributions.
         """
         power = super().compute_power(
-            D2, curvature_new, v_old, v_new, y_new, eta_new, force, dt, x
+            ds, D2, curvature_new, v_old, v_new, y_new, eta_new, force, dt, x
         )
         power["p_dissip"] = (
             (self.ei_max - self.ei_min)
