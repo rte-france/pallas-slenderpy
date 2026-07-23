@@ -8,7 +8,7 @@ post-hoc from Newton's second law on the clamp.
 import numpy as np
 import scipy as sp
 
-from ..core.stockbridge import Stockbridge, Result
+from ..core.stockbridge import Result, Stockbridge
 
 
 def solve_imposed_acceleration(
@@ -20,7 +20,7 @@ def solve_imposed_acceleration(
     rot_acceleration: float,
     dt: float,
 ) -> Result:
-    """Solver for the imposed-acceleration case. 
+    """Solver for the imposed-acceleration case.
 
     Parameters
     ----------
@@ -50,7 +50,13 @@ def solve_imposed_acceleration(
 
     t = np.arange(0, tf, dt)
     res = Result(sb, t)
-    res.update(0, initial_conditions_right, initial_conditions_left, vertical_acceleration[0], rot_acceleration[0])
+    res.update(
+        0,
+        initial_conditions_right,
+        initial_conditions_left,
+        vertical_acceleration[0],
+        rot_acceleration[0],
+    )
 
     u1_old = initial_conditions_right.copy()
     u2_old = initial_conditions_left.copy()
@@ -69,15 +75,15 @@ def solve_imposed_acceleration(
         rhs1 = sb.mass_right.build_rhs_acceleration_imposed(
             u1_old,
             sb.clamp.half_length,
-            (vertical_acceleration[k]+vertical_acceleration[k-1])/2,
-            (rot_acceleration[k]+rot_acceleration[k-1])/2,
+            (vertical_acceleration[k] + vertical_acceleration[k - 1]) / 2,
+            (rot_acceleration[k] + rot_acceleration[k - 1]) / 2,
             dt,
         )
         rhs2 = sb.mass_left.build_rhs_acceleration_imposed(
             u2_old,
             sb.clamp.half_length,
-            (vertical_acceleration[k]+vertical_acceleration[k-1])/2,
-            (rot_acceleration[k]+rot_acceleration[k-1])/2,
+            (vertical_acceleration[k] + vertical_acceleration[k - 1]) / 2,
+            (rot_acceleration[k] + rot_acceleration[k - 1]) / 2,
             dt,
         )
 
@@ -88,7 +94,7 @@ def solve_imposed_acceleration(
         old_curvature_derivative1 = u1[6 : 6 + n1] - u1_old[6 : 6 + n1]
         old_curvature_derivative2 = u2[6 : 6 + n2] - u2_old[6 : 6 + n2]
 
-        res.update(k, u1, u2, vertical_acceleration[k], rot_acceleration[k]) 
+        res.update(k, u1, u2, vertical_acceleration[k], rot_acceleration[k])
         u1_old = np.array(u1)
         u2_old = np.array(u2)
 

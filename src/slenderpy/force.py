@@ -1,6 +1,6 @@
 """Force objects."""
 
-from typing import Optional, Union, Tuple, Any
+from typing import Any, Optional, Tuple, Union
 
 import numpy as np
 
@@ -148,7 +148,7 @@ class Excitation:
 
     def _wind_friction(self, s, vn):
         if self.wind_friction:
-            return 0.5 * air_volumic_mass() * self.cd * vn**2 
+            return 0.5 * air_volumic_mass() * self.cd * vn**2
         return np.zeros_like(s)
 
     def __call__(

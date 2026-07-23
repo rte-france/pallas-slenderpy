@@ -14,7 +14,7 @@ container are filled with NaNs.
 
 import numpy as np
 
-from ..core.stockbridge import Stockbridge, Result 
+from ..core.stockbridge import Result, Stockbridge
 
 #: Size of the reduced linearised state vector.
 LINEARIZED_SIZE = 5
@@ -69,14 +69,18 @@ def _build_A_linearized(sb: Stockbridge, dt) -> np.ndarray:
 
 
 def build_rhs_linearized(
-    sb: Stockbridge, time_step: int, old_unknowns: np.ndarray, f_ext: np.ndarray, dt: float
+    sb: Stockbridge,
+    time_step: int,
+    old_unknowns: np.ndarray,
+    f_ext: np.ndarray,
+    dt: float,
 ) -> np.ndarray:
     """Build the right-hand side at a given time step.
 
     Parameters
     ----------
     sb : Stockbridge
-        Stockbridge object. 
+        Stockbridge object.
     time_step : int
         Time step index.
     old_unknowns : np.ndarray
@@ -108,12 +112,7 @@ def build_rhs_linearized(
     f_sum = f_ext[0:2, time_step] + f_ext[0:2, time_step - 1]
     rhs[2:4] = (
         dotX_n
-        - ht
-        * (
-            (invM @ sb.K) @ X_n
-            + (invM @ sb.C) @ dotX_n
-            + (invM @ a) * ddotWc_n
-        )
+        - ht * ((invM @ sb.K) @ X_n + (invM @ sb.C) @ dotX_n + (invM @ a) * ddotWc_n)
         + ht * (invM @ f_sum)
     )
 
@@ -149,16 +148,24 @@ def solve_linearized_imposed_force(
     Result
         Result object containing the solution.
     """
-    
+
     dt = dt
     n1 = sb.mass_right.nb_space_points
     n2 = sb.mass_left.nb_space_points
 
     t = np.arange(0, tf, dt)
     res = Result(sb, t)
-    indexr = [0, 1, 4, 5, 10, 11] + list(range(14, 14+2*n1))
-    indexl = [2, 3, 6, 7, 12, 13] + list(range(14+2*n1, 14+2*n1+2*n2))
-    res.update(0, initial_conditions[indexr], initial_conditions[indexl], initial_conditions[8], initial_conditions[9], f_ext[-1][0], np.nan)
+    indexr = [0, 1, 4, 5, 10, 11] + list(range(14, 14 + 2 * n1))
+    indexl = [2, 3, 6, 7, 12, 13] + list(range(14 + 2 * n1, 14 + 2 * n1 + 2 * n2))
+    res.update(
+        0,
+        initial_conditions[indexr],
+        initial_conditions[indexl],
+        initial_conditions[8],
+        initial_conditions[9],
+        f_ext[-1][0],
+        np.nan,
+    )
 
     # Reduced state: pick out [xR, phiR, vR, omegaR, ddot_wc] from the full
     # 14+2*n state vector at indices [0, 1, 4, 5, 8].
@@ -182,10 +189,10 @@ def solve_linearized_imposed_force(
         # Re-expand the 5 unknowns onto the full state vector layout used
         # by Out.fill_imposed_force (positions 0..1, velocities 4..5,
         # clamp acceleration 8); leave everything else as NaN.
-        u_tot = np.hstack(
-            [u[:2], u_zero[:2], u[2:4], u_zero[2:4], u[4], u_zero[4:]]
+        u_tot = np.hstack([u[:2], u_zero[:2], u[2:4], u_zero[2:4], u[4], u_zero[4:]])
+        res.update(
+            k, u_tot[indexr], u_tot[indexl], u_tot[8], u_tot[9], f_ext[-1][k], np.nan
         )
-        res.update(k, u_tot[indexr], u_tot[indexl], u_tot[8], u_tot[9], f_ext[-1][k], np.nan)
         u_old = u
 
     return res

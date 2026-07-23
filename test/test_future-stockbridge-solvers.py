@@ -17,7 +17,6 @@ from slenderpy.future.stockbridge import (
     solve_linearized_imposed_force,
 )
 
-
 # Cable used by the manufactured-solution suite (kept at the original size
 # so the analytic tolerances still hold).
 _CABLE_FOTI = MessengerCableParameters(
@@ -50,7 +49,9 @@ def _build_sb(mass_params, K, C):
     mass_right = Mass(mass_params, _CABLE_FOTI, Side.RIGHT)
     mass_left = Mass(mass_params, _CABLE_FOTI, Side.LEFT)
     clamp = Clamp(_CLAMP_DEFAULT)
-    sb = Stockbridge(_CLAMP_DEFAULT, mass_params, _CABLE_FOTI, mass_params, _CABLE_FOTI, K, C)
+    sb = Stockbridge(
+        _CLAMP_DEFAULT, mass_params, _CABLE_FOTI, mass_params, _CABLE_FOTI, K, C
+    )
     return sb, mass_right, mass_left, clamp
 
 
@@ -59,8 +60,8 @@ def _build_sb(mass_params, K, C):
 
 def test_mathematics():
     """Manufactured-solution check: exact polynomial response under crafted forcing."""
-    k1 = 12 * _CABLE_FOTI.ei_max_cable / (_MASS_FOTI.length_to_clamp ** 3)
-    k2 = -6 * _CABLE_FOTI.ei_max_cable / (_MASS_FOTI.length_to_clamp ** 2)
+    k1 = 12 * _CABLE_FOTI.ei_max_cable / (_MASS_FOTI.length_to_clamp**3)
+    k2 = -6 * _CABLE_FOTI.ei_max_cable / (_MASS_FOTI.length_to_clamp**2)
     k3 = 4 * _CABLE_FOTI.ei_max_cable / _MASS_FOTI.length_to_clamp
     K = np.array([[k1, k2], [k2, k3]])
     C = 1e-2 * K
@@ -149,7 +150,10 @@ def test_forced_vibration():
     assert np.allclose(
         res.general["acceleration_clamp"],
         f_ext[-1] / clamp.mass
-        + 2 * k1 / clamp.mass * (amp_xh * np.cos(omega_x * t) + amp_xp * np.cos(omega * t)),
+        + 2
+        * k1
+        / clamp.mass
+        * (amp_xh * np.cos(omega_x * t) + amp_xp * np.cos(omega * t)),
         atol=10,
         rtol=80,
     )
@@ -174,10 +178,12 @@ def test_damped_vibration():
     lambda_x = 0.5 * C[0, 0] * mass_all
     pseudo_omega_phi = np.sqrt(omega_phi**2 - lambda_phi**2)
     pseudo_omega_x = np.sqrt(omega_x**2 - lambda_x**2)
-    amp_xp = -f_amp / clamp.mass * np.abs(
-        1 / (-omega**2 + 1j * C[0, 0] * mass_all * omega + k1 * mass_all)
+    amp_xp = (
+        -f_amp
+        / clamp.mass
+        * np.abs(1 / (-(omega**2) + 1j * C[0, 0] * mass_all * omega + k1 * mass_all))
     )
-    arg_xp = -np.angle(-omega**2 + 1j * C[0, 0] * mass_all * omega + k1 * mass_all)
+    arg_xp = -np.angle(-(omega**2) + 1j * C[0, 0] * mass_all * omega + k1 * mass_all)
     ic = np.zeros(mr.nb_unknowns + ml.nb_unknowns + 2)
     ic[0] = amp_xh + amp_xp
     ic[1] = amp_phi
@@ -229,8 +235,8 @@ def test_damped_vibration():
 def test_linearized_solver_requires_K_C(sb):
     """Calling the linearised solver without K/C should raise."""
     nb = 5
-    tf = 1.
-    dt = tf/nb
+    tf = 1.0
+    dt = tf / nb
     t = np.linspace(0, tf, nb)
     f_ext = np.array([0 * t, 0 * t, 0 * t])
     ic = np.zeros(sb.mass_right.nb_unknowns + sb.mass_left.nb_unknowns + 2)
@@ -245,7 +251,7 @@ def test_solve_imposed_force_zero_input(sb):
     """Zero force/moment input yields zero displacement at every node."""
     tf = 0.03
     nb = 30
-    dt = tf/nb
+    dt = tf / nb
     fc = np.zeros(nb)
     mc = np.zeros(nb)
     ic = np.zeros(sb.mass_right.nb_unknowns + sb.mass_left.nb_unknowns + 2)
@@ -259,7 +265,7 @@ def test_solve_imposed_force_records_inputs(sb):
     """The Out container should hold the imposed force/moment series verbatim."""
     nb = 20
     tf = 0.02
-    dt = tf/nb
+    dt = tf / nb
     t = np.linspace(0, tf, nb)
     fc = np.sin(2 * np.pi * 5 * t)
     mc = np.cos(2 * np.pi * 5 * t)
@@ -276,7 +282,7 @@ def test_solve_imposed_force_records_inputs(sb):
 def test_solve_imposed_acceleration_zero_input(sb):
     nb = 30
     tf = 0.03
-    dt = tf/nb
+    dt = tf / nb
     acc = np.zeros(nb)
     ang = np.zeros(nb)
     ic1 = np.zeros(sb.mass_right.nb_unknowns)
@@ -291,7 +297,7 @@ def test_solve_imposed_acceleration_left_right_symmetry(sb):
     """With identical right/left masses and pure vertical forcing, the two sides match."""
     nb = 50
     tf = 0.05
-    dt = tf/nb
+    dt = tf / nb
     t = np.linspace(0, tf, nb)
     acc = -0.1 * (2 * np.pi * 20) * np.sin(2 * np.pi * 20 * t)
     ang = np.zeros(nb)
@@ -312,7 +318,7 @@ def test_force_acceleration_round_trip(sb):
     """Acceleration imposed -> force recovered -> acceleration recovered, equal to start."""
     nb = 200
     tf = 0.2
-    dt = tf/nb 
+    dt = tf / nb
     t = np.linspace(0, 0.2, nb)
     omega = 2 * np.pi * 20
     acc_in = -0.05 * omega * np.sin(omega * t)
@@ -327,9 +333,7 @@ def test_force_acceleration_round_trip(sb):
         sb, tf, ic, res1.general["force_clamp"], res1.general["moment_clamp"], dt
     )
     # The first sample stays at zero (initial condition); compare from k=1.
-    assert np.allclose(
-        res2.general["acceleration_clamp"][1:], acc_in[1:], atol=1e-2
-    )
+    assert np.allclose(res2.general["acceleration_clamp"][1:], acc_in[1:], atol=1e-2)
 
 
 # --- linearised: energy balance -------------------------------------------
@@ -337,8 +341,8 @@ def test_force_acceleration_round_trip(sb):
 
 def test_linearized_energy_balance():
     """Power: kinetic + potential + dissipated - external should sum near zero."""
-    k1 = 12 * _CABLE_FOTI.ei_max_cable / (_MASS_FOTI.length_to_clamp ** 3)
-    k2 = -6 * _CABLE_FOTI.ei_max_cable / (_MASS_FOTI.length_to_clamp ** 2)
+    k1 = 12 * _CABLE_FOTI.ei_max_cable / (_MASS_FOTI.length_to_clamp**3)
+    k2 = -6 * _CABLE_FOTI.ei_max_cable / (_MASS_FOTI.length_to_clamp**2)
     k3 = 4 * _CABLE_FOTI.ei_max_cable / _MASS_FOTI.length_to_clamp
     K = np.array([[k1, k2], [k2, k3]])
     bend = 1e-4

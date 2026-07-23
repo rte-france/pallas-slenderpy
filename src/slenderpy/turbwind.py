@@ -84,7 +84,6 @@ class RandomWind1D:
         self.u = self._generate()
 
     def _generate(self, fmax=None):
-
         t = self.t
 
         if fmax is None:
@@ -594,7 +593,6 @@ class Force2D:
 
 
 if __name__ == "__main__":
-
     # Some test of wind features
 
     import matplotlib.pyplot as plt

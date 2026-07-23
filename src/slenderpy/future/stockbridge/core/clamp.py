@@ -3,13 +3,18 @@ from .parameters import ClampParameters
 
 class Clamp:
     """Rigid clamp connecting the messenger cables to the main cable."""
-    
-    var_name = ["force_clamp", "moment_clamp", "acceleration_clamp", "acceleration_angular_clamp"]
 
-    var_dim = [1,1,1,1]
+    var_name = [
+        "force_clamp",
+        "moment_clamp",
+        "acceleration_clamp",
+        "acceleration_angular_clamp",
+    ]
+
+    var_dim = [1, 1, 1, 1]
 
     def __init__(self, parameters: ClampParameters) -> None:
-        """Init with args. 
+        """Init with args.
 
         Parameters
         ----------
@@ -58,4 +63,3 @@ class Clamp:
             - F1 * (l1 + self.half_length)
         )
         return Fc, Mc
-    

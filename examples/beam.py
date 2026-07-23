@@ -1,11 +1,11 @@
-import numpy as np
-import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+import matplotlib.pyplot as plt
+import numpy as np
 
-from slenderpy.future.beam.beam import BeamBW, BeamConst
 import slenderpy.future.beam.fd_utils as FD
 from slenderpy import simtools
 from slenderpy.future._constant import _GRAVITY
+from slenderpy.future.beam.beam import BeamBW, BeamConst
 
 
 def _plot_animation(x, sol_static, sol_dynamic, ymin, ymax, nb_time, dt):
@@ -25,7 +25,8 @@ def _plot_animation(x, sol_static, sol_dynamic, ymin, ymax, nb_time, dt):
         time_text.set_text(f"t = {i * dt:.4f}")
         return line_static, line_dynamic
 
-    ani = animation.FuncAnimation(
+    # Keep a reference alive so the animation is not garbage-collected.
+    _ani = animation.FuncAnimation(
         fig,
         animate,
         frames=np.arange(0, nb_time + 1),
@@ -33,7 +34,7 @@ def _plot_animation(x, sol_static, sol_dynamic, ymin, ymax, nb_time, dt):
         blit=False,
         repeat=True,
     )
-    # ani.save('test_case__bretelle.mp4', writer='ffmpeg', fps=50)
+    # _ani.save('test_case__bretelle.mp4', writer='ffmpeg', fps=50)
     plt.show()
 
 
@@ -314,7 +315,6 @@ def bretelle():
 def damping():
     lspan = 440
     nb_space = 500
-    x = np.linspace(0, 440, nb_space)
     final_time = 30.0
     dt = 1e-2
     dr = 1e-1
@@ -331,7 +331,6 @@ def damping():
     beam = BeamConst(
         length=lspan, boundary_conditions=bc, tension=tension, mass=mass, ei=ei
     )
-    f0 = beam.natural_frequency()
     sol_static_more_gravity = beam.solve_static(
         n=nb_space, rhs=rhs, approx_curvature=False
     )

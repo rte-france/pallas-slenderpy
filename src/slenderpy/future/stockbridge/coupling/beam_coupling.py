@@ -3,14 +3,14 @@ from typing import Any, Optional
 import numpy as np
 import scipy as sp
 
+import slenderpy.future.beam.fd_utils as FD
 from slenderpy import _progress_bar as spb
 from slenderpy import simtools
-import slenderpy.future.beam.fd_utils as FD
-from slenderpy.future.stockbridge import Result 
+from slenderpy.future.stockbridge import Result
 
 
 def solve_dynamic_with_sb(
-    stockbridges_dict: dict, 
+    stockbridges_dict: dict,
     beam: Any,
     parameters: Any,
     initial_position: np.ndarray,
@@ -31,7 +31,7 @@ def solve_dynamic_with_sb(
         Dictionary of stockbridge dampers, with keys being the name of the damper and values being dictionaries with keys "stockbridge" (the Stockbridge object),
         "position" (the position of the damper on the beam) and "initial_conditions" (the initial conditions for the damper).
     beam : Any
-        Beam object. 
+        Beam object.
     parameters : Any
         Parameters object containing the simulation parameters.
     initial_position : np.ndarray
@@ -98,7 +98,7 @@ def solve_dynamic_with_sb(
         f0 = beam.natural_frequency()
     damp = 2 * beam.mass * 2 * np.pi * f0 * zeta
 
-    #beam result 
+    # beam result
     toolbox = beam._build_dict(parameters, damp, K, D2)
     powers_name = ["p_kin", "p_bend", "p_tens", "p_ext", "p_dissip"]
     energies_name = ["e_kin", "e_bend", "e_tens", "e_ext", "e_dissip"]
@@ -109,48 +109,75 @@ def solve_dynamic_with_sb(
     res_cable = simtools.Results(
         lot=time_vector,
         lov=all_lov,
-        lov_dims=[2, 2, 2, 2, 
-                  1, 1, 1, 1, 1, 
-                  1, 1, 1, 1, 1,
-                  1,],
+        lov_dims=[
+            2,
+            2,
+            2,
+            2,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+        ],
         los=np.linspace(0, 1, len(parameters.los)),
     )
-    res_cable.update(0, x / lspan, lov, [y_old, v_old, curvature_old, bending_moment_old])
+    res_cable.update(
+        0, x / lspan, lov, [y_old, v_old, curvature_old, bending_moment_old]
+    )
     pb = spb.generate(parameters.pp, parameters.nt, desc=__name__)
 
-    acc_clamp_old = [0 for _ in stockbridges_dict.values()] 
+    acc_clamp_old = [0 for _ in stockbridges_dict.values()]
     acc_ang_clamp_old = [0 for _ in stockbridges_dict.values()]
     force_clamp = np.array([0 for _ in stockbridges_dict.values()])
 
     # Initialize stockbridge state and result containers for each damper.
-    u1_old = [value.get("initial condition right") for value in stockbridges_dict.values()]
+    u1_old = [
+        value.get("initial condition right") for value in stockbridges_dict.values()
+    ]
     u1_new = u1_old.copy()
-    u2_old = [value.get("initial condition left") for value in stockbridges_dict.values()]
+    u2_old = [
+        value.get("initial condition left") for value in stockbridges_dict.values()
+    ]
     u2_new = u2_old.copy()
     sb_results_dict = {}
     for idx, key in enumerate(stockbridges_dict.keys()):
-        sb = stockbridges_dict[key]['stockbridge']
+        sb = stockbridges_dict[key]["stockbridge"]
         sb_results_dict[key] = Result(sb, time_vector)
-        sb_results_dict[key].update(0, u1_old[idx], u2_old[idx], acc_clamp_old[idx], acc_ang_clamp_old[idx])
+        sb_results_dict[key].update(
+            0, u1_old[idx], u2_old[idx], acc_clamp_old[idx], acc_ang_clamp_old[idx]
+        )
 
-    old_curvature_derivative1 = [np.zeros(value.get("stockbridge").mass_right.nb_space_points) for value in stockbridges_dict.values()]
-    old_curvature_derivative2 = [np.zeros(value.get("stockbridge").mass_left.nb_space_points) for value in stockbridges_dict.values()]
+    old_curvature_derivative1 = [
+        np.zeros(value.get("stockbridge").mass_right.nb_space_points)
+        for value in stockbridges_dict.values()
+    ]
+    old_curvature_derivative2 = [
+        np.zeros(value.get("stockbridge").mass_left.nb_space_points)
+        for value in stockbridges_dict.values()
+    ]
     all_pos = np.array([value.get("position") for value in stockbridges_dict.values()])
     id_pos_stockbridge = np.maximum(
         1, np.minimum(ns - 2, np.round(all_pos / lspan * (ns - 1)))
     ).astype(int)
     d = x[id_pos_stockbridge + 1] - x[id_pos_stockbridge - 1]
 
-    # time iteration 
+    # time iteration
     for k in range(1, parameters.nt):
         if beam.bc.dynamic_values is not None:
             rhs_bc = beam.bc.update_rhs(ns, x, k)
 
         # Apply previous stockbridge forces to the beam as distributed loads.
         # The stencil weights approximate the clamp force on adjacent beam nodes.
-        force[id_pos_stockbridge, k] += - 0.5 * 2 * force_clamp / d
-        force[id_pos_stockbridge+1, k] += - 0.25 * 2 * force_clamp / d
-        force[id_pos_stockbridge-1, k] += - 0.25 * 2 * force_clamp / d 
+        force[id_pos_stockbridge, k] += -0.5 * 2 * force_clamp / d
+        force[id_pos_stockbridge + 1, k] += -0.25 * 2 * force_clamp / d
+        force[id_pos_stockbridge - 1, k] += -0.25 * 2 * force_clamp / d
 
         force_previous = FD.clean_rhs(order, force[:, k - 1])
         force_current = FD.clean_rhs(order, force[:, k])
@@ -172,12 +199,17 @@ def solve_dynamic_with_sb(
 
         # Compute clamp acceleration from the updated cable state.
         # This acceleration is passed back to the stockbridge model.
-        acc_clamp_new = (force[id_pos_stockbridge, k] + beam.tension*(D2@y_new)[id_pos_stockbridge] - (D2@bending_moment_new)[id_pos_stockbridge] - damp*v_new[id_pos_stockbridge]) / beam.mass
-        acc_ang_clamp_new = 0 * acc_clamp_new  
+        acc_clamp_new = (
+            force[id_pos_stockbridge, k]
+            + beam.tension * (D2 @ y_new)[id_pos_stockbridge]
+            - (D2 @ bending_moment_new)[id_pos_stockbridge]
+            - damp * v_new[id_pos_stockbridge]
+        ) / beam.mass
+        acc_ang_clamp_new = 0 * acc_clamp_new
 
-        # loop for all stockbridges 
+        # loop for all stockbridges
         for idx, key in enumerate(stockbridges_dict.keys()):
-            sb = stockbridges_dict[key]['stockbridge']
+            sb = stockbridges_dict[key]["stockbridge"]
             A1 = sb.mass_right.build_matrix_acceleration_imposed(
                 old_curvature_derivative1[idx], dt
             )
@@ -187,22 +219,22 @@ def solve_dynamic_with_sb(
             rhs1 = sb.mass_right.build_rhs_acceleration_imposed(
                 u1_old[idx],
                 sb.clamp.half_length,
-                (acc_clamp_old[idx] + acc_clamp_new[idx])/2,
-                (acc_ang_clamp_old[idx] + acc_ang_clamp_new[idx])/2,
+                (acc_clamp_old[idx] + acc_clamp_new[idx]) / 2,
+                (acc_ang_clamp_old[idx] + acc_ang_clamp_new[idx]) / 2,
                 dt,
             )
             rhs2 = sb.mass_left.build_rhs_acceleration_imposed(
                 u2_old[idx],
                 sb.clamp.half_length,
-                (acc_clamp_old[idx] + acc_clamp_new[idx])/2,
-                (acc_ang_clamp_old[idx] + acc_ang_clamp_new[idx])/2,
+                (acc_clamp_old[idx] + acc_clamp_new[idx]) / 2,
+                (acc_ang_clamp_old[idx] + acc_ang_clamp_new[idx]) / 2,
                 dt,
             )
 
             # Solve the stockbridge damper state for the current imposed clamp accelerations.
             u1_new[idx] = sp.sparse.linalg.spsolve(A1, rhs1)
             u2_new[idx] = sp.sparse.linalg.spsolve(A2, rhs2)
-            
+
             # Compute the clamp forces produced by the updated mass states.
             force_clamp, _ = sb.clamp.compute_forces_at_clamp(
                 u1_new[idx][4],
@@ -215,13 +247,19 @@ def solve_dynamic_with_sb(
                 acc_ang_clamp_new[idx],
             )
 
-            old_curvature_derivative1[idx] = u1_new[idx][6 : 6 + sb.mass_right.nb_space_points] - u1_old[idx][6 : 6 + sb.mass_right.nb_space_points]
-            old_curvature_derivative2[idx] = u2_new[idx][6 : 6 + sb.mass_left.nb_space_points] - u2_old[idx][6 : 6 + sb.mass_left.nb_space_points]
+            old_curvature_derivative1[idx] = (
+                u1_new[idx][6 : 6 + sb.mass_right.nb_space_points]
+                - u1_old[idx][6 : 6 + sb.mass_right.nb_space_points]
+            )
+            old_curvature_derivative2[idx] = (
+                u2_new[idx][6 : 6 + sb.mass_left.nb_space_points]
+                - u2_old[idx][6 : 6 + sb.mass_left.nb_space_points]
+            )
             u1_old[idx] = np.array(u1_new[idx])
             u2_old[idx] = np.array(u2_new[idx])
-                    
+
         acc_clamp_old = acc_clamp_new
-            
+
         if (k + 1) % parameters.rr == 0:
             values = (
                 [y_new, v_new, curvature_new, bending_moment_new]
@@ -248,8 +286,14 @@ def solve_dynamic_with_sb(
             )
             pb.update(parameters.rr)
             for idx, key in enumerate(stockbridges_dict.keys()):
-                sb = stockbridges_dict[key]['stockbridge']
-                sb_results_dict[key].update((k // parameters.rr) + 1, u1_old[idx], u2_old[idx], acc_clamp_new[idx], acc_ang_clamp_new[idx])
+                sb = stockbridges_dict[key]["stockbridge"]
+                sb_results_dict[key].update(
+                    (k // parameters.rr) + 1,
+                    u1_old[idx],
+                    u2_old[idx],
+                    acc_clamp_new[idx],
+                    acc_ang_clamp_new[idx],
+                )
 
         current_time += dt
         v_old = v_new
@@ -259,14 +303,14 @@ def solve_dynamic_with_sb(
         bending_moment_old = bending_moment_new
 
     beam.update_energies(
-            res_cable,
-            powers_name,
-            energies_name,
-            parameters.tf / parameters.nr,
-            parameters.nr,
-        )
+        res_cable,
+        powers_name,
+        energies_name,
+        parameters.tf / parameters.nr,
+        parameters.nr,
+    )
     pb.close()
     res_cable.set_state(
         {"y": y_new, "v": v_new, "c": curvature_new, "M": bending_moment_new}
     )
-    return res_cable, sb_results_dict 
+    return res_cable, sb_results_dict

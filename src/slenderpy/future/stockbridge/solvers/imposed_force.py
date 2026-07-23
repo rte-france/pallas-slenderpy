@@ -18,7 +18,7 @@ size ``14 + 2*n1 + 2*n2`` and are ordered as follows:
 
 import numpy as np
 
-from ..core.stockbridge import Stockbridge, Result 
+from ..core.stockbridge import Result, Stockbridge
 
 
 def _build_A_base(sb: Stockbridge, dt: float) -> np.ndarray:
@@ -43,9 +43,9 @@ def _build_A_base(sb: Stockbridge, dt: float) -> np.ndarray:
     M = sb.mass_matrix_inv
     A = np.zeros((size, size))
     a, b = sb.ab
-    l = sb.mass_right.length_to_clamp
-    x1 = np.linspace(0, l, n1)
-    x2 = np.linspace(0, l, n2)
+    length = sb.mass_right.length_to_clamp
+    x1 = np.linspace(0, length, n1)
+    x2 = np.linspace(0, length, n2)
     x = {0: x1, 2: x2}
     ei_min = {0: sb.mass_right.ei_min, 2: sb.mass_left.ei_min}
     ei_max = {0: sb.mass_right.ei_max, 2: sb.mass_left.ei_max}
@@ -82,15 +82,15 @@ def _build_A_base(sb: Stockbridge, dt: float) -> np.ndarray:
     for j in [0, 2]:
         A[10 + j, 0 + j] = 1
         A[11 + j, 1 + j] = 1
-        A[10 + j, 14 + j * n[j]] = -(x[j][1] - x[j][0]) / 2 * (l - x[j][0])
+        A[10 + j, 14 + j * n[j]] = -(x[j][1] - x[j][0]) / 2 * (length - x[j][0])
         A[11 + j, 14 + j * n[j]] = -(x[j][1] - x[j][0]) / 2
         for k in range(1, n[j] - 1):
             A[10 + j, 14 + j * n[j] + k] = (
-                -(x[j][k + 1] - x[j][k - 1]) / 2 * (l - x[j][k])
+                -(x[j][k + 1] - x[j][k - 1]) / 2 * (length - x[j][k])
             )
             A[11 + j, 14 + j * n[j] + k] = -(x[j][k + 1] - x[j][k - 1]) / 2
         A[10 + j, 14 + j * n[j] + n[j] - 1] = (
-            -(x[j][-1] - x[j][-2]) / 2 * (l - x[j][-1])
+            -(x[j][-1] - x[j][-2]) / 2 * (length - x[j][-1])
         )
         A[11 + j, 14 + j * n[j] + n[j] - 1] = -(x[j][-1] - x[j][-2]) / 2
 
@@ -98,7 +98,7 @@ def _build_A_base(sb: Stockbridge, dt: float) -> np.ndarray:
     # The eta-eta diagonal block (the only term depending on the previous
     # step) is left at zero here and refreshed by build_matrix_force_imposed.
     for j in [0, 2]:
-        A[14 + j * n[j] : 14 + j * n[j] + n[j], 10 + j] = l - x[j]
+        A[14 + j * n[j] : 14 + j * n[j] + n[j], 10 + j] = length - x[j]
         A[14 + j * n[j] : 14 + j * n[j] + n[j], 11 + j] = 1
         for k in range(n[j]):
             A[14 + j * n[j] + k, 14 + j * n[j] + k] = -ei_min[j][k]
@@ -138,8 +138,8 @@ def build_matrix_force_imposed(
     # previous step. j=0 -> right mass, j=2 -> left mass.
     for j in [0, 2]:
         for k in range(n[j]):
-            A[14 + j * n[j] + n[j] + k, 14 + j * n[j] + n[j] + k] = (
-                chi0[k] + np.abs(old_curvature_derivative[k + n[j] * (j // 2)])
+            A[14 + j * n[j] + n[j] + k, 14 + j * n[j] + n[j] + k] = chi0[k] + np.abs(
+                old_curvature_derivative[k + n[j] * (j // 2)]
             )
     return A
 
@@ -211,7 +211,7 @@ def solve_imposed_force(
     initial_conditions: np.ndarray,
     fc: np.ndarray,
     mc: np.ndarray,
-    dt
+    dt,
 ) -> Result:
     """Integrate the stockbridge response under imposed clamp force/moment.
 
@@ -245,9 +245,17 @@ def solve_imposed_force(
 
     t = np.arange(0, tf, dt)
     res = Result(sb, t)
-    indexr = [0, 1, 4, 5, 10, 11] + list(range(14, 14+2*n1))
-    indexl = [2, 3, 6, 7, 12, 13] + list(range(14+2*n1, 14+2*n1+2*n2))
-    res.update(0, initial_conditions[indexr], initial_conditions[indexl], initial_conditions[8], initial_conditions[9], fc[0], mc[0])
+    indexr = [0, 1, 4, 5, 10, 11] + list(range(14, 14 + 2 * n1))
+    indexl = [2, 3, 6, 7, 12, 13] + list(range(14 + 2 * n1, 14 + 2 * n1 + 2 * n2))
+    res.update(
+        0,
+        initial_conditions[indexr],
+        initial_conditions[indexl],
+        initial_conditions[8],
+        initial_conditions[9],
+        fc[0],
+        mc[0],
+    )
 
     # Pre-compute the time-step-independent block of the system matrix.
     A_base = _build_A_base(sb, dt)

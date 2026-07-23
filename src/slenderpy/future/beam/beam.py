@@ -1,12 +1,12 @@
-from typing import Optional
 from abc import ABC
+from typing import Optional
 
 import numpy as np
 import scipy as sp
 
 import slenderpy.future.beam.fd_utils as FD
-from slenderpy import simtools
 from slenderpy import _progress_bar as spb
+from slenderpy import simtools
 
 
 class Beam(ABC):
@@ -235,7 +235,7 @@ class Beam(ABC):
             lot=parameters.time_vector_output().tolist(),
             lov=all_lov,
             lov_dims=[2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            los=np.linspace(0,1, ns),
+            los=np.linspace(0, 1, ns),
         )
         res.update(0, x / lspan, lov, [y_old, v_old, curvature_old, bending_moment_old])
         pb = spb.generate(parameters.pp, parameters.nt, desc=__name__)
@@ -588,7 +588,6 @@ class BeamConst(Beam):
         it = 0
         error = 100
         while it < it_picard and error > tol_picard:
-
             if approx_curvature:
                 rhs = B @ v_old + dt2 * forces - dt * K @ y_old + rhs_bc
 
@@ -798,7 +797,6 @@ class BeamBW(Beam):
         it = 0
         error = 100
         while it < it_picard and error > tol_picard:
-
             if approx_curvature:
                 rhs = (
                     B @ v_old

@@ -3,8 +3,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from .core.stockbridge import Result
 from .core.side import Side
+from .core.stockbridge import Result
 
 
 def _side_value(side: Side | str) -> str:
@@ -43,9 +43,9 @@ def plot_mass(res: Result, side: Side | str) -> None:
     res : Result
         Result object containing the mass data to plot.
     side : Side | str
-        Which mass to plot (``Side.LEFT``, ``Side.RIGHT``, ``"left"`` or ``"right"``). 
+        Which mass to plot (``Side.LEFT``, ``Side.RIGHT``, ``"left"`` or ``"right"``).
     """
-    s =  _side_value(side)
+    s = _side_value(side)
     s_obj = getattr(res, s)
 
     plt.figure()
@@ -121,16 +121,16 @@ def plot_clamp_all_versions(
 
 
 def plot_spectrum(time: np.ndarray, value: np.ndarray, dt: float) -> None:
-    """Plot a time signal and the modulus of its Fourier spectrum. 
+    """Plot a time signal and the modulus of its Fourier spectrum.
 
     Parameters
     ----------
     time : np.ndarray
-        Time vector corresponding to the signal.    
+        Time vector corresponding to the signal.
     value : np.ndarray
         Time signal array.
     dt : float
-        Time step. 
+        Time step.
     """
     n = len(time)
     N = n // 2
