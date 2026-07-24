@@ -71,6 +71,7 @@ class Excitation:
         gravity: bool = False,
         wind_friction: bool = False,
         g: float = 9.81,
+        diameter: float = 31.1e-3,
         cd: float = 1.0,
     ) -> None:
         """Init with args.
@@ -139,6 +140,7 @@ class Excitation:
         self.gravity = gravity
         self.wind_friction = wind_friction
         self.g = g
+        self.d = diameter
         self.cd = cd
 
     def _gravity(self, s):
@@ -148,7 +150,7 @@ class Excitation:
 
     def _wind_friction(self, s, vn):
         if self.wind_friction:
-            return 0.5 * air_volumic_mass() * self.cd * vn**2
+            return -0.5 * self.d * air_volumic_mass() * self.cd * np.abs(vn) * vn
         return np.zeros_like(s)
 
     def __call__(
