@@ -13,8 +13,12 @@ few are model-specific and default to ``None``:
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from slenderpy.future.beam.fd_utils import BoundaryCondition
 
 
 def _check_positive(name: str, value: float) -> None:
@@ -67,3 +71,28 @@ class Conductor:
             raise ValueError(
                 f"ei_max ({self.ei_max}) must be >= ei_min ({self.ei_min})"
             )
+
+
+@dataclass(frozen=True)
+class Span:
+    """Geometry and loading of a span.
+
+    Attributes:
+        length: Span length (m).
+        tension: Mechanical tension (N).
+        sld: Support level difference between the two supports (m). May be
+            negative; the sign encodes which support is higher.
+        boundary_conditions: Boundary conditions for the beam model. ``None``
+            for the cable model.
+    """
+
+    length: float
+    tension: float
+    sld: float = 0.0
+    boundary_conditions: Optional["BoundaryCondition"] = None
+
+    def __post_init__(self) -> None:
+        _check_positive("length", self.length)
+        _check_positive("tension", self.tension)
+        if not math.isfinite(self.sld):
+            raise ValueError(f"sld must be finite, got {self.sld}")

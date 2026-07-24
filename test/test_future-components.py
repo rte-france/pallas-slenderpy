@@ -2,7 +2,8 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from slenderpy.future.components import Conductor
+from slenderpy.future.beam.fd_utils import BoundaryCondition
+from slenderpy.future.components import Conductor, Span
 
 
 def test_conductor_minimal():
@@ -70,3 +71,44 @@ def test_conductor_allows_ei_max_equal_ei_min():
 def test_conductor_allows_negative_thermal_expansion():
     c = Conductor(mass=1.0, thermal_expansion=-1e-06)
     assert c.thermal_expansion == -1e-06
+
+
+def test_span_minimal():
+    s = Span(length=400.0, tension=30000.0)
+    assert s.length == 400.0
+    assert s.tension == 30000.0
+    assert s.sld == 0.0
+    assert s.boundary_conditions is None
+
+
+def test_span_negative_sld_allowed():
+    s = Span(length=400.0, tension=30000.0, sld=-5.0)
+    assert s.sld == -5.0
+
+
+def test_span_with_boundary_conditions():
+    bc = BoundaryCondition(order=2)
+    s = Span(length=400.0, tension=30000.0, boundary_conditions=bc)
+    assert s.boundary_conditions is bc
+
+
+def test_span_is_frozen():
+    s = Span(length=400.0, tension=30000.0)
+    with pytest.raises(FrozenInstanceError):
+        s.length = 500.0
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"length": 0.0, "tension": 30000.0},
+        {"length": -1.0, "tension": 30000.0},
+        {"length": 400.0, "tension": 0.0},
+        {"length": 400.0, "tension": -1.0},
+        {"length": 400.0, "tension": 30000.0, "sld": float("inf")},
+        {"length": 400.0, "tension": 30000.0, "sld": float("nan")},
+    ],
+)
+def test_span_rejects_invalid(kwargs):
+    with pytest.raises(ValueError):
+        Span(**kwargs)
