@@ -4,8 +4,10 @@ import numpy as np
 from pyntb.optimize import bisect_v
 
 from slenderpy.future._constant import _GRAVITY
-from slenderpy.future.cable.static.nleq import _RTOL, _MAXITER, length as n_length
-from slenderpy.future.cable.static.parabolic import length as p_length, sag
+from slenderpy.future.cable.static.nleq import _MAXITER, _RTOL
+from slenderpy.future.cable.static.nleq import length as n_length
+from slenderpy.future.cable.static.parabolic import length as p_length
+from slenderpy.future.cable.static.parabolic import sag
 
 
 def _natural(length, tension, linm):

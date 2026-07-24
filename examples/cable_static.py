@@ -2,10 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from slenderpy.future._constant import _GRAVITY
-from slenderpy.future.cable.static import blondel
-from slenderpy.future.cable.static import catenary
-from slenderpy.future.cable.static import nleq
-from slenderpy.future.cable.static import parabolic
+from slenderpy.future.cable.static import blondel, catenary, nleq, parabolic
 
 
 def _aster570():
@@ -160,7 +157,6 @@ def compare_all(lspan=400.0, ratio=0.25, sld=0.0):
 
 
 def test_blondel():
-
     # conductor properties
     linm, axs, rts, alpha = _aster570()
 
@@ -178,7 +174,6 @@ def test_blondel():
     fig, ax = plt.subplots(nrows=len(slds), ncols=len(tensions))
     for i in range(len(slds)):
         for j in range(len(tensions)):
-
             sld = slds[i]
             tension = tensions[j]
 

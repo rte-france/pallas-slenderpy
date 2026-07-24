@@ -1,12 +1,12 @@
-from typing import Optional
 from abc import ABC
+from typing import Optional
 
 import numpy as np
 import scipy as sp
 
 import slenderpy.future.beam.fd_utils as FD
-from slenderpy import simtools
 from slenderpy import _progress_bar as spb
+from slenderpy import simtools
 
 
 class Beam(ABC):

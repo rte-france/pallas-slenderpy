@@ -1,5 +1,5 @@
-import pytest
 import numpy as np
+import pytest
 
 from slenderpy.future.stockbridge import (
     Clamp,
@@ -102,7 +102,9 @@ def clamp(clamp_params) -> Clamp:
 @pytest.fixture
 def sb(clamp_params, mass_params, cable_params) -> Stockbridge:
     """Default stockbridge model, no linearised K/C."""
-    return Stockbridge(clamp_params, mass_params, cable_params, mass_params, cable_params)
+    return Stockbridge(
+        clamp_params, mass_params, cable_params, mass_params, cable_params
+    )
 
 
 @pytest.fixture

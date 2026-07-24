@@ -1,10 +1,10 @@
-import numpy as np
-import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+import matplotlib.pyplot as plt
+import numpy as np
 
-from slenderpy.future.beam.beam import BeamConst, BeamBW
-from slenderpy.future.beam.fd_utils import BoundaryCondition
 from slenderpy import simtools
+from slenderpy.future.beam.beam import BeamBW, BeamConst
+from slenderpy.future.beam.fd_utils import BoundaryCondition
 
 
 def _plot_animation(x, exact, sol, ymin, ymax, nb_time, final_time):
@@ -30,7 +30,8 @@ def _plot_animation(x, exact, sol, ymin, ymax, nb_time, final_time):
             line_approx,
         )
 
-    ani = animation.FuncAnimation(
+    # Keep a reference alive so the animation is not garbage-collected.
+    _ani = animation.FuncAnimation(
         fig,
         animate,
         frames=np.arange(0, nb_time + 1),
@@ -93,10 +94,7 @@ def test_solve_approx_curvature_bending_moment_constant_static_BC(plot=False):
         _plot_animation(x, exact, y, -7, 7, parameters.nr, final_time)
 
     analitical_results = np.array(
-        [
-            exact(x, i * (final_time / parameters.nr))
-            for i in range(parameters.nr + 1)
-        ]
+        [exact(x, i * (final_time / parameters.nr)) for i in range(parameters.nr + 1)]
     )
 
     atol = 1.0e-06
@@ -170,10 +168,7 @@ def test_solve_approx_curvature_bending_moment_constant_dynamic_BC(plot=False):
         _plot_animation(x, exact, y, -5, 5, parameters.nr, final_time)
 
     analitical_results = np.array(
-        [
-            exact(x, i * (final_time / parameters.nr))
-            for i in range(parameters.nr + 1)
-        ]
+        [exact(x, i * (final_time / parameters.nr)) for i in range(parameters.nr + 1)]
     )
     atol = 1.0e-01
     rtol = 1.0e-06
@@ -250,10 +245,7 @@ def test_solve_exact_curvature_bending_moment_constant(plot=False):
         _plot_animation(x, exact, y, 1, 7, parameters.nr, final_time)
 
     analitical_results = np.array(
-        [
-            exact(x, i * (final_time / parameters.nr))
-            for i in range(parameters.nr + 1)
-        ]
+        [exact(x, i * (final_time / parameters.nr)) for i in range(parameters.nr + 1)]
     )
     atol = 1.0e-6
     rtol = 1.0e-3
@@ -333,10 +325,7 @@ def test_solve_approx_curvature_bending_moment_variable(plot=False):
         _plot_animation(x, exact, y, 1, 7, parameters.nr, final_time)
 
     analitical_results = np.array(
-        [
-            exact(x, i * (final_time / parameters.nr))
-            for i in range(parameters.nr + 1)
-        ]
+        [exact(x, i * (final_time / parameters.nr)) for i in range(parameters.nr + 1)]
     )
     atol = 1.0e-6
     rtol = 1.0e-1
@@ -422,10 +411,7 @@ def test_solve_exact_curvature_bending_moment_variable(plot=False):
         _plot_animation(x, exact, y, 1, 7, parameters.nr, final_time)
 
     analitical_results = np.array(
-        [
-            exact(x, i * (final_time / parameters.nr))
-            for i in range(parameters.nr + 1)
-        ]
+        [exact(x, i * (final_time / parameters.nr)) for i in range(parameters.nr + 1)]
     )
     atol = 1.0e-6
     rtol = 1.0e-3

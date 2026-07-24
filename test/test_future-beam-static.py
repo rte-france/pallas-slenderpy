@@ -1,7 +1,7 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
-from slenderpy.future.beam.beam import BeamConst, BeamBW
+from slenderpy.future.beam.beam import BeamBW, BeamConst
 from slenderpy.future.beam.fd_utils import BoundaryCondition
 
 

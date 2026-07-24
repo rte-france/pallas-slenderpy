@@ -3,7 +3,7 @@
 import json
 import pickle as pk
 import time
-from typing import Union, Optional, List, Tuple
+from typing import List, Optional, Tuple, Union
 
 import matplotlib.axes
 import matplotlib.pyplot as plt
@@ -166,7 +166,7 @@ class Results:
         self,
         lot: Optional[List[float]] = None,
         lov: Optional[List[str]] = None,
-        lov_dims: Optional[Tuple[int]] = None, 
+        lov_dims: Optional[Tuple[int]] = None,
         los: Optional[List[float]] = None,
         filename: Optional[str] = None,
     ) -> None:
@@ -203,13 +203,16 @@ class Results:
     def _from_args(self, lot, lov, lov_dims=None, los=None):
         """Build zero dataset from input lists."""
         if lov_dims is None:
-            lov_dims = 2*np.ones(len(lov))
+            lov_dims = 2 * np.ones(len(lov))
         crd = {__stime__: lot, __scabs__: los}
         dct = {}
         self.lov_dims = {}
         for index, v in enumerate(lov):
             if lov_dims[index] == 2:
-                dct[v] = ([__stime__, __scabs__], np.nan * np.zeros((len(lot), len(los))))
+                dct[v] = (
+                    [__stime__, __scabs__],
+                    np.nan * np.zeros((len(lot), len(los))),
+                )
             elif lov_dims[index] == 1:
                 dct[v] = ([__stime__], np.nan * np.zeros(len(lot)))
             else:
@@ -327,7 +330,7 @@ class Results:
             else:
                 tmp = tmp[ttk]
                 dct[v] = ([__stime__], tmp)
-            
+
         self.data = xr.Dataset(dct, coords=crd)
 
     def to_netcdf(self, **kwargs):
@@ -346,7 +349,8 @@ class Results:
                 for i, s in enumerate(self.los()):
                     tmp.append(self.data[v][:, i].values.tolist())
                 out[v] = tmp
-            else:out[v] = self.data[v].values.tolist()
+            else:
+                out[v] = self.data[v].values.tolist()
 
         return json.dumps(out)
 

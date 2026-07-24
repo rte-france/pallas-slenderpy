@@ -2,7 +2,7 @@
 
 import io
 import os
-from typing import Tuple, Union, Callable, Optional
+from typing import Callable, Optional, Tuple, Union
 
 import numpy as np
 import scipy as sp
@@ -250,11 +250,11 @@ def tension_corr_temperature(
     l_ = Lr
     v_ = 0.5 * w * l_
 
-    def f1(v, l):
-        return phi1(l, v, H, 0.0) - Lp
+    def f1(v, length):
+        return phi1(length, v, H, 0.0) - Lp
 
-    def f2(v, l):
-        return phi2(l, v, H, 0.0) - l * sv / cv
+    def f2(v, length):
+        return phi2(length, v, H, 0.0) - length * sv / cv
 
     v_, l_, _, qa = qnewt2d_v(f1, f2, v_, l_, rtol=epsilon, maxiter=maxiter)
 
@@ -611,7 +611,6 @@ def solve(
     res.start_timer()
     pb = spb.generate(pm.pp, pm.nt, desc=__name__)
     for k in range(pm.nt):
-
         h = -1.0 / vt2 * un + 0.5 * ((C * un) ** 2 + (C * ub) ** 2)
         e = 0.5 * np.sum((h[:-1] + h[1:]) * ds)
         b = vt2 + vl2 * e
@@ -736,7 +735,6 @@ def _solve_added_mass(
     res.start_timer()
     pb = spb.generate(pm.pp, pm.nt, desc=__name__)
     for k in range(pm.nt):
-
         h = -1.0 / vt2 * un + 0.5 * ((C * un) ** 2 + (C * ub) ** 2)
         e = 0.5 * np.sum((h[:-1] + h[1:]) * ds)
         b = vt2 + vl2 * e

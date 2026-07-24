@@ -5,9 +5,7 @@ import scipy as sp
 
 from slenderpy import _cable_utils as cbu
 from slenderpy import _progress_bar as spb
-from slenderpy import cable
-from slenderpy import force
-from slenderpy import simtools
+from slenderpy import cable, force, simtools
 
 
 def solve(
@@ -55,7 +53,7 @@ def solve(
 
     ns, s, ds, N, n = cbu.spacediscr(pm.ns)
     vt2, vl2 = cbu.vtvl(cb)
-    C, A, I, J = cbu.matrix(ds, n)
+    C, A, Id, J = cbu.matrix(ds, n)
     tAd, uAd = cbu.adim(cb)
     t, tf, dt, ht, ht2 = cbu.times(pm, tAd)
     z = np.zeros_like(s)
@@ -70,21 +68,20 @@ def solve(
     res.update(0, s, lov, [ut, un, ub, q])
 
     if fast:
-        Is1 = I.multiply(1.0 + ht2)
-        Is2 = I.multiply(1.0 / M)
-        Is3 = I.multiply(ht * bt)
+        Is1 = Id.multiply(1.0 + ht2)
+        Is2 = Id.multiply(1.0 / M)
+        Is3 = Id.multiply(ht * bt)
         Xb = np.zeros((3, n))
         Yb = np.zeros((3, n))
     else:
-        A25 = I.multiply(M)
-        A61 = I.multiply(wo.gm / w**2)
-        A62 = I.multiply(wo.bt / w**2)
+        A25 = Id.multiply(M)
+        A61 = Id.multiply(wo.gm / w**2)
+        A62 = Id.multiply(wo.bt / w**2)
 
     # loop
     res.start_timer()
     pb = spb.generate(pm.pp, pm.nt, desc=__name__)
     for k in range(pm.nt):
-
         h = -1.0 * cb.m * cb.g * cb.d / cb.H * un + 0.5 * (cb.d / cb.L) ** 2 * (
             (C * un) ** 2 + (C * ub) ** 2
         )
@@ -94,7 +91,7 @@ def solve(
             Aa = A.multiply((cb.H + cb.EA * e) / (cb.m * cb.L**2 * w**2) * ht)
             Bb = (cb.EA * cb.g * e) / (cb.H * cb.d * w**2)
             A21 = Aa
-            A41 = Aa.multiply(al) + I.multiply(ht * gm)
+            A41 = Aa.multiply(al) + Id.multiply(ht * gm)
             A44 = sp.sparse.diags([(-1.0 * ht * wo.eps) * (q[1:-1] ** 2 - 1.0)], [0])
             R1 = un[1:-1] + ht * vn[1:-1]
             R2 = vn[1:-1] + A21 * un[1:-1] + (ht * M) * q[1:-1] + (dt * Bb) * J
@@ -123,12 +120,13 @@ def solve(
                 q[1:-1] = ht * r[1:-1] + R3
             else:
                 Xx = (
-                    ((I - A44).multiply(1.0 / (M * ht2)) + Is2) * (I - A21.multiply(ht))
+                    ((Id - A44).multiply(1.0 / (M * ht2)) + Is2)
+                    * (Id - A21.multiply(ht))
                     - A41.multiply(ht)
                     - Is3
                 )
                 Rs = (A21 * R1 + R2) / M
-                Rx = R4 + A41 * R1 + Rs + (I - A44) * (Rs / ht2 + R3 / ht)
+                Rx = R4 + A41 * R1 + Rs + (Id - A44) * (Rs / ht2 + R3 / ht)
                 Xb[0, +1:] = Xx.diagonal(k=1)
                 Xb[1, :] = Xx.diagonal(k=0)
                 Xb[2, :-1] = Xx.diagonal(k=-1)
@@ -143,17 +141,17 @@ def solve(
             A66 = sp.sparse.diags([q[1:-1] ** 2 - 1.0], [0]).multiply(-1.0 * wo.eps)
             AA = sp.sparse.bmat(
                 [
-                    [None, I, None, None, None, None],
+                    [None, Id, None, None, None, None],
                     [A21, None, None, None, A25, None],
-                    [None, None, None, I, None, None],
+                    [None, None, None, Id, None, None],
                     [None, None, A43, None, None, None],
-                    [None, None, None, None, None, I],
+                    [None, None, None, None, None, Id],
                     [
                         A61 + A21.multiply(wo.al / w**2),
                         A62,
                         None,
                         None,
-                        A25.multiply(wo.al / w**2) - I,
+                        A25.multiply(wo.al / w**2) - Id,
                         A66,
                     ],
                 ]

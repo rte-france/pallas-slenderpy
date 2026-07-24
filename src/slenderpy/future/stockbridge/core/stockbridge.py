@@ -1,9 +1,10 @@
 import numpy as np
+
 from slenderpy import simtools
 
-from .parameters import ClampParameters, MessengerCableParameters, MassParameters
 from .clamp import Clamp
 from .mass import Mass
+from .parameters import ClampParameters, MassParameters, MessengerCableParameters
 from .side import Side
 
 
@@ -40,8 +41,12 @@ class Stockbridge:
             2x2 linearised damping matrix (used by the linearised solver), by default None
         """
         self.clamp = Clamp(clamp_parameters)
-        self.mass_right = Mass(mass_right_parameters, messenger_cable_right_parameters, Side.RIGHT)
-        self.mass_left = Mass(mass_left_parameters, messenger_cable_left_parameters, Side.LEFT)
+        self.mass_right = Mass(
+            mass_right_parameters, messenger_cable_right_parameters, Side.RIGHT
+        )
+        self.mass_left = Mass(
+            mass_left_parameters, messenger_cable_left_parameters, Side.LEFT
+        )
         self.K = K
         self.C = C
         self.nr = self.mass_right.nb_space_points
@@ -82,12 +87,13 @@ class Stockbridge:
             ]
         )
         return a, b
-    
+
+
 class Result:
     """Results of a stockbridge simulation, stored in :class:`simtools.Results` objects for the right mass, left mass and clamp."""
 
     def __init__(self, stockbridge: Stockbridge, time_vector: np.ndarray) -> None:
-        """Init with args. 
+        """Init with args.
 
         Parameters
         ----------
@@ -97,32 +103,38 @@ class Result:
             The time vector for the simulation.
         """
         self.right = simtools.Results(
-                lot=time_vector,
-                lov=stockbridge.mass_right.var_name, 
-                lov_dims=stockbridge.mass_right.var_dim,
-                los=np.linspace(0, 1, stockbridge.nr)
-            )
-        
+            lot=time_vector,
+            lov=stockbridge.mass_right.var_name,
+            lov_dims=stockbridge.mass_right.var_dim,
+            los=np.linspace(0, 1, stockbridge.nr),
+        )
+
         self.left = simtools.Results(
-                lot=time_vector,
-                lov=stockbridge.mass_left.var_name, 
-                lov_dims=stockbridge.mass_left.var_dim,
-                los=np.linspace(0, 1, stockbridge.nl),
-            )
-        
+            lot=time_vector,
+            lov=stockbridge.mass_left.var_name,
+            lov_dims=stockbridge.mass_left.var_dim,
+            los=np.linspace(0, 1, stockbridge.nl),
+        )
+
         self.general = simtools.Results(
-                lot=time_vector,
-                lov=stockbridge.clamp.var_name, 
-                lov_dims=stockbridge.clamp.var_dim,
-                # los=[0,1]
-            ) 
-        
+            lot=time_vector,
+            lov=stockbridge.clamp.var_name,
+            lov_dims=stockbridge.clamp.var_dim,
+            # los=[0,1]
+        )
+
         self.sb = stockbridge
 
-    def update(self, k: int, 
-               value_right: np.ndarray, value_left: np.ndarray, 
-               acc_clamp: float, acc_ang_clamp: float, 
-               force_clamp: float = None, moment_clamp: float = None) -> None:
+    def update(
+        self,
+        k: int,
+        value_right: np.ndarray,
+        value_left: np.ndarray,
+        acc_clamp: float,
+        acc_ang_clamp: float,
+        force_clamp: float = None,
+        moment_clamp: float = None,
+    ) -> None:
         """Update the results objects with the values at time iteration ``k``.
 
         Parameters
@@ -142,10 +154,26 @@ class Result:
         moment_clamp : float, optional
             The moment acting on the clamp at the current time iteration, by default None
         """
-        self.right.update(k, self.sb.mass_right.x / self.sb.mass_right.length_to_clamp, self.sb.mass_right.var_name, 
-                            [*value_right[0:6], value_right[6:6+self.sb.nr], value_right[6+self.sb.nr:]])
-        self.left.update(k, self.sb.mass_left.x / self.sb.mass_left.length_to_clamp, self.sb.mass_left.var_name, 
-                            [*value_left[0:6], value_left[6:6+self.sb.nr], value_left[6+self.sb.nr:]])
+        self.right.update(
+            k,
+            self.sb.mass_right.x / self.sb.mass_right.length_to_clamp,
+            self.sb.mass_right.var_name,
+            [
+                *value_right[0:6],
+                value_right[6 : 6 + self.sb.nr],
+                value_right[6 + self.sb.nr :],
+            ],
+        )
+        self.left.update(
+            k,
+            self.sb.mass_left.x / self.sb.mass_left.length_to_clamp,
+            self.sb.mass_left.var_name,
+            [
+                *value_left[0:6],
+                value_left[6 : 6 + self.sb.nr],
+                value_left[6 + self.sb.nr :],
+            ],
+        )
 
         if force_clamp is None and moment_clamp is None:
             force_clamp, moment_clamp = self.sb.clamp.compute_forces_at_clamp(
@@ -159,4 +187,9 @@ class Result:
                 acc_ang_clamp,
             )
 
-        self.general.update(k, None, self.sb.clamp.var_name, [force_clamp, moment_clamp, acc_clamp, acc_ang_clamp])
+        self.general.update(
+            k,
+            None,
+            self.sb.clamp.var_name,
+            [force_clamp, moment_clamp, acc_clamp, acc_ang_clamp],
+        )

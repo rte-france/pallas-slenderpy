@@ -50,7 +50,6 @@ def _rainflow(array_ext, flm=0, l_ult=1e16, uc_mult=0.5):
 
     # loop through each turning point stored in input array
     for i in range(tot_num):
-
         j += 1  # increment "a" counter
         a[j] = array_ext[pr]  # put turning point into temporary array
         pr += 1  # increment input array pointer

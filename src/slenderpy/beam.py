@@ -1,6 +1,6 @@
 """Beam object and associated solvers."""
 
-from typing import Tuple, List, Union, Optional, Callable
+from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
 import scipy as sp
@@ -594,7 +594,6 @@ def solve_ft(
     res.start_timer()
     pb = spb.generate(pm.pp, pm.nt, desc=__name__)
     for k in range(pm.nt):
-
         f1, _ = force(s, t, y, None, v, None)
         f2, _ = force(s, t + dt, y, None, v, None)
 

@@ -1,6 +1,6 @@
 """Force objects."""
 
-from typing import Optional, Union, Tuple, Any
+from typing import Any, Optional, Tuple, Union
 
 import numpy as np
 

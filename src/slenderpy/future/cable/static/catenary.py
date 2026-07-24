@@ -16,8 +16,8 @@ def _mechparam(
     return tension / (linm * g)
 
 
-def _qfactor(l, h):
-    return np.log((l + h) / (l - h))
+def _qfactor(larc, h):
+    return np.log((larc + h) / (larc - h))
 
 
 def _length(ls, a, sld):
@@ -32,8 +32,8 @@ def length(
     g: floatArrayLike = _GRAVITY,
 ):
     a = _mechparam(tension, linm, g=g)
-    l = _length(lspan, a, sld)
-    return l
+    larc = _length(lspan, a, sld)
+    return larc
 
 
 def _lax0(
@@ -44,10 +44,10 @@ def _lax0(
     g: floatArrayLike = _GRAVITY,
 ) -> Tuple[floatArrayLike, floatArrayLike, floatArrayLike]:
     a = _mechparam(tension, linm, g=g)
-    l = _length(lspan, a, sld)
-    q = _qfactor(l, sld)
+    larc = _length(lspan, a, sld)
+    q = _qfactor(larc, sld)
     x0 = a * q - lspan
-    return l, a, x0
+    return larc, a, x0
 
 
 def shape(

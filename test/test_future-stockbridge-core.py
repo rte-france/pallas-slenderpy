@@ -14,7 +14,6 @@ from slenderpy.future.stockbridge import (
     Side,
 )
 
-
 # --- Side -----------------------------------------------------------------
 
 
@@ -148,7 +147,10 @@ def test_mass_matrix_analytic(mass_right, mass_params):
     expected = np.array(
         [
             [mass_params.mass, -coef],
-            [-coef, mass_params.moment_of_inertia + mass_params.length_to_centroid * coef],
+            [
+                -coef,
+                mass_params.moment_of_inertia + mass_params.length_to_centroid * coef,
+            ],
         ]
     )
     assert np.allclose(mass_right.mass_matrix, expected)

@@ -22,7 +22,7 @@ dependencies = [
     "matplotlib >= 3.3.2",
     "numpy >= 1.19.0",
     "pandas >= 1.1.3",
-    "pyntb >= 2026.1.0",
+    "pyntb >= 2026.1.1",
     "scipy >= 1.7.0",
     "tqdm >= 4.58.0",
     "xarray >= 0.16.2",
@@ -37,7 +37,6 @@ test = [
     "pytest",
 ]
 lint = [
-    "black ~= 25.1.0",
     "mypy ~= 1.13.0",
     "ruff ~= 0.8.0"
 ]
@@ -47,3 +46,15 @@ dev = [
 
 [project.urls]
 "Homepage" = "https://github.com/rte-france/pallas-slenderpy"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+# E: pycodestyle errors, F: pyflakes (unused imports/vars, undefined names),
+# I: import sorting. Catches basic mistakes and keeps imports tidy.
+select = ["E", "F", "I"]
+# Line length is enforced by `ruff format`; E501 would only add manual
+# wrapping of docstrings/comments the formatter intentionally leaves alone.
+ignore = ["E501"]

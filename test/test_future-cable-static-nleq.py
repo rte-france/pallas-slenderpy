@@ -54,8 +54,8 @@ def test_length(ast570, random_spans):
     tension = rts * tratio
     lcab, lve = nleq.solve(lspan, tension, sld, linm, axs)
 
-    l = np.linspace(0, lcab, nx)
-    x, y = nleq.shape(l, lspan, tension, sld, linm, axs, lcab=lcab, lve=lve)
+    larc = np.linspace(0, lcab, nx)
+    x, y = nleq.shape(larc, lspan, tension, sld, linm, axs, lcab=lcab, lve=lve)
 
     length_1 = nleq.length(lspan, tension, sld, linm, axs, lcab=lcab, lve=lve)
     length_2 = np.sqrt(np.diff(x, axis=0) ** 2 + np.diff(y, axis=0) ** 2).sum(axis=0)
@@ -74,8 +74,8 @@ def test_sag(ast570, random_spans):
     tension = rts * tratio
     lcab, lve = nleq.solve(lspan, tension, sld, linm, axs)
 
-    l = np.linspace(0, lcab, nx)
-    x, y = nleq.shape(l, lspan, tension, sld, linm, axs, lcab=lcab, lve=lve)
+    larc = np.linspace(0, lcab, nx)
+    x, y = nleq.shape(larc, lspan, tension, sld, linm, axs, lcab=lcab, lve=lve)
 
     l0 = nleq.argsag(lspan, tension, sld, linm, axs, lcab=lcab, lve=lve)
     x0, y0 = nleq.shape(l0, lspan, tension, sld, linm, axs, lcab=lcab, lve=lve)
@@ -83,11 +83,11 @@ def test_sag(ast570, random_spans):
 
     ix = np.argmin(y, axis=0)
     ns = len(lspan)
-    l1 = l[ix, range(ns)]
+    l1 = larc[ix, range(ns)]
     x1 = x[ix, range(ns)]
     s1 = sld * x1 / lspan - y[ix, range(ns)]
 
-    atoll = np.max(np.diff(l, axis=0), axis=0)
+    atoll = np.max(np.diff(larc, axis=0), axis=0)
     l2 = np.vstack((l1 + atoll, l1, l1 - atoll))
     x2, y2 = nleq.shape(l2, lspan, tension, sld, linm, axs, lcab=lcab, lve=lve)
     y2 = sld * x2 / lspan - y2
@@ -110,8 +110,8 @@ def test_chord(ast570, random_spans):
     tension = rts * tratio
     lcab, lve = nleq.solve(lspan, tension, sld, linm, axs)
 
-    l = np.linspace(0, lcab, nx)
-    x, y = nleq.shape(l, lspan, tension, sld, linm, axs, lcab=lcab, lve=lve)
+    larc = np.linspace(0, lcab, nx)
+    x, y = nleq.shape(larc, lspan, tension, sld, linm, axs, lcab=lcab, lve=lve)
 
     l0 = (lve - tension * sld / lspan) / (-linm * nleq._GRAVITY)
     x0, _ = nleq.shape(l0, lspan, tension, sld, linm, axs, lcab=lcab, lve=lve)
@@ -119,11 +119,11 @@ def test_chord(ast570, random_spans):
 
     ix = np.argmax(sld * x / lspan - y, axis=0)
     ns = len(lspan)
-    l1 = l[ix, range(ns)]
+    l1 = larc[ix, range(ns)]
     x1 = x[ix, range(ns)]
     s1 = sld * x1 / lspan - y[ix, range(ns)]
 
-    atoll = np.max(np.diff(l, axis=0), axis=0)
+    atoll = np.max(np.diff(larc, axis=0), axis=0)
     l2 = np.vstack((l1 + atoll, l1, l1 - atoll))
     x2, y2 = nleq.shape(l2, lspan, tension, sld, linm, axs, lcab=lcab, lve=lve)
     y2 = sld * x2 / lspan - y2

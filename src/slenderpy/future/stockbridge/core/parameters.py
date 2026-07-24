@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+
 @dataclass(frozen=True)
 class MassParameters:
     """Inertial and geometric parameters of a damper mass.

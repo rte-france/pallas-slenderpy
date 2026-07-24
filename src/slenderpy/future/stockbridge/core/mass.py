@@ -8,17 +8,18 @@ from .side import Side
 class Mass:
     """Damper mass attached to the clamp via a messenger cable."""
 
-    var_name = ["mass_displacement",
+    var_name = [
+        "mass_displacement",
         "mass_rotation",
         "mass_velocity",
         "mass_angular_velocity",
         "force_extremity",
         "moment_extremity",
-        "curvature", 
-        "hysteresis_variable"]
-    
-    var_dim = [1,1,1,1,1,1,
-               2,2]
+        "curvature",
+        "hysteresis_variable",
+    ]
+
+    var_dim = [1, 1, 1, 1, 1, 1, 2, 2]
 
     def __init__(
         self,
@@ -26,7 +27,7 @@ class Mass:
         cable_parameters: MessengerCableParameters,
         side: Side,
     ) -> None:
-        """Init with args. 
+        """Init with args.
 
         Parameters
         ----------
@@ -46,7 +47,9 @@ class Mass:
         nb_space_points = cable_parameters.nb_space_points
         self.nb_space_points = nb_space_points
         self.x = np.linspace(0, self.length_to_clamp, nb_space_points)
-        self.nb_unknowns = 6 + 2 * nb_space_points # position, rotation, velocity, angular velocity, force_extremity, moment_extremity (4), curvature(x), hysteresis_variable(x) (2*nb_space_points)
+        self.nb_unknowns = (
+            6 + 2 * nb_space_points
+        )  # position, rotation, velocity, angular velocity, force_extremity, moment_extremity (4), curvature(x), hysteresis_variable(x) (2*nb_space_points)
 
         self.ei_max, self.ei_min, self.chi0 = self._build_messenger_cable_arrays(
             cable_parameters
@@ -63,8 +66,8 @@ class Mass:
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Build the piecewise-constant arrays along the messenger cable.
         The cable is split into three regions of size
-        ``ratio_boundary1 * l``, ``(1 - ratio_boundary1 - ratio_boundary2) * l``
-        and ``ratio_boundary2 * l``. The first and third regions take the
+        ``ratio_boundary1 * length``, ``(1 - ratio_boundary1 - ratio_boundary2) * length``
+        and ``ratio_boundary2 * length``. The first and third regions take the
         ``*_boundary`` values and the middle one takes the ``*_cable`` values.
 
         Parameters
@@ -79,12 +82,12 @@ class Mass:
         """
         n = cable.nb_space_points
         x = self.x
-        l = self.length_to_clamp
+        length = self.length_to_clamp
 
-        index1 = np.argmin(np.abs(x - cable.ratio_boundary1 * l))
+        index1 = np.argmin(np.abs(x - cable.ratio_boundary1 * length))
         if index1 > 0:
             index1 += 1
-        index2 = np.argmin(np.abs(x - (1 - cable.ratio_boundary2) * l))
+        index2 = np.argmin(np.abs(x - (1 - cable.ratio_boundary2) * length))
         if index2 == n - 1:
             index2 += 1
 
@@ -113,7 +116,7 @@ class Mass:
     def compute_exterior_forces(
         self, half_length: float, vert_acc: float, rot_acc: float
     ) -> tuple[float, float]:
-        """Force and moment at clamp (force of the cable on the clamp). 
+        """Force and moment at clamp (force of the cable on the clamp).
 
         Parameters
         ----------
@@ -176,12 +179,14 @@ class Mass:
         A[4, 6] = -0.5 * (self.x[1] - self.x[0]) * (self.length_to_clamp - self.x[0])
         A[5, 6] = -0.5 * (self.x[1] - self.x[0])
         for k in range(1, n - 1):
-            A[4, 6 + k] = -0.5 * (self.x[k + 1] - self.x[k - 1]) * (
-                self.length_to_clamp - self.x[k]
+            A[4, 6 + k] = (
+                -0.5
+                * (self.x[k + 1] - self.x[k - 1])
+                * (self.length_to_clamp - self.x[k])
             )
             A[5, 6 + k] = -0.5 * (self.x[k + 1] - self.x[k - 1])
-        A[4, 6 + n - 1] = -0.5 * (self.x[-1] - self.x[-2]) * (
-            self.length_to_clamp - self.x[-1]
+        A[4, 6 + n - 1] = (
+            -0.5 * (self.x[-1] - self.x[-2]) * (self.length_to_clamp - self.x[-1])
         )
         A[5, 6 + n - 1] = -0.5 * (self.x[-1] - self.x[-2])
 
@@ -253,8 +258,7 @@ class Mass:
         )
         # Hysteresis update for eta_{n+1}: explicit half from chi_n / eta_n.
         rhs[6 + n : 6 + 2 * n] = (
-            -old_unknowns[6 : 6 + n]
-            + self.chi0 * old_unknowns[6 + n : 6 + 2 * n]
+            -old_unknowns[6 : 6 + n] + self.chi0 * old_unknowns[6 + n : 6 + 2 * n]
         )
 
-        return rhs        
+        return rhs

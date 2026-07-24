@@ -1,6 +1,6 @@
 """Utility functions hidden to the user."""
 
-from typing import Tuple, Optional
+from typing import Optional, Tuple
 
 import numpy as np
 import scipy.interpolate
@@ -123,9 +123,9 @@ def matrix(ds, n):
     """Generate finite differences matrixes."""
     C = fdmu.d1M(ds)
     A = fdmu.d2M(ds)
-    I = scipy.sparse.eye(n)
+    Id = scipy.sparse.eye(n)
     J = np.ones((n,))
-    return C, A, I, J
+    return C, A, Id, J
 
 
 def adim(cb):
