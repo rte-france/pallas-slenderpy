@@ -112,3 +112,11 @@ def test_span_is_frozen():
 def test_span_rejects_invalid(kwargs):
     with pytest.raises(ValueError):
         Span(**kwargs)
+
+
+def test_reexported_from_package():
+    from slenderpy.future import Conductor as PkgConductor
+    from slenderpy.future import Span as PkgSpan
+
+    assert PkgConductor is Conductor
+    assert PkgSpan is Span
