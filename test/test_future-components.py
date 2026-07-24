@@ -51,6 +51,8 @@ def test_conductor_is_frozen():
         {"mass": 1.0, "ei_min": 0.0},
         {"mass": 1.0, "ei_max": -5.0},
         {"mass": 1.0, "chi0": 0.0},
+        {"mass": float("nan")},
+        {"mass": float("inf")},
     ],
 )
 def test_conductor_rejects_non_positive(kwargs):
@@ -107,6 +109,8 @@ def test_span_is_frozen():
         {"length": 400.0, "tension": -1.0},
         {"length": 400.0, "tension": 30000.0, "sld": float("inf")},
         {"length": 400.0, "tension": 30000.0, "sld": float("nan")},
+        {"length": float("nan"), "tension": 30000.0},
+        {"length": float("inf"), "tension": 30000.0},
     ],
 )
 def test_span_rejects_invalid(kwargs):

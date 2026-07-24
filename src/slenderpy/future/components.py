@@ -15,19 +15,19 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from slenderpy.future.beam.fd_utils import BoundaryCondition
 
 
 def _check_positive(name: str, value: float) -> None:
-    """Raise ValueError if value is not strictly positive."""
-    if value <= 0:
-        raise ValueError(f"{name} must be > 0, got {value}")
+    """Raise ValueError if value is not a finite value strictly greater than 0."""
+    if not math.isfinite(value) or value <= 0:
+        raise ValueError(f"{name} must be a finite value > 0, got {value}")
 
 
-def _check_optional_positive(name: str, value: Optional[float]) -> None:
+def _check_optional_positive(name: str, value: float | None) -> None:
     """Raise ValueError if value is provided and not strictly positive."""
     if value is not None:
         _check_positive(name, value)
@@ -49,12 +49,12 @@ class Conductor:
     """
 
     mass: float
-    diameter: Optional[float] = None
-    axial_stiffness: Optional[float] = None
-    ei_min: Optional[float] = None
-    ei_max: Optional[float] = None
-    chi0: Optional[float] = None
-    thermal_expansion: Optional[float] = None
+    diameter: float | None = None
+    axial_stiffness: float | None = None
+    ei_min: float | None = None
+    ei_max: float | None = None
+    chi0: float | None = None
+    thermal_expansion: float | None = None
 
     def __post_init__(self) -> None:
         _check_positive("mass", self.mass)
@@ -89,7 +89,7 @@ class Span:
     length: float
     tension: float
     sld: float = 0.0
-    boundary_conditions: Optional["BoundaryCondition"] = None
+    boundary_conditions: BoundaryCondition | None = None
 
     def __post_init__(self) -> None:
         _check_positive("length", self.length)
