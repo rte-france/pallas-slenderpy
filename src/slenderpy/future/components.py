@@ -5,7 +5,7 @@ models of :mod:`slenderpy.future`. Most parameters are common to both models; a
 few are model-specific and default to ``None``:
 
     - ``axial_stiffness`` is used by the cable model only.
-    - ``ei_min``, ``ei_max`` and ``chi0`` describe the beam bending behaviour;
+    - ``ei_min``, ``ei_max`` and ``chi0`` describe the beam bending behavior;
       the choice between a constant-``EI`` and a Bouc-Wen sub-model is made by
       the solvers, not by the data.
     - ``boundary_conditions`` is used by the beam model only.

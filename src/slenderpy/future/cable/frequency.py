@@ -1,65 +1,96 @@
 """Different models to compute cable natural frequencies and modes."""
 
+from enum import Enum
+
 import numpy as np
 from pyntb.optimize import bisect_v
 
+from slenderpy.future import floatArrayLike
 from slenderpy.future._constant import _GRAVITY
+from slenderpy.future.cable.static.catenary import length as c_length
 from slenderpy.future.cable.static.nleq import _MAXITER, _RTOL
 from slenderpy.future.cable.static.nleq import length as n_length
 from slenderpy.future.cable.static.parabolic import length as p_length
 from slenderpy.future.cable.static.parabolic import sag
 
 
-def _natural(length, tension, linm):
+class FrequencyMethod(str, Enum):
+    """Length model used in the taut-string natural-frequency formula."""
+
+    TAUT = "taut"
+    PARABOLIC = "parabolic"
+    CATENARY = "catenary"
+    NLEQ = "nleq"
+
+
+def _natural(length: floatArrayLike, tension: floatArrayLike, linm: floatArrayLike):
     """Get natural frequency of cable."""
     return 0.5 * np.sqrt(tension / (linm * length**2))
 
 
-def _natural_taut(lspan, tension, sld, linm):
+def _natural_taut(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike):
     """Get natural frequency using taut string formula."""
     length = np.sqrt(lspan**2 + sld**2)
-    return _natural(length, tension, sld, linm)
+    return _natural(length, tension, linm)
 
 
-def _natural_parabolic(lspan, tension, sld, linm, g=_GRAVITY):
+def _natural_parabolic(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike, g:float=_GRAVITY):
     """Get natural frequency using taut string formula and length from parabolic model."""
     length = p_length(lspan, tension, sld, linm, g=g)
-    return _natural(length, tension, sld, linm)
+    return _natural(length, tension, linm)
+
+
+def _natural_catenary(
+    lspan: floatArrayLike,
+    tension: floatArrayLike,
+    sld: floatArrayLike,
+    linm: floatArrayLike,
+    g: float = _GRAVITY,
+):
+    """Get natural frequency using taut string formula and length from catenary model."""
+    length = c_length(lspan, tension, sld, linm, g=g)
+    return _natural(length, tension, linm)
 
 
 def _natural_nleq(
-    lspan, tension, sld, linm, axs, g=_GRAVITY, rtol=_RTOL, maxiter=_MAXITER
+    lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike, axs, g:float=_GRAVITY, rtol:float=_RTOL, maxiter:int=_MAXITER
 ):
     """Get natural frequency using taut string formula and length from nleq models."""
     length = n_length(lspan, tension, sld, linm, axs, g=g, rtol=rtol, maxiter=maxiter)
-    return _natural(length, tension, sld, linm)
+    return _natural(length, tension, linm)
 
 
 def natural(
-    lspan,
-    tension,
-    sld,
-    linm,
-    axs=None,
-    method="taut",
-    g=_GRAVITY,
-    rtol=_RTOL,
-    maxiter=_MAXITER,
+    lspan: floatArrayLike,
+    tension: floatArrayLike,
+    sld: floatArrayLike,
+    linm: floatArrayLike,
+    axs: floatArrayLike | None=None,
+    method:FrequencyMethod=FrequencyMethod.TAUT,
+    g:float=_GRAVITY,
+    rtol:float=_RTOL,
+    maxiter:int=_MAXITER,
 ):
-    """Get natural frequency using taut string formula with different lengths according to arg method."""
-    if method == "taut":
+    """Get natural frequency using taut string formula with different lengths according to arg method.
+
+    The ``method`` argument accepts a :class:`FrequencyMethod` member or its
+    string value ("taut", "parabolic", "catenary" or "nleq"); an invalid value
+    raises ``ValueError``.
+    """
+    method = FrequencyMethod(method)
+    if method is FrequencyMethod.TAUT:
         return _natural_taut(lspan, tension, sld, linm)
-    elif method == "parabolic":
+    elif method is FrequencyMethod.PARABOLIC:
         return _natural_parabolic(lspan, tension, sld, linm, g=g)
-    elif method == "nleq":
+    elif method is FrequencyMethod.CATENARY:
+        return _natural_catenary(lspan, tension, sld, linm, g=g)
+    else:
         return _natural_nleq(
             lspan, tension, sld, linm, axs, g=g, rtol=rtol, maxiter=maxiter
         )
-    else:
-        raise ValueError()
 
 
-def irvine_number(lspan, tension, sld, linm, axs, g=_GRAVITY):
+def irvine_number(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike, axs, g=_GRAVITY):
     """Compute Irvine number."""
     r = sag(lspan, tension, sld, linm, g=g) / lspan
     return np.sqrt(64 * r**2 * lspan / (1 + 8 * r**2) * axs / tension)
@@ -71,7 +102,7 @@ def _irvine_frequencies(
     sld: float,
     linm: float,
     axs: float,
-    g=_GRAVITY,
+    g:float=_GRAVITY,
     n: int = 10,
     tol: float = 1.0e-09,
     maxiter: int = 64,
