@@ -235,7 +235,9 @@ def energy():
     plt.plot(times, e_tens, label="tension")
     plt.plot(times, e_ext, label="exterior")
     plt.plot(times, e_bound_tens, label="bound tension")
-    plt.plot(times, e_kin + e_bend + e_dissip + e_tens - e_ext - e_bound_tens, label="total")
+    plt.plot(
+        times, e_kin + e_bend + e_dissip + e_tens - e_ext - e_bound_tens, label="total"
+    )
     plt.legend()
     plt.title("energy")
 
@@ -309,7 +311,16 @@ def bretelle():
     plt.plot(times, res["p_tens"], label="tension")
     plt.plot(times, res["p_ext"], label="exterior")
     plt.plot(times, res["p_bound_tens"], label="boud, tension")
-    plt.plot(times, res["p_kin"] + res['p_bend'] + res['p_tens'] + res['p_dissip'] - res['p_ext'] - res["p_bound_tens"], label="total")
+    plt.plot(
+        times,
+        res["p_kin"]
+        + res["p_bend"]
+        + res["p_tens"]
+        + res["p_dissip"]
+        - res["p_ext"]
+        - res["p_bound_tens"],
+        label="total",
+    )
     plt.legend()
     plt.title("power")
 
@@ -320,7 +331,9 @@ def bretelle():
     plt.plot(times, e_tens, label="tension")
     plt.plot(times, e_ext, label="exterior")
     plt.plot(times, e_bound_tens, label="boud, tension")
-    plt.plot(times, e_kin + e_dissip + e_bend + e_tens - e_ext - e_bound_tens, label ="total")
+    plt.plot(
+        times, e_kin + e_dissip + e_bend + e_tens - e_ext - e_bound_tens, label="total"
+    )
     plt.legend()
     plt.title("energy")
 

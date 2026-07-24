@@ -82,14 +82,14 @@ class Beam(ABC):
         nn = np.linspace(1, n, n)
         Wn = nn * np.sqrt(1.0 + ep * (np.pi * nn) ** 2)
         return Wn * self.natural_frequency()
-    
+
     def natural_frequencies_rot_none(self, n: int, ei: float) -> np.ndarray:
         """Compute natural frequencies for clamped-beam.
 
         Parameters
         ----------
         n : int
-            Number of frequencies to compute. 
+            Number of frequencies to compute.
         ei : float
             Bending stiffness.
 
@@ -278,23 +278,55 @@ class Beam(ABC):
 
         toolbox = self._build_dict(parameters, damp, K, D2)
         powers_name = ["p_kin", "p_bend", "p_tens", "p_ext", "p_dissip", "p_bound_tens"]
-        energies_name = ["e_kin", "e_bend", "e_tens", "e_ext", "e_dissip", "e_bound_tens"]
+        energies_name = [
+            "e_kin",
+            "e_bend",
+            "e_tens",
+            "e_ext",
+            "e_dissip",
+            "e_bound_tens",
+        ]
         picard = ["it_picard"]
         lov = ["y", "v", "c", "M", "eta"]
         all_lov = lov + powers_name + energies_name + picard
         res = simtools.Results(
             lot=parameters.time_vector_output().tolist(),
             lov=all_lov,
-            lov_dims=[2, 2, 2, 2, 2, 
-                      1, 1, 1, 1, 1, 1, 
-                      1, 1, 1, 1, 1, 1, 1, 
-                      1,],
-            los=np.linspace(0,1, ns),
+            lov_dims=[
+                2,
+                2,
+                2,
+                2,
+                2,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+            ],
+            los=np.linspace(0, 1, ns),
         )
         forces = FD.clean_rhs(order, force(x, current_time, y_old, v_old))
-        res.update(0, x / lspan, lov + powers_name, 
-                   [y_old, v_old, curvature_old, bending_moment_old, eta_old] 
-                   + list(self.compute_power(ds, D2, curvature_old, v_old, v_old, y_old, eta_old, forces, dt, x).values()))
+        res.update(
+            0,
+            x / lspan,
+            lov + powers_name,
+            [y_old, v_old, curvature_old, bending_moment_old, eta_old]
+            + list(
+                self.compute_power(
+                    ds, D2, curvature_old, v_old, v_old, y_old, eta_old, forces, dt, x
+                ).values()
+            ),
+        )
         pb = spb.generate(parameters.pp, parameters.nt, desc=__name__)
 
         for k in range(parameters.nt):
@@ -370,7 +402,7 @@ class Beam(ABC):
 
     def compute_power(
         self,
-        ds : float,
+        ds: float,
         D2: sp.sparse.csr_matrix,
         curvature_new: np.ndarray[float],
         v_old: np.ndarray[float],
@@ -386,7 +418,7 @@ class Beam(ABC):
         Parameters
         ----------
         ds : float
-            Space step. 
+            Space step.
         D2 : sp.sparse.csr_matrix
             Matrix scheme for second derivative.
         curvature_new : np.ndarray[float]
@@ -422,13 +454,13 @@ class Beam(ABC):
         power["p_tens"] = -self.tension * sp.integrate.simpson((D2 @ y_new) * v_new, x)
         power["p_ext"] = sp.integrate.simpson(force * v_new, x)
         power["p_dissip"] = np.nan
-        power["p_bound_tens"] = -self.tension * (dy[-1]*v_new[-1] - dy[0]*v_new[0])
+        power["p_bound_tens"] = -self.tension * (dy[-1] * v_new[-1] - dy[0] * v_new[0])
 
         return power
 
     def update_energies(
         self,
-        x: np.ndarray[float], 
+        x: np.ndarray[float],
         ds: float,
         res: simtools.Results,
         dr: float,
@@ -447,21 +479,35 @@ class Beam(ABC):
         dr : float
             Output time step.
         nr : int
-            Number of output time simulation. 
+            Number of output time simulation.
         """
-        t = np.linspace(0, dr * (nr + 1), nr+1)
-        dy = np.gradient(res['y'], ds, axis=1)
-        e_kin = sp.integrate.simpson(1/2*self.mass*res['v']**2, x)
-        e_tens = sp.integrate.simpson(1/2*self.tension*(dy**2), x)
-        e_bend = sp.integrate.cumulative_simpson(res["p_bend"], x=t, initial=0) + sp.integrate.simpson(1/2*self.get_ei()*(res['c'][0,:]**2), x)
+        t = np.linspace(0, dr * (nr + 1), nr + 1)
+        dy = np.gradient(res["y"], ds, axis=1)
+        e_kin = sp.integrate.simpson(1 / 2 * self.mass * res["v"] ** 2, x)
+        e_tens = sp.integrate.simpson(1 / 2 * self.tension * (dy**2), x)
+        e_bend = sp.integrate.cumulative_simpson(
+            res["p_bend"], x=t, initial=0
+        ) + sp.integrate.simpson(1 / 2 * self.get_ei() * (res["c"][0, :] ** 2), x)
         e_dissip = sp.integrate.cumulative_simpson(res["p_dissip"], x=t, initial=0)
         e_ext = sp.integrate.cumulative_simpson(res["p_ext"], x=t, initial=0)
-        e_bound_tens = sp.integrate.cumulative_simpson(res["p_bound_tens"], x=t, initial=0)
+        e_bound_tens = sp.integrate.cumulative_simpson(
+            res["p_bound_tens"], x=t, initial=0
+        )
 
-        for k in range(nr+1):
-            res.update(k, None, ['e_kin', 'e_tens', 'e_bend', 'e_dissip', 'e_ext', 'e_bound_tens'], 
-                       [e_kin[k], e_tens[k], e_bend[k], e_dissip[k], e_ext[k], e_bound_tens[k]])
-
+        for k in range(nr + 1):
+            res.update(
+                k,
+                None,
+                ["e_kin", "e_tens", "e_bend", "e_dissip", "e_ext", "e_bound_tens"],
+                [
+                    e_kin[k],
+                    e_tens[k],
+                    e_bend[k],
+                    e_dissip[k],
+                    e_ext[k],
+                    e_bound_tens[k],
+                ],
+            )
 
     def _build_dict(
         self,
@@ -651,7 +697,6 @@ class BeamConst(Beam):
         it = 0
         error = 100
         while it < it_picard and error > tol_picard:
-
             if approx_curvature:
                 rhs = B @ v_old + dt2 * forces - dt * K @ y_old + rhs_bc
 
@@ -861,7 +906,6 @@ class BeamBW(Beam):
         it = 0
         error = 100
         while it < it_picard and error > tol_picard:
-
             if approx_curvature:
                 rhs = (
                     B @ v_old
@@ -920,7 +964,7 @@ class BeamBW(Beam):
 
     def compute_power(
         self,
-        ds : float,
+        ds: float,
         D2: sp.sparse.csr_matrix,
         curvature_new: np.ndarray[float],
         v_old: np.ndarray[float],
@@ -936,7 +980,7 @@ class BeamBW(Beam):
         Parameters
         ----------
         ds : float
-            Space step. 
+            Space step.
         D2 : sp.sparse.csr_matrix
             Matrix scheme for second derivative.
         curvature_new : np.ndarray[float]

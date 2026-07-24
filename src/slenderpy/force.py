@@ -150,7 +150,7 @@ class Excitation:
 
     def _wind_friction(self, s, vn):
         if self.wind_friction:
-            return - 0.5 * self.d * air_volumic_mass() * self.cd * np.abs(vn) * vn 
+            return -0.5 * self.d * air_volumic_mass() * self.cd * np.abs(vn) * vn
         return np.zeros_like(s)
 
     def __call__(
