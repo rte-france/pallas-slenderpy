@@ -15,10 +15,8 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from slenderpy.future.beam.fd_utils import BoundaryCondition
+from slenderpy.future.boundary_condition import BoundaryCondition
 
 
 def _check_positive(name: str, value: float) -> None:

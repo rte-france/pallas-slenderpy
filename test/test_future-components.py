@@ -2,7 +2,7 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from slenderpy.future.beam.fd_utils import BoundaryCondition
+from slenderpy.future.boundary_condition import BoundaryCondition
 from slenderpy.future.components import Conductor, Span
 
 

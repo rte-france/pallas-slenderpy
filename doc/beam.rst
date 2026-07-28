@@ -264,4 +264,4 @@ we thus derivate with respect to time :eq:`eq:bc` obtaining the same matrix :mat
 :math:`d_i(t) \forall i \in \left\{1,2,3,4\right\}`. 
 
 Thus when using the method :code:`solve_dynamic` the user should set the attribute :code:`dynamic_values` with :math:`\frac{\partial d_i}{\partial t} \forall i \in \left\{1,2,3,4\right\}` 
-in the :class:`~slenderpy.future.beam.fd_utils.BoundaryCondition` constructor. 
+in the :class:`~slenderpy.future.boundary_condition.BoundaryCondition` constructor.

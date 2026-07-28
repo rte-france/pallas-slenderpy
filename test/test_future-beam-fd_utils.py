@@ -3,6 +3,7 @@ import numpy as np
 import scipy as sp
 
 import slenderpy.future.beam.fd_utils as FD
+from slenderpy.future.boundary_condition import BoundaryCondition
 
 
 def _plot(x, exact, sol):
@@ -73,7 +74,7 @@ def test_second_derivative(plot=False):
 
     left = [[1, 0, 0, 1]]
     right = [[0, 1, 0, 2]]
-    bc = FD.BoundaryCondition(order=2, left=left, right=right)
+    bc = BoundaryCondition(order=2, left=left, right=right)
     BC, rhs = bc.compute(n, ds)
     sol_bc = sp.sparse.linalg.spsolve(A + BC, rhs)
 
@@ -125,7 +126,7 @@ def test_fourth_derivative(plot=False):
 
     left = [[1, 0, 0, 0], [0, 1, 0, 1]]
     right = [[1, 0, 0, 1], [0, 1, 0, 2]]
-    bc = FD.BoundaryCondition(order=4, left=left, right=right)
+    bc = BoundaryCondition(order=4, left=left, right=right)
     BC, rhs = bc.compute(n, ds)
     sol_bc = sp.sparse.linalg.spsolve(A + BC, rhs)
 

@@ -2,10 +2,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
 
-import slenderpy.future.beam.fd_utils as FD
 from slenderpy import simtools
 from slenderpy.force import Excitation
 from slenderpy.future.beam.beam import BeamBW
+from slenderpy.future.boundary_condition import hinged
 from slenderpy.future.stockbridge import (
     ClampParameters,
     MassParameters,
@@ -255,7 +255,7 @@ def coupling():
 
     beamBW = BeamBW(
         length=LSPAN,
-        boundary_conditions=FD.rot_free(0, 0, 0, 0),
+        boundary_conditions=hinged(0, 0, 0, 0),
         tension=TENSION,
         mass=CABLE_MASS,
         ei_max=EI_MAX,
@@ -263,7 +263,7 @@ def coupling():
         critical_curvature=CHI0,
     )
 
-    freq = beamBW.natural_frequencies_rot_free(MODE, EI_MAX)[-1]
+    freq = beamBW.natural_frequencies_hinged(MODE, EI_MAX)[-1]
     nb_space = 20 * MODE
     dt = min(0.01 / freq, 1e-3)
     dr = 5 * dt

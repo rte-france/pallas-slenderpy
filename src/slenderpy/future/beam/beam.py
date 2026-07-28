@@ -7,6 +7,7 @@ import scipy as sp
 import slenderpy.future.beam.fd_utils as FD
 from slenderpy import _progress_bar as spb
 from slenderpy import simtools
+from slenderpy.future.boundary_condition import BoundaryCondition
 
 
 class Beam(ABC):
@@ -16,7 +17,7 @@ class Beam(ABC):
     def __init__(
         self,
         length: float,
-        boundary_conditions: FD.BoundaryCondition,
+        boundary_conditions: BoundaryCondition,
         tension: float,
         mass: float,
     ) -> None:
@@ -26,7 +27,7 @@ class Beam(ABC):
         ----------
         length : float
             Span length (m).
-        boundary_conditions : FD.BoundaryCondition
+        boundary_conditions : BoundaryCondition
             Boundary conditions.
         tension : float
             Span tension (N).
@@ -63,7 +64,7 @@ class Beam(ABC):
         """Compute the natural frequency of the vibrating string."""
         return self.natural_frequencies(n=1)[0]
 
-    def natural_frequencies_rot_free(self, n: int, ei: float) -> np.ndarray:
+    def natural_frequencies_hinged(self, n: int, ei: float) -> np.ndarray:
         """Compute natural frequencies for pinned-beam.
 
         Parameters
@@ -83,7 +84,7 @@ class Beam(ABC):
         Wn = nn * np.sqrt(1.0 + ep * (np.pi * nn) ** 2)
         return Wn * self.natural_frequency()
 
-    def natural_frequencies_rot_none(self, n: int, ei: float) -> np.ndarray:
+    def natural_frequencies_clamped(self, n: int, ei: float) -> np.ndarray:
         """Compute natural frequencies for clamped-beam.
 
         Parameters
@@ -563,7 +564,7 @@ class BeamConst(Beam):
     def __init__(
         self,
         length: float,
-        boundary_conditions: FD.BoundaryCondition,
+        boundary_conditions: BoundaryCondition,
         tension: float,
         mass: float,
         ei: float,
@@ -574,7 +575,7 @@ class BeamConst(Beam):
         ----------
         length : float
             Span length (m).
-        boundary_conditions : FD.BoundaryCondition
+        boundary_conditions : BoundaryCondition
             Boundary conditions.
         tension : float
             Span tension (N).
@@ -733,7 +734,7 @@ class BeamBW(Beam):
     def __init__(
         self,
         length: float,
-        boundary_conditions: FD.BoundaryCondition,
+        boundary_conditions: BoundaryCondition,
         tension: float,
         mass: float,
         ei_min: float,
@@ -746,7 +747,7 @@ class BeamBW(Beam):
         ----------
         length : float
             Span length (m).
-        boundary_conditions : FD.BoundaryCondition
+        boundary_conditions : BoundaryCondition
             Boundary conditions.
         tension : float
             Span tension (N).

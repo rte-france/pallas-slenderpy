@@ -6,6 +6,7 @@ import slenderpy.future.beam.fd_utils as FD
 from slenderpy import simtools
 from slenderpy.future._constant import _GRAVITY
 from slenderpy.future.beam.beam import BeamBW, BeamConst
+from slenderpy.future.boundary_condition import hinged
 
 
 def _plot_animation(x, sol_static, sol_dynamic, ymin, ymax, nb_time, dt):
@@ -55,7 +56,7 @@ def static_gravity():
     def force(x, t, y, v):
         return -_GRAVITY * np.ones(nb_space) * mass
 
-    bc = FD.rot_free(0, 0, 0, 0)
+    bc = hinged(0, 0, 0, 0)
     rhs = force(None, None, None, None)
     beam = BeamBW(
         length=lspan,
@@ -101,7 +102,7 @@ def hyteresis():
     ei_min = 28.28
     chi0 = 0.03
 
-    bc = FD.rot_free(0, 0, 0, 0)
+    bc = hinged(0, 0, 0, 0)
     beam = BeamBW(
         length=lspan,
         boundary_conditions=bc,
@@ -180,7 +181,7 @@ def energy():
     def force(x, t, y, v):
         return -_GRAVITY * np.ones(nb_space) * mass
 
-    bc = FD.rot_free(0, 0, 0, 0)
+    bc = hinged(0, 0, 0, 0)
     rhs = -10 * np.ones(nb_space) * mass
     beam = BeamBW(
         length=lspan,
@@ -266,7 +267,7 @@ def bretelle():
     def force(x, t, y, v):
         return -_GRAVITY * np.ones(nb_space) * mass
 
-    bc = FD.rot_free(0, 0, 0, 0)
+    bc = hinged(0, 0, 0, 0)
     rhs = force(None, None, None, None)
     beam = BeamBW(
         length=lspan,
@@ -365,7 +366,7 @@ def damping():
     def force(x, t, y, v):
         return -_GRAVITY * np.ones(nb_space) * mass
 
-    bc = FD.rot_free(0, 0, 0, 0)
+    bc = hinged(0, 0, 0, 0)
     rhs = -10 * np.ones(nb_space) * mass
     beam = BeamConst(
         length=lspan, boundary_conditions=bc, tension=tension, mass=mass, ei=ei

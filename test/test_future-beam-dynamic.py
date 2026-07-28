@@ -4,7 +4,7 @@ import numpy as np
 
 from slenderpy import simtools
 from slenderpy.future.beam.beam import BeamBW, BeamConst
-from slenderpy.future.beam.fd_utils import BoundaryCondition
+from slenderpy.future.boundary_condition import BoundaryCondition
 
 
 def _plot_animation(x, exact, sol, ymin, ymax, nb_time, final_time):

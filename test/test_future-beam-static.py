@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from slenderpy.future.beam.beam import BeamBW, BeamConst
-from slenderpy.future.beam.fd_utils import BoundaryCondition
+from slenderpy.future.boundary_condition import BoundaryCondition
 
 
 def _plot(x, exact, sol):
