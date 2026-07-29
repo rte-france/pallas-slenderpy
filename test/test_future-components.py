@@ -13,7 +13,7 @@ def test_conductor_minimal():
     assert c.axial_stiffness is None
     assert c.ei_min is None
     assert c.ei_max is None
-    assert c.chi0 is None
+    assert c.beta_flexion is None
     assert c.thermal_expansion is None
 
 
@@ -24,14 +24,14 @@ def test_conductor_full():
         axial_stiffness=3.653e07,
         ei_min=10.0,
         ei_max=2155.0,
-        chi0=0.03,
+        beta_flexion=0.03,
         thermal_expansion=2.3e-05,
     )
     assert c.diameter == 0.0234
     assert c.axial_stiffness == 3.653e07
     assert c.ei_min == 10.0
     assert c.ei_max == 2155.0
-    assert c.chi0 == 0.03
+    assert c.beta_flexion == 0.03
     assert c.thermal_expansion == 2.3e-05
 
 
@@ -50,7 +50,7 @@ def test_conductor_is_frozen():
         {"mass": 1.0, "axial_stiffness": -1.0},
         {"mass": 1.0, "ei_min": 0.0},
         {"mass": 1.0, "ei_max": -5.0},
-        {"mass": 1.0, "chi0": 0.0},
+        {"mass": 1.0, "beta_flexion": 0.0},
         {"mass": float("nan")},
         {"mass": float("inf")},
     ],
