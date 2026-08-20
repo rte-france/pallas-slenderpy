@@ -28,13 +28,24 @@ def _natural(length: floatArrayLike, tension: floatArrayLike, linm: floatArrayLi
     return 0.5 * np.sqrt(tension / (linm * length**2))
 
 
-def _natural_taut(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike):
+def _natural_taut(
+    lspan: floatArrayLike,
+    tension: floatArrayLike,
+    sld: floatArrayLike,
+    linm: floatArrayLike,
+):
     """Get natural frequency using taut string formula."""
     length = np.sqrt(lspan**2 + sld**2)
     return _natural(length, tension, linm)
 
 
-def _natural_parabolic(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike, g:float=_GRAVITY):
+def _natural_parabolic(
+    lspan: floatArrayLike,
+    tension: floatArrayLike,
+    sld: floatArrayLike,
+    linm: floatArrayLike,
+    g: float = _GRAVITY,
+):
     """Get natural frequency using taut string formula and length from parabolic model."""
     length = p_length(lspan, tension, sld, linm, g=g)
     return _natural(length, tension, linm)
@@ -53,7 +64,14 @@ def _natural_catenary(
 
 
 def _natural_nleq(
-    lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike, axs, g:float=_GRAVITY, rtol:float=_RTOL, maxiter:int=_MAXITER
+    lspan: floatArrayLike,
+    tension: floatArrayLike,
+    sld: floatArrayLike,
+    linm: floatArrayLike,
+    axs,
+    g: float = _GRAVITY,
+    rtol: float = _RTOL,
+    maxiter: int = _MAXITER,
 ):
     """Get natural frequency using taut string formula and length from nleq models."""
     length = n_length(lspan, tension, sld, linm, axs, g=g, rtol=rtol, maxiter=maxiter)
@@ -65,11 +83,11 @@ def natural(
     tension: floatArrayLike,
     sld: floatArrayLike,
     linm: floatArrayLike,
-    axs: floatArrayLike | None=None,
-    method:FrequencyMethod=FrequencyMethod.TAUT,
-    g:float=_GRAVITY,
-    rtol:float=_RTOL,
-    maxiter:int=_MAXITER,
+    axs: floatArrayLike | None = None,
+    method: FrequencyMethod = FrequencyMethod.TAUT,
+    g: float = _GRAVITY,
+    rtol: float = _RTOL,
+    maxiter: int = _MAXITER,
 ):
     """Get natural frequency using taut string formula with different lengths according to arg method.
 
@@ -90,7 +108,14 @@ def natural(
         )
 
 
-def irvine_number(lspan: floatArrayLike, tension: floatArrayLike, sld: floatArrayLike, linm: floatArrayLike, axs, g=_GRAVITY):
+def irvine_number(
+    lspan: floatArrayLike,
+    tension: floatArrayLike,
+    sld: floatArrayLike,
+    linm: floatArrayLike,
+    axs,
+    g=_GRAVITY,
+):
     """Compute Irvine number."""
     r = sag(lspan, tension, sld, linm, g=g) / lspan
     return np.sqrt(64 * r**2 * lspan / (1 + 8 * r**2) * axs / tension)
@@ -102,7 +127,7 @@ def _irvine_frequencies(
     sld: float,
     linm: float,
     axs: float,
-    g:float=_GRAVITY,
+    g: float = _GRAVITY,
     n: int = 10,
     tol: float = 1.0e-09,
     maxiter: int = 64,

@@ -232,8 +232,7 @@ class BoundaryCondition:
         return rhs
 
 
-def hinged(
-    y_left: float = 0, y_right: float = 0) -> BoundaryCondition:
+def hinged(y_left: float = 0, y_right: float = 0) -> BoundaryCondition:
     """Get boundary condition with free derivative and constrained value and curvature.
 
     Parameters
@@ -250,13 +249,12 @@ def hinged(
     """
     return BoundaryCondition(
         4,
-        left=((1.0, 0.0, 0.0, y_left), (0.0, 0.0, 1.0, 0.)),
-        right=((1.0, 0.0, 0.0, y_right), (0.0, 0.0, 1.0, 0.)),
+        left=((1.0, 0.0, 0.0, y_left), (0.0, 0.0, 1.0, 0.0)),
+        right=((1.0, 0.0, 0.0, y_right), (0.0, 0.0, 1.0, 0.0)),
     )
 
 
-def clamped(
-    y_left: float = 0, y_right: float = 0) -> BoundaryCondition:
+def clamped(y_left: float = 0, y_right: float = 0) -> BoundaryCondition:
     """_summary_
 
     Parameters
@@ -273,6 +271,6 @@ def clamped(
     """
     return BoundaryCondition(
         4,
-        left=((1.0, 0.0, 0.0, y_left), (0.0, 1.0, 0.0, 0.)),
-        right=((1.0, 0.0, 0.0, y_right), (0.0, 1.0, 0.0, 0.)),
+        left=((1.0, 0.0, 0.0, y_left), (0.0, 1.0, 0.0, 0.0)),
+        right=((1.0, 0.0, 0.0, y_right), (0.0, 1.0, 0.0, 0.0)),
     )

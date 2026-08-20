@@ -60,10 +60,14 @@ def test_exact_curvature_constant_uses_ei_max_default():
     tension = 5.0
 
     def rhs(x):
-        return 8.3 * (
-            -24.0 * (1 + 4 * x**2) ** (-5.0 / 2)
-            + 480 * x**2 * (1 + 4 * x**2) ** (-7.0 / 2)
-        ) - 2 * tension
+        return (
+            8.3
+            * (
+                -24.0 * (1 + 4 * x**2) ** (-5.0 / 2)
+                + 480 * x**2 * (1 + 4 * x**2) ** (-7.0 / 2)
+            )
+            - 2 * tension
+        )
 
     left = [[1, 0, 0, lmin**2], [0, 1, 0, 2 * lmin]]
     right = [[1, 0, 0, lmax**2], [0, 1, 0, 2 * lmax]]
@@ -134,9 +138,7 @@ def test_approx_curvature_varying():
 
     # chi0 is derived from the flexion compliance and the span tension, so pass
     # beta_flexion = chi0 / H to keep the manufactured chi0 for this case.
-    conductor = Conductor(
-        mass=1.0, ei_min=ei_min, ei_max=ei_max, beta_flexion=chi0 / H
-    )
+    conductor = Conductor(mass=1.0, ei_min=ei_min, ei_max=ei_max, beta_flexion=chi0 / H)
     span = Span(length=lmax - lmin, tension=H, boundary_conditions=bc)
     sol = solve(
         conductor,
@@ -193,9 +195,7 @@ def test_exact_curvature_varying():
 
     # chi0 is derived from the flexion compliance and the span tension, so pass
     # beta_flexion = chi0 / H to keep the manufactured chi0 for this case.
-    conductor = Conductor(
-        mass=1.0, ei_min=ei_min, ei_max=ei_max, beta_flexion=chi0 / H
-    )
+    conductor = Conductor(mass=1.0, ei_min=ei_min, ei_max=ei_max, beta_flexion=chi0 / H)
     span = Span(length=lmax - lmin, tension=H, boundary_conditions=bc)
     sol = solve(
         conductor,
