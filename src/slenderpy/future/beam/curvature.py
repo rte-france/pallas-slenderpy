@@ -45,27 +45,27 @@ class Curvature(ABC):
         self.d2 = fdu.second_derivative(n, ds)
 
     @abstractmethod
-    def value(self, y: np.ndarray[float]) -> np.ndarray[float]:
+    def value(self, y: np.ndarray) -> np.ndarray:
         """Curvature of the deflection field ``y``.
 
         Parameters
         ----------
-        y : np.ndarray[float]
+        y : np.ndarray
             Deflection at the ``n`` nodes.
 
         Returns
         -------
-        np.ndarray[float]
+        np.ndarray
             Curvature at the ``n`` nodes.
         """
 
     @abstractmethod
-    def jacobian(self, y: np.ndarray[float]) -> sp.sparse.spmatrix:
+    def jacobian(self, y: np.ndarray) -> sp.sparse.spmatrix:
         """Derivative of :meth:`value` with respect to ``y``.
 
         Parameters
         ----------
-        y : np.ndarray[float]
+        y : np.ndarray
             Deflection at the ``n`` nodes.
 
         Returns
@@ -78,11 +78,11 @@ class Curvature(ABC):
 class ApproximateCurvature(Curvature):
     """Small-slope curvature ``D2 @ y``, linear in ``y``."""
 
-    def value(self, y: np.ndarray[float]) -> np.ndarray[float]:
+    def value(self, y: np.ndarray) -> np.ndarray:
         """Curvature of the deflection field ``y``."""
         return self.d2 @ y
 
-    def jacobian(self, y: np.ndarray[float]) -> sp.sparse.spmatrix:
+    def jacobian(self, y: np.ndarray) -> sp.sparse.spmatrix:
         """Derivative of :meth:`value` with respect to ``y``, constant here."""
         return self.d2
 
@@ -107,14 +107,14 @@ class ExactCurvature(Curvature):
         super().__init__(n, ds)
         self.d1 = fdu.first_derivative(n, ds)
 
-    def value(self, y: np.ndarray[float]) -> np.ndarray[float]:
+    def value(self, y: np.ndarray) -> np.ndarray:
         """Curvature of the deflection field ``y``."""
         metric = 1.0 + (self.d1 @ y) ** 2
         # metric * sqrt(metric) rather than metric**1.5: a float exponent goes
         # through pow(), several times slower than a square root
         return self.d2 @ y / (metric * np.sqrt(metric))
 
-    def jacobian(self, y: np.ndarray[float]) -> sp.sparse.spmatrix:
+    def jacobian(self, y: np.ndarray) -> sp.sparse.spmatrix:
         """Derivative of :meth:`value` with respect to ``y``."""
         slope = self.d1 @ y
         metric = 1.0 + slope**2

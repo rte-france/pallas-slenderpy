@@ -1,94 +1,109 @@
 """Static shape (deflection) of a beam under a custom right-hand-side force.
 
-Two bending models are supported: a constant bending stiffness and a varying
-(Bouc-Wen) bending stiffness. The solver is a free function taking the
-``Conductor`` and ``Span`` dataclasses from :mod:`slenderpy.future.components`.
-The constitutive laws are exposed as standalone factories so the dynamic solver
-can reuse them.
+The solver is a free function taking the ``Conductor`` and ``Span`` dataclasses
+from :mod:`slenderpy.future.components`. The two constitutive ingredients come
+from their own modules and are chosen independently:
+
+    - the bending law, constant or Bouc-Wen, from
+      :mod:`slenderpy.future.beam.bending`;
+    - the curvature model, approximate or exact, from
+      :mod:`slenderpy.future.beam.curvature`.
+
+The nonlinear system is solved with a damped Newton iteration on the analytic
+Jacobian assembled from ``law.tangent`` and ``chi.jacobian``. A
+finite-difference Jacobian stalls on low-tension spans, where the Bouc-Wen
+moment varies over a curvature scale ``chi_bar`` orders of magnitude below the
+curvature itself. A solve that does not reach the requested tolerance returns
+``nan`` rather than its last iterate, so a failed solve cannot be mistaken for
+a solution downstream.
 """
 
 from __future__ import annotations
 
-from enum import Enum
-
 import numpy as np
 import scipy as sp
 
+import slenderpy.future.beam.bending as bending
+import slenderpy.future.beam.curvature as curvature
 import slenderpy.future.beam.fd_utils as FD
+from slenderpy.future.beam.bending import BendingModel
 from slenderpy.future.components import Conductor, Span
 
+__all__ = ["BendingModel", "solve"]
 
-class BendingModel(str, Enum):
-    """Bending-stiffness model used by the static solver."""
-
-    CONSTANT = "constant"
-    VARYING = "varying"
+# smallest Newton relaxation factor tried before declaring the step useless
+_MIN_RELAXATION = 1.0e-06
 
 
-def _bending_moment_constant(ei):
-    """Return the constant-stiffness law ``M(curvature) = ei * curvature``."""
-
-    def bending_moment(curvature):
-        return ei * curvature
-
-    return bending_moment
-
-
-def _bending_moment_varying(ei_min, ei_max, chi0):
-    """Return the Bouc-Wen static bending-moment law as a function of curvature."""
-    chi_bar = (1 - ei_min / ei_max) * chi0
-
-    def bending_moment(curvature):
-        c = np.abs(curvature)
-        return (
-            (ei_max * chi_bar + ei_min * c)
-            * (1 - np.exp(-c / chi_bar))
-            * np.sign(curvature)
-        )
-
-    return bending_moment
-
-
-def _solve(length, tension, bc, ei_linear, bending_moment, rhs, n, approx_curvature):
-    """Shared static-solve core: finite-difference assembly then nonlinear root find.
+def _solve(
+    length: float,
+    tension: float,
+    bc,
+    law: bending.Bending,
+    rhs: np.ndarray,
+    n: int,
+    approx_curvature: bool,
+    tol: float = 1.0e-06,
+    max_iter: int = 64,
+) -> np.ndarray:
+    """Shared static-solve core: finite-difference assembly then damped Newton.
 
     Solves ``(d^2/dx^2) M - tension * (d^2/dx^2) y = rhs``, where ``M`` is the
-    bending moment produced by ``bending_moment(curvature(y))``.
+    bending moment ``law.moment(chi.value(y))``. The Newton Jacobian is
+    assembled analytically as ``D2 @ diag(law.tangent) @ chi.jacobian + linear
+    part``, and each step is relaxed until it decreases the residual norm.
+
+    Returns the displacement, or an array of ``nan`` when ``max|residual|`` does
+    not reach ``tol`` relative to the load level within ``max_iter`` iterations.
     """
     ds = length / (n - 1)
     order = bc.order
-    D2_border = FD.second_derivative(n, ds)
-    D2 = FD.clean_matrix(order, D2_border)
-    BC, rhs_bc = bc.compute(n, ds)
+    D2 = FD.clean_matrix(order, FD.second_derivative(n, ds))
     D4 = FD.fourth_derivative(n, ds)
-    K = ei_linear * D4 - tension * D2
-    A = K + BC
-    rhs = FD.clean_rhs(order, rhs)
-    rhs_tot = rhs + rhs_bc
+    BC, rhs_bc = bc.compute(n, ds)
+    rhs_tot = FD.clean_rhs(order, rhs) + rhs_bc
 
-    sol = sp.sparse.linalg.spsolve(A, rhs_tot)
+    # linear part of the equation, and constant-stiffness solution as first guess
+    linear = -tension * D2 + BC
+    y = sp.sparse.linalg.spsolve(law.ei_linear * D4 + linear, rhs_tot)
 
-    if approx_curvature:
+    chi = curvature.create(n, ds, approx_curvature)
 
-        def curvature(y):
-            return D2_border @ y
+    def residual(y):
+        return D2 @ law.moment(chi.value(y)) + linear @ y - rhs_tot
 
-    else:
-        D1 = FD.first_derivative(n, ds)
+    threshold = tol * np.abs(rhs_tot).max()
+    res = residual(y)
 
-        def curvature(y):
-            return D2_border @ y / np.sqrt((1 + (D1 @ y) ** 2) ** 3)
+    for _ in range(max_iter):
+        if np.abs(res).max() <= threshold:
+            return y
 
-    def equation(y):
-        moment = bending_moment(curvature(y))
-        return D2 @ moment - tension * D2 @ y + BC @ y - rhs_tot
+        tangent = sp.sparse.diags(law.tangent(chi.value(y)))
+        jacobian = sp.sparse.csr_matrix(D2 @ tangent @ chi.jacobian(y) + linear)
+        step = sp.sparse.linalg.spsolve(jacobian, -res)
 
-    result = sp.optimize.root(equation, sol)
+        # backtrack until the step actually decreases the residual norm
+        relaxation = 1.0
+        res_new = residual(y + step)
+        while (
+            np.linalg.norm(res_new) >= np.linalg.norm(res)
+            and relaxation > _MIN_RELAXATION
+        ):
+            relaxation *= 0.5
+            res_new = residual(y + relaxation * step)
 
-    if not result.success:
-        print(result.message)
+        if np.linalg.norm(res_new) >= np.linalg.norm(res):
+            break
 
-    return result.x
+        y = y + relaxation * step
+        res = res_new
+
+    print(
+        f"static solve did not converge: max|residual| = {np.abs(res).max():.3e} "
+        f"for a target of {threshold:.3e}"
+    )
+    return np.full(n, np.nan)
 
 
 def solve(
@@ -99,6 +114,8 @@ def solve(
     model: BendingModel = BendingModel.CONSTANT,
     ei: float | None = None,
     approx_curvature: bool = True,
+    tol: float = 1.0e-06,
+    max_iter: int = 64,
 ) -> np.ndarray:
     """Compute the static displacement (shape) of a beam under a nodal force.
 
@@ -118,16 +135,22 @@ def solve(
         ``CONSTANT`` or ``VARYING``; accepts the enum member or its string value.
         Default ``CONSTANT``.
     ei : float or None, optional
-        Constant model only: overrides the constant bending stiffness. When
-        ``None`` (default), ``conductor.ei_max`` is used.
+        Constant model only: overrides the bending stiffness. When ``None``
+        (default), ``conductor.ei_max`` is used.
     approx_curvature : bool, optional
         ``True`` (default) uses the approximate curvature ``D2 @ y``; ``False``
         uses the exact geometric curvature.
+    tol : float, optional
+        Convergence threshold on ``max|residual|``, relative to the load level.
+        Default 1e-06.
+    max_iter : int, optional
+        Maximum number of Newton iterations. Default 64.
 
     Returns
     -------
     np.ndarray
-        Displacement at the ``n`` nodes.
+        Displacement at the ``n`` nodes, or an array of ``nan`` if the solve did
+        not converge.
 
     Raises
     ------
@@ -135,8 +158,6 @@ def solve(
         If boundary conditions are missing, ``rhs`` has the wrong length, or the
         bending-stiffness parameters required by ``model`` are not set.
     """
-    model = BendingModel(model)
-
     if span.boundary_conditions is None:
         raise ValueError("span.boundary_conditions is required for a beam solve")
 
@@ -144,38 +165,16 @@ def solve(
     if rhs.shape != (n,):
         raise ValueError(f"rhs must have length {n}, got shape {rhs.shape}")
 
-    if model is BendingModel.CONSTANT:
-        ei_used = ei if ei is not None else conductor.ei_max
-        if ei_used is None:
-            raise ValueError(
-                "constant model requires `ei` or `conductor.ei_max` to be set"
-            )
-        ei_linear = ei_used
-        bending_moment = _bending_moment_constant(ei_used)
-    else:
-        if (
-            conductor.ei_min is None
-            or conductor.ei_max is None
-            or conductor.beta_flexion is None
-        ):
-            raise ValueError(
-                "varying model requires conductor.ei_min, ei_max and "
-                "beta_flexion to be set"
-            )
-        ei_linear = conductor.ei_min
-        # The critical curvature depends on the span tension.
-        chi0 = conductor.beta_flexion * span.tension
-        bending_moment = _bending_moment_varying(
-            conductor.ei_min, conductor.ei_max, chi0
-        )
+    law = bending.create(conductor, span, model, ei)
 
     return _solve(
         span.length,
         span.tension,
         span.boundary_conditions,
-        ei_linear,
-        bending_moment,
+        law,
         rhs,
         n,
         approx_curvature,
+        tol=tol,
+        max_iter=max_iter,
     )

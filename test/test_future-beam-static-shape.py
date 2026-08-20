@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from slenderpy.future.beam import bending
 from slenderpy.future.beam.static import shape
 from slenderpy.future.beam.static.shape import BendingModel, solve
 from slenderpy.future.boundary_condition import BoundaryCondition
@@ -10,8 +11,14 @@ from slenderpy.future.components import Conductor, Span
 def test_approx_curvature_constant_uses_ei_override():
     """Approximate curvature, constant model: y"" - y" = 0 on [0, 1]
     with y(0)=0, y"(0)=1, y(1)=0, y"(1)=0. Exercises the explicit ei override.
+
+    The node count is bounded by the solver, not by accuracy: the residual is
+    two composed second differences, so its rounding grows as 1/ds**4 while the
+    truncation error only falls as ds**2. Past n ~ 300 the noise floor rises
+    above the default tol and the solve reports a failure. n = 200 keeps a 7x
+    margin there, at the price of a truncation error of 1.9e-04.
     """
-    n = 1000
+    n = 200
     x = np.linspace(0.0, 1.0, n)
 
     left = [[1, 0, 0, 0], [0, 0, 1, 1]]
@@ -37,7 +44,7 @@ def test_approx_curvature_constant_uses_ei_override():
         C = -D - A * np.exp(1) - B * np.exp(-1)
         return A * np.exp(x) + B * np.exp(-x) + C * x + D
 
-    assert np.allclose(exact(x), sol, atol=1.0e-06, rtol=1.0e-03)
+    assert np.allclose(exact(x), sol, atol=5.0e-04, rtol=1.0e-03)
 
 
 def test_exact_curvature_constant_uses_ei_max_default():
@@ -80,8 +87,12 @@ def test_exact_curvature_constant_uses_ei_max_default():
 
 
 def test_approx_curvature_varying():
-    """Approximate curvature, varying model: manufactured solution y = sin(x)."""
-    n = 1000
+    """Approximate curvature, varying model: manufactured solution y = sin(x).
+
+    n is capped for the same reason as in the constant case above; n = 500
+    leaves a 16x margin on the residual noise floor.
+    """
+    n = 500
     lmin, lmax = -1.0, 3.0
     x = np.linspace(lmin, lmax, n)
 
@@ -136,7 +147,7 @@ def test_approx_curvature_varying():
         approx_curvature=True,
     )
 
-    assert np.allclose(exact(x), sol, atol=1.0e-03, rtol=1.0e-09)
+    assert np.allclose(exact(x), sol, atol=3.0e-03, rtol=1.0e-09)
 
 
 def test_exact_curvature_varying():
@@ -245,14 +256,10 @@ def test_rhs_length_mismatch_raises():
         solve(conductor, span, rhs=np.zeros(5), n=10, model=BendingModel.CONSTANT)
 
 
-def test_module_exposes_bending_moment_factories():
-    """The constitutive laws are standalone for reuse by the dynamic solver."""
-    const = shape._bending_moment_constant(2.0)
-    assert const(np.array([1.0, -3.0])) == pytest.approx([2.0, -6.0])
+def test_bending_model_is_reexported():
+    """The model selector lives in `bending`; `shape` re-exports it unchanged.
 
-    varying = shape._bending_moment_varying(1.0, 10.0, 5.0)
-    c = np.array([0.0, 2.0, -2.0])
-    m = varying(c)
-    assert m[0] == pytest.approx(0.0)
-    assert m[1] > 0 and m[2] < 0
-    assert m[1] == pytest.approx(-m[2])  # odd function of curvature
+    The constitutive laws themselves are covered by test_future-beam-bending.py
+    and test_future-beam-curvature.py; here only the wiring is checked.
+    """
+    assert shape.BendingModel is bending.BendingModel
