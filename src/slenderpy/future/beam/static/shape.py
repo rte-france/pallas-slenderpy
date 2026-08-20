@@ -25,7 +25,7 @@ import scipy as sp
 
 import slenderpy.future.beam.bending as bending
 import slenderpy.future.beam.curvature as curvature
-import slenderpy.future.beam.fd_utils as FD
+import slenderpy.future.fd_utils as fdu
 from slenderpy.future.beam.bending import BendingModel
 from slenderpy.future.components import Conductor, Span
 
@@ -58,10 +58,10 @@ def _solve(
     """
     ds = length / (n - 1)
     order = bc.order
-    D2 = FD.clean_matrix(order, FD.second_derivative(n, ds))
-    D4 = FD.fourth_derivative(n, ds)
+    D2 = fdu.clean_matrix(order, fdu.second_derivative(n, ds))
+    D4 = fdu.fourth_derivative(n, ds)
     BC, rhs_bc = bc.compute(n, ds)
-    rhs_tot = FD.clean_rhs(order, rhs) + rhs_bc
+    rhs_tot = fdu.clean_rhs(order, rhs) + rhs_bc
 
     # linear part of the equation, and constant-stiffness solution as first guess
     linear = -tension * D2 + BC

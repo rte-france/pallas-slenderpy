@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 import slenderpy.future.beam.curvature as CV
-import slenderpy.future.beam.fd_utils as FD
+import slenderpy.future.fd_utils as fdu
 
 _N = 201
 _DS = 0.05
@@ -53,13 +53,13 @@ def test_approximate_value_is_the_second_derivative():
     y = np.sin(_X)
     operator = CV.ApproximateCurvature(_N, _DS)
 
-    assert np.array_equal(operator.value(y), FD.second_derivative(_N, _DS) @ y)
+    assert np.array_equal(operator.value(y), fdu.second_derivative(_N, _DS) @ y)
 
 
 def test_approximate_jacobian_does_not_depend_on_y():
     """Check the approximate operator is linear: one constant jacobian."""
     operator = CV.ApproximateCurvature(_N, _DS)
-    expected = FD.second_derivative(_N, _DS).toarray()
+    expected = fdu.second_derivative(_N, _DS).toarray()
 
     for y in (np.zeros(_N), np.sin(_X), 100.0 * _X**2):
         assert np.array_equal(operator.jacobian(y).toarray(), expected)
@@ -90,8 +90,8 @@ def test_exact_value_matches_the_float_power_form():
     faster form to a few epsilon.
     """
     y = 3.0 * np.sin(_X)
-    d1 = FD.first_derivative(_N, _DS)
-    d2 = FD.second_derivative(_N, _DS)
+    d1 = fdu.first_derivative(_N, _DS)
+    d2 = fdu.second_derivative(_N, _DS)
 
     value = CV.ExactCurvature(_N, _DS).value(y)
     reference = d2 @ y * (1.0 + (d1 @ y) ** 2) ** -1.5

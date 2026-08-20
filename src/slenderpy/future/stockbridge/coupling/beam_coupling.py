@@ -3,7 +3,7 @@ from typing import Any, Optional
 import numpy as np
 import scipy as sp
 
-import slenderpy.future.beam.fd_utils as FD
+import slenderpy.future.fd_utils as fdu
 from slenderpy import _progress_bar as spb
 from slenderpy import simtools
 from slenderpy.future.stockbridge import Result
@@ -67,10 +67,10 @@ def solve_dynamic_with_sb(
     current_time = parameters.t0 + dt
 
     order = beam.bc.order
-    D1 = FD.first_derivative(ns, ds)
-    D2_border = FD.second_derivative(ns, ds)
-    D2 = FD.clean_matrix(order, D2_border)
-    D4 = FD.fourth_derivative(ns, ds)
+    D1 = fdu.first_derivative(ns, ds)
+    D2_border = fdu.second_derivative(ns, ds)
+    D2 = fdu.clean_matrix(order, D2_border)
+    D4 = fdu.fourth_derivative(ns, ds)
     rhs_bc = np.zeros(ns)
 
     if approx_curvature:
@@ -179,8 +179,8 @@ def solve_dynamic_with_sb(
         force[id_pos_stockbridge + 1, k] += -0.25 * 2 * force_clamp / d
         force[id_pos_stockbridge - 1, k] += -0.25 * 2 * force_clamp / d
 
-        force_previous = FD.clean_rhs(order, force[:, k - 1])
-        force_current = FD.clean_rhs(order, force[:, k])
+        force_previous = fdu.clean_rhs(order, force[:, k - 1])
+        force_current = fdu.clean_rhs(order, force[:, k])
 
         v_new, y_new, eta_new, curvature_new, bending_moment_new, it = (
             beam.picard_process(

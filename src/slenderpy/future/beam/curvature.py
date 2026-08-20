@@ -16,7 +16,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 import scipy as sp
 
-import slenderpy.future.beam.fd_utils as fdu
+import slenderpy.future.fd_utils as fdu
 
 
 class Curvature(ABC):
