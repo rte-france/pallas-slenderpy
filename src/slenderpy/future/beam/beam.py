@@ -4,7 +4,7 @@ from typing import Optional
 import numpy as np
 import scipy as sp
 
-import slenderpy.future.beam.fd_utils as FD
+import slenderpy.future.fd_utils as fdu
 from slenderpy import _progress_bar as spb
 from slenderpy import simtools
 from slenderpy.future.boundary_condition import BoundaryCondition
@@ -161,13 +161,13 @@ class Beam(ABC):
 
         ds = self.length / (n - 1)
         order = self.bc.order
-        D2_border = FD.second_derivative(n, ds)
-        D2 = FD.clean_matrix(order, D2_border)
+        D2_border = fdu.second_derivative(n, ds)
+        D2 = fdu.clean_matrix(order, D2_border)
         BC, rhs_bc = self.bc.compute(n, ds)
-        D4 = FD.fourth_derivative(n, ds)
+        D4 = fdu.fourth_derivative(n, ds)
         K = self.get_ei() * D4 - self.tension * D2
         A = K + BC
-        rhs = FD.clean_rhs(order, rhs)
+        rhs = fdu.clean_rhs(order, rhs)
         rhs_tot = rhs + rhs_bc
 
         sol = sp.sparse.linalg.spsolve(A, rhs_tot)
@@ -178,7 +178,7 @@ class Beam(ABC):
                 return D2_border @ y
 
         else:
-            D1 = FD.first_derivative(n, ds)
+            D1 = fdu.first_derivative(n, ds)
 
             def curvature(y):
                 return D2_border @ y / np.sqrt((1 + (D1 @ y) ** 2) ** (3))
@@ -247,10 +247,10 @@ class Beam(ABC):
         current_time = parameters.t0 + dt
 
         order = self.bc.order
-        D1 = FD.first_derivative(ns, ds)
-        D2_border = FD.second_derivative(ns, ds)
-        D2 = FD.clean_matrix(order, D2_border)
-        D4 = FD.fourth_derivative(ns, ds)
+        D1 = fdu.first_derivative(ns, ds)
+        D2_border = fdu.second_derivative(ns, ds)
+        D2 = fdu.clean_matrix(order, D2_border)
+        D4 = fdu.fourth_derivative(ns, ds)
         rhs_bc = np.zeros(ns)
 
         if approx_curvature:
@@ -316,7 +316,7 @@ class Beam(ABC):
             ],
             los=np.linspace(0, 1, ns),
         )
-        forces = FD.clean_rhs(order, force(x, current_time, y_old, v_old))
+        forces = fdu.clean_rhs(order, force(x, current_time, y_old, v_old))
         res.update(
             0,
             x / lspan,
@@ -334,10 +334,10 @@ class Beam(ABC):
             if self.bc.dynamic_values is not None:
                 rhs_bc = self.bc.update_rhs(ns, x, current_time)
 
-            force_previous = FD.clean_rhs(
+            force_previous = fdu.clean_rhs(
                 order, force(x, current_time - dt, y_old, v_old)
             )
-            force_current = FD.clean_rhs(order, force(x, current_time, y_old, v_old))
+            force_current = fdu.clean_rhs(order, force(x, current_time, y_old, v_old))
 
             v_new, y_new, eta_new, curvature_new, bending_moment_new, it = (
                 self.picard_process(
@@ -544,7 +544,7 @@ class Beam(ABC):
         order = self.bc.order
         BC, _ = self.bc.compute(ns, ds)
         Id = sp.sparse.identity(ns)
-        Id = FD.clean_matrix(order, Id)
+        Id = fdu.clean_matrix(order, Id)
 
         M = self.mass * Id
         res["A"] = M + dt2**2 * K + dt2 * damp * Id + BC

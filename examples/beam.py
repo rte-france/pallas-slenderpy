@@ -2,7 +2,7 @@ import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
 
-import slenderpy.future.beam.fd_utils as FD
+import slenderpy.future.fd_utils as fdu
 from slenderpy import simtools
 from slenderpy.future._constant import _GRAVITY
 from slenderpy.future.beam.beam import BeamBW, BeamConst
@@ -121,8 +121,8 @@ def hyteresis():
         return np.zeros(nb_space)
 
     ds = lspan / (nb_space - 1)
-    D1 = FD.first_derivative(nb_space, ds)
-    D2 = FD.second_derivative(nb_space, ds)
+    D1 = fdu.first_derivative(nb_space, ds)
+    D2 = fdu.second_derivative(nb_space, ds)
 
     def curvature(y):
         return D2 @ y / np.sqrt((np.ones(nb_space) + ((D1 @ y) ** 2)) ** 3)
