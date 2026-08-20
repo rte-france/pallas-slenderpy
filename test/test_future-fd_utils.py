@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 import scipy as sp
 
-import slenderpy.future.beam.fd_utils as FD
+import slenderpy.future.fd_utils as fdu
 from slenderpy.future.boundary_condition import BoundaryCondition
 
 
@@ -34,7 +34,7 @@ def test_first_derivative(plot=False):
     bc_matrix[-1, -1] = 1 / ds
     bc_matrix[-1, -2] = -1 / ds
 
-    A = FD.first_derivative(n, ds)
+    A = fdu.first_derivative(n, ds)
 
     sol = sp.sparse.linalg.spsolve(A + bc_matrix, rhs)
 
@@ -70,7 +70,7 @@ def test_second_derivative(plot=False):
     bc_matrix[-1, -1] = 1 / ds
     bc_matrix[-1, -2] = -1 / ds
 
-    A = FD.second_derivative(n, ds)
+    A = fdu.second_derivative(n, ds)
     sol = sp.sparse.linalg.spsolve(A + bc_matrix, rhs)
 
     left = [[1, 0, 0, 1]]
@@ -122,7 +122,7 @@ def test_fourth_derivative(plot=False):
     bc_matrix[-1, -1] = 1 / ds
     bc_matrix[-1, -2] = -1 / ds
 
-    A = FD.fourth_derivative(n, ds)
+    A = fdu.fourth_derivative(n, ds)
     sol = sp.sparse.linalg.spsolve(A + bc_matrix, rhs)
 
     left = [[1, 0, 0, 0], [0, 1, 0, 1]]
@@ -147,20 +147,20 @@ def test_fourth_derivative(plot=False):
 
 def test_derivative_size_guards():
     """Check sizes leaving no interior node are rejected."""
-    for builder in (FD.first_derivative, FD.second_derivative):
+    for builder in (fdu.first_derivative, fdu.second_derivative):
         with pytest.raises(ValueError):
             builder(2, 1.0)
 
     with pytest.raises(ValueError):
-        FD.fourth_derivative(4, 1.0)
+        fdu.fourth_derivative(4, 1.0)
 
 
 @pytest.mark.parametrize(
     "builder, rows",
     [
-        (FD.first_derivative, [0, -1]),
-        (FD.second_derivative, [0, -1]),
-        (FD.fourth_derivative, [0, 1, -2, -1]),
+        (fdu.first_derivative, [0, -1]),
+        (fdu.second_derivative, [0, -1]),
+        (fdu.fourth_derivative, [0, 1, -2, -1]),
     ],
 )
 def test_derivative_boundary_rows_are_empty(builder, rows):
@@ -178,9 +178,9 @@ def test_derivative_boundary_rows_are_empty(builder, rows):
 def test_clean_matrix(order, rows):
     """Check the expected rows are erased and the others are left untouched."""
     n = 20
-    A = FD.second_derivative(n, 0.1)
+    A = fdu.second_derivative(n, 0.1)
 
-    cleaned = FD.clean_matrix(order, A).toarray()
+    cleaned = fdu.clean_matrix(order, A).toarray()
     expected = A.toarray()
     expected[rows, :] = 0.0
 
@@ -197,7 +197,7 @@ def test_clean_matrix_identity(order, rows):
     """
     n = 20
 
-    cleaned = FD.clean_matrix(order, sp.sparse.identity(n)).toarray()
+    cleaned = fdu.clean_matrix(order, sp.sparse.identity(n)).toarray()
     expected = np.eye(n)
     expected[rows, :] = 0.0
 
@@ -208,10 +208,10 @@ def test_clean_matrix_identity(order, rows):
 def test_clean_matrix_input_format(fmt):
     """Check any sparse format is accepted and the input is left unchanged."""
     n = 20
-    A = FD.second_derivative(n, 0.1).asformat(fmt)
+    A = fdu.second_derivative(n, 0.1).asformat(fmt)
     before = A.toarray()
 
-    cleaned = FD.clean_matrix(4, A).toarray()
+    cleaned = fdu.clean_matrix(4, A).toarray()
     expected = before.copy()
     expected[[0, 1, -2, -1], :] = 0.0
 
@@ -222,7 +222,7 @@ def test_clean_matrix_input_format(fmt):
 def test_clean_matrix_bad_order():
     """Check an order other than 2 or 4 is rejected."""
     with pytest.raises(ValueError):
-        FD.clean_matrix(3, FD.second_derivative(20, 0.1))
+        fdu.clean_matrix(3, fdu.second_derivative(20, 0.1))
 
 
 @pytest.mark.parametrize("order, rows", [(2, [0, -1]), (4, [0, 1, -2, -1])])
@@ -231,7 +231,7 @@ def test_clean_rhs(order, rows):
     n = 20
     rhs = np.arange(1.0, n + 1.0)
 
-    cleaned = FD.clean_rhs(order, rhs)
+    cleaned = fdu.clean_rhs(order, rhs)
     expected = np.arange(1.0, n + 1.0)
     expected[rows] = 0.0
 
@@ -242,4 +242,4 @@ def test_clean_rhs(order, rows):
 def test_clean_rhs_bad_order():
     """Check an order other than 2 or 4 is rejected."""
     with pytest.raises(ValueError):
-        FD.clean_rhs(3, np.zeros(20))
+        fdu.clean_rhs(3, np.zeros(20))
