@@ -1,5 +1,6 @@
-"""Simulation configuration (:class:`Parameters`) and time-series results
-(:class:`Results`).
+"""Simulation configuration (:class:`Parameters`), time-series results
+(:class:`Results`) and the helpers to plot (:func:`multiplot`) and transform
+(:func:`spectrum`) them.
 
 Ported from :mod:`slenderpy.simtools` with bug fixes and modernization. The
 public API is kept compatible so existing solvers can migrate with an import
@@ -12,14 +13,21 @@ from __future__ import annotations
 import json
 import pickle as pk
 import time
+import warnings
 from collections.abc import Sequence
 
+import matplotlib.figure
+import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 
 # Coordinate names in the underlying dataset.
 _TIME = "time"
 _CURV = "curv"
+
+# Default figure font sizes.
+_TITLE_SIZE = 12
+_LABEL_SIZE = 10
 
 
 def _check_los(los):
@@ -324,3 +332,220 @@ class Results:
                 out[v] = self.data[v].values.tolist()
 
         return json.dumps(out)
+
+
+def _as_results_list(res: Results | list[Results]) -> list[Results]:
+    """Normalize the multiplot input to a list of consistent Results."""
+    if isinstance(res, Results):
+        return [res]
+    if not isinstance(res, list):
+        raise TypeError("input res must be a Results or a list of Results")
+    if len(res) < 1:
+        raise ValueError("input res must not be empty")
+    for r in res:
+        if not isinstance(r, Results):
+            raise TypeError("input res must be a list of Results")
+
+    ref = res[0]
+    for r in res[1:]:
+        if r.lov() != ref.lov():
+            raise ValueError("all Results must store the same variables (lov)")
+        if not np.array_equal(r.los(), ref.los()):
+            raise ValueError("all Results must store the same positions (los)")
+        if r.lov_dims != ref.lov_dims:
+            raise ValueError("all Results must store the same variable dimensions")
+    return res
+
+
+def multiplot(
+    res: Results | list[Results],
+    lb: list[str] | None = None,
+    Lref: float = 1.0,
+    stl: str = "-",
+    log: bool = False,
+    t0: float = 0.0,
+    tf: float = np.inf,
+    fst: int = _TITLE_SIZE,
+    fsl: int = _LABEL_SIZE,
+) -> tuple[matplotlib.figure.Figure, np.ndarray]:
+    """Plot on a single figure one or more Results instances.
+
+    The figure is a grid with one row per stored variable and one column per
+    position of interest. A scalar variable (``lov_dims == 1``) does not depend
+    on position, so it gets a single axes spanning its whole row.
+
+    Parameters
+    ----------
+    res : Results or list of Results
+        Simulation results to plot. When several are given they must store the
+        same variables, positions and dimensions.
+    lb : list of str, optional
+        One label per Results instance. Defaults to their index.
+    Lref : float, optional
+        Reference length (m) used to turn the normalized positions into a
+        physical abscissa in the column titles. The default is 1.
+    stl : str, optional
+        Line plot style. The default is '-'.
+    log : bool, optional
+        Use log-log axes and label the x axis as a frequency, ie plot the
+        output of :func:`spectrum`. The default is False.
+    t0 : float, optional
+        Lower bound of the plotted time (or frequency) window. The default is 0.
+    tf : float, optional
+        Upper bound of the plotted time (or frequency) window. The default is inf.
+    fst : int, optional
+        Title font size. The default is 12.
+    fsl : int, optional
+        Label font size. The default is 10.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        The generated figure.
+    ax : numpy.ndarray
+        Object array of Axes with shape (number of variables, number of
+        positions). Every column of a scalar variable row references the same
+        spanning axes.
+
+    Raises
+    ------
+    TypeError
+        If res is not a Results or a list of Results.
+    ValueError
+        If res is empty, holds no variable, mixes inconsistent Results, or if
+        lb does not have one label per Results.
+    """
+    res = _as_results_list(res)
+    ref = res[0]
+    lov = ref.lov()
+    los = ref.los()
+    if len(lov) < 1:
+        raise ValueError("input res must store at least one variable")
+
+    nr = len(lov)
+    nc = max(len(los), 1)  # a Results with only scalar variables has no position
+
+    if lb is None:
+        lb = [str(i) for i in range(len(res))]
+    elif len(lb) != len(res):
+        raise ValueError("input lb must hold one label per Results")
+
+    # One color per Results, sampled inside viridis to skip its extremes.
+    colors: list = ["royalblue"]
+    if len(res) > 1:
+        cmap = plt.get_cmap("viridis")
+        colors = list(cmap(np.linspace(0.0, 1.0, len(res) + 2))[1:-1])
+
+    fig = plt.figure()
+    gs = fig.add_gridspec(nrows=nr, ncols=nc)
+    ax = np.empty((nr, nc), dtype=object)
+    for i, v in enumerate(lov):
+        if ref.lov_dims[v] == 2:
+            for j in range(nc):
+                ax[i, j] = fig.add_subplot(gs[i, j])
+        else:
+            spanning = fig.add_subplot(gs[i, :])
+            for j in range(nc):
+                ax[i, j] = spanning
+
+    for k, r in enumerate(res):
+        # Select instead of Results.drop so the caller's data stays untouched.
+        dat = r.data.sel({_TIME: slice(t0, tf)})
+        for i, v in enumerate(lov):
+            if ref.lov_dims[v] == 2:
+                for j, s in enumerate(los):
+                    ax[i, j].plot(
+                        dat[_TIME], dat[v].loc[:, s], stl, c=colors[k], label=lb[k]
+                    )
+            else:
+                ax[i, 0].plot(dat[_TIME], dat[v], stl, c=colors[k], label=lb[k])
+
+    for i in range(nr):
+        ax[i, 0].set_ylabel(lov[i], fontsize=fsl)
+        for j in range(nc):
+            ax[i, j].grid(True)
+            if log:
+                ax[i, j].set_xscale("log")
+                ax[i, j].set_yscale("log")
+
+    xlabel = "Freq (Hz)" if log else "Time (s)"
+    for j in range(nc):
+        ax[-1, j].set_xlabel(xlabel, fontsize=fsl)
+
+    # Column titles belong to the topmost row that actually varies with position.
+    titled = next((i for i, v in enumerate(lov) if ref.lov_dims[v] == 2), None)
+    if titled is not None:
+        for j, s in enumerate(los):
+            ax[titled, j].set_title(
+                f"@ x={s * Lref:.1E} m ({s * 100.0:.1f} %)", fontsize=fst
+            )
+
+    ax[-1, -1].legend()
+    fig.tight_layout()
+
+    return fig, ax
+
+
+def spectrum(res: Results) -> Results:
+    """FFT modulus of every variable of a Results.
+
+    The returned Results stores frequencies (Hz) in place of times, keeping the
+    same variables, dimensions and positions. Values are the one-sided modulus
+    ``abs(fft(x) / n)`` over the first ``n // 2`` bins, the DC bin included;
+    this 1/n normalization is the same convention as :mod:`slenderpy.simtools`,
+    so a unit-amplitude sine peaks at 0.5.
+
+    Parameters
+    ----------
+    res : Results
+        Results from a simulation, expected to be sampled at a constant rate.
+
+    Returns
+    -------
+    spc : Results
+        Spectrum of each variable of the input.
+
+    Raises
+    ------
+    ValueError
+        If the input holds fewer than two time samples.
+
+    Warns
+    -----
+    UserWarning
+        If the time sampling is not uniform, or if a variable holds NaN (which
+        propagates to its whole spectrum).
+    """
+    lot = np.asarray(res.lot(), dtype=float)
+    n = len(lot)
+    if n < 2:
+        raise ValueError("input res must hold at least two time samples")
+
+    steps = np.diff(lot)
+    if not np.allclose(steps, steps[0]):
+        warnings.warn(
+            "time sampling is not uniform, using the mean time step", stacklevel=2
+        )
+    dt = float(np.nanmean(steps))
+
+    nf = n // 2
+    freq = np.fft.fftfreq(n, d=dt)[:nf]
+
+    lov = res.lov()
+    spc = Results(
+        lot=freq.tolist(),
+        lov=lov,
+        lov_dims=[res.lov_dims[v] for v in lov],
+        los=res.los(),
+    )
+    spc.start_timer()
+    for v in lov:
+        values = res.data[v].values
+        if np.isnan(values).any():
+            warnings.warn(
+                f"variable {v} holds NaN, its spectrum will be NaN", stacklevel=2
+            )
+        spc.data[v][:] = np.abs(np.fft.fft(values, axis=0) / n)[:nf]
+    spc.stop_timer()
+
+    return spc
