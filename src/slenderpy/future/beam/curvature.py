@@ -42,7 +42,10 @@ class Curvature(ABC):
     def __init__(self, n: int, ds: float) -> None:
         self.n = n
         self.ds = ds
-        self.d2 = fdu.second_derivative(n, ds)
+        d2 = fdu.second_derivative(n, ds).tolil()
+        d2[0, :4] = np.array([2.0, -5.0, 4.0, -1.0]) / ds**2
+        d2[-1, -4:] = np.array([-1.0, 4.0, -5.0, 2.0]) / ds**2
+        self.d2 = d2
 
     @abstractmethod
     def value(self, y: np.ndarray) -> np.ndarray:
@@ -105,7 +108,10 @@ class ExactCurvature(Curvature):
 
     def __init__(self, n: int, ds: float) -> None:
         super().__init__(n, ds)
-        self.d1 = fdu.first_derivative(n, ds)
+        d1 = fdu.first_derivative(n, ds).tolil()
+        d1[0, :3] = np.array([-3 / 2, 2, -1 / 2]) / ds
+        d1[-1, -3:] = np.array([1 / 2, -2, 3 / 2]) / ds
+        self.d1 = d1.tocsr()
 
     def value(self, y: np.ndarray) -> np.ndarray:
         """Curvature of the deflection field ``y``."""
