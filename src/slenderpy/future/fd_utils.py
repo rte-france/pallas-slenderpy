@@ -79,6 +79,33 @@ def first_derivative(n: int, ds: float) -> sp.sparse.dia_matrix:
     return res
 
 
+def first_derivative_with_borders(n: int, ds: float) -> sp.sparse.csr_matrix:
+    """Centered scheme, with the first and last line completed (order 2).
+
+    Parameters
+    ----------
+    n : int
+        Matrix size, at least 3.
+    ds : float
+        Space discretization step.
+
+    Returns
+    -------
+    sp.sparse.csr_matrix
+        Derivative matrix with borders.
+
+    Raises
+    ------
+    ValueError
+        If n leaves no interior node (n < 3).
+    """
+    d1 = first_derivative(n, ds).tolil()
+    d1[0, :3] = np.array([-3 / 2, 2, -1 / 2]) / ds
+    d1[-1, -3:] = np.array([1 / 2, -2, 3 / 2]) / ds
+
+    return d1.tocsr()
+
+
 def second_derivative(n: int, ds: float) -> sp.sparse.dia_matrix:
     """Centered scheme, the first and last line have to be completed with BC (order 2).
 
@@ -114,6 +141,36 @@ def second_derivative(n: int, ds: float) -> sp.sparse.dia_matrix:
     res = sp.sparse.diags([dinf, diag, dsup], [-1, 0, 1])
 
     return res
+
+
+def second_derivative_with_borders(n: int, ds: float) -> sp.sparse.csr_matrix:
+    """Centered scheme, with the first and last line completed (order 2).
+
+    Parameters
+    ----------
+    n : int
+        Matrix size, at least 4.
+    ds : float
+        Space discretization step.
+
+    Returns
+    -------
+    sp.sparse.csr_matrix
+        Derivative matrix with borders.
+
+    Raises
+    ------
+    ValueError
+        If n leaves no interior node (n < 4).
+    """
+    if n < 4:
+        raise ValueError("n must be at least 4 for an order-2 scheme with borders")
+
+    d2 = second_derivative(n, ds).tolil()
+    d2[0, :4] = np.array([2.0, -5.0, 4.0, -1.0]) / ds**2
+    d2[-1, -4:] = np.array([-1.0, 4.0, -5.0, 2.0]) / ds**2
+
+    return d2.tocsr()
 
 
 def fourth_derivative(n: int, ds: float) -> sp.sparse.dia_matrix:

@@ -34,18 +34,19 @@ class Curvature(ABC):
 
     Attributes
     ----------
-    d2 : sp.sparse.dia_matrix
+    d2_with_borders : sp.sparse.csr_matrix
+        Second-derivative matrix. Its first and last rows are completed, so the
+        curvature is computed the end nodes.
+    d2_no_borders : sp.sparse.dia_matrix
         Second-derivative matrix. Its first and last rows are empty, so the
-        curvature vanishes at the end nodes.
+        jacobian vanishes at the end nodes.
     """
 
     def __init__(self, n: int, ds: float) -> None:
         self.n = n
         self.ds = ds
-        d2 = fdu.second_derivative(n, ds).tolil()
-        d2[0, :4] = np.array([2.0, -5.0, 4.0, -1.0]) / ds**2
-        d2[-1, -4:] = np.array([-1.0, 4.0, -5.0, 2.0]) / ds**2
-        self.d2 = d2
+        self.d2_with_borders = fdu.second_derivative_with_borders(n, ds)
+        self.d2_no_borders = fdu.second_derivative(n, ds)
 
     @abstractmethod
     def value(self, y: np.ndarray) -> np.ndarray:
@@ -83,11 +84,11 @@ class ApproximateCurvature(Curvature):
 
     def value(self, y: np.ndarray) -> np.ndarray:
         """Curvature of the deflection field ``y``."""
-        return self.d2 @ y
+        return self.d2_with_borders @ y
 
     def jacobian(self, y: np.ndarray) -> sp.sparse.spmatrix:
         """Derivative of :meth:`value` with respect to ``y``, constant here."""
-        return self.d2
+        return self.d2_no_borders
 
 
 class ExactCurvature(Curvature):
@@ -102,34 +103,36 @@ class ExactCurvature(Curvature):
 
     Attributes
     ----------
-    d1 : sp.sparse.dia_matrix
-        First-derivative matrix, used for the slope.
+    d1_with_borders : sp.sparse.csr_matrix
+        First-derivative matrix, used for the slope of the curvature.
+    d1_no_borders : sp.sparse.dia_matrix
+        First-derivative matrix, used for the slope of the jacobian.
     """
 
     def __init__(self, n: int, ds: float) -> None:
         super().__init__(n, ds)
-        d1 = fdu.first_derivative(n, ds).tolil()
-        d1[0, :3] = np.array([-3 / 2, 2, -1 / 2]) / ds
-        d1[-1, -3:] = np.array([1 / 2, -2, 3 / 2]) / ds
-        self.d1 = d1.tocsr()
+        self.d1_with_borders = fdu.first_derivative_with_borders(n, ds)
+        self.d1_no_borders = fdu.first_derivative(n, ds)
 
     def value(self, y: np.ndarray) -> np.ndarray:
         """Curvature of the deflection field ``y``."""
-        metric = 1.0 + (self.d1 @ y) ** 2
+        metric = 1.0 + (self.d1_with_borders @ y) ** 2
         # metric * sqrt(metric) rather than metric**1.5: a float exponent goes
         # through pow(), several times slower than a square root
-        return self.d2 @ y / (metric * np.sqrt(metric))
+        return self.d2_with_borders @ y / (metric * np.sqrt(metric))
 
     def jacobian(self, y: np.ndarray) -> sp.sparse.spmatrix:
         """Derivative of :meth:`value` with respect to ``y``."""
-        slope = self.d1 @ y
+        slope = self.d1_no_borders @ y
         metric = 1.0 + slope**2
         # see value() on the square root; the second factor reuses the first
         inv_metric_15 = 1.0 / (metric * np.sqrt(metric))
         inv_metric_25 = inv_metric_15 / metric
         return (
-            sp.sparse.diags(inv_metric_15) @ self.d2
-            - 3.0 * sp.sparse.diags(slope * (self.d2 @ y) * inv_metric_25) @ self.d1
+            sp.sparse.diags(inv_metric_15) @ self.d2_no_borders
+            - 3.0
+            * sp.sparse.diags(slope * (self.d2_no_borders @ y) * inv_metric_25)
+            @ self.d1_no_borders
         )
 
 
