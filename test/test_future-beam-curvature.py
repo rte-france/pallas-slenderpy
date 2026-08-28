@@ -18,7 +18,7 @@ def _finite_difference_jacobian(operator, y, h):
         step[k] = h
         jac[:, k] = (operator.value(y + step) - operator.value(y - step)) / (2.0 * h)
 
-    return jac
+    return fdu.clean_rhs(2, jac)
 
 
 @pytest.mark.parametrize(
@@ -53,7 +53,9 @@ def test_approximate_value_is_the_second_derivative():
     y = np.sin(_X)
     operator = CV.ApproximateCurvature(_N, _DS)
 
-    assert np.array_equal(operator.value(y), fdu.second_derivative(_N, _DS) @ y)
+    assert np.array_equal(
+        operator.value(y), fdu.second_derivative_with_borders(_N, _DS) @ y
+    )
 
 
 def test_approximate_jacobian_does_not_depend_on_y():
@@ -80,7 +82,7 @@ def test_exact_value_on_a_parabola():
     numerical = CV.ExactCurvature(_N, _DS).value(y)
     analytical = 2.0 * a / (1.0 + (2.0 * a * _X) ** 2) ** 1.5
 
-    assert np.allclose(numerical[1:-1], analytical[1:-1], rtol=1.0e-09, atol=0.0)
+    assert np.allclose(numerical, analytical, rtol=1.0e-09, atol=0.0)
 
 
 def test_exact_value_matches_the_float_power_form():
@@ -90,8 +92,8 @@ def test_exact_value_matches_the_float_power_form():
     faster form to a few epsilon.
     """
     y = 3.0 * np.sin(_X)
-    d1 = fdu.first_derivative(_N, _DS)
-    d2 = fdu.second_derivative(_N, _DS)
+    d1 = fdu.first_derivative_with_borders(_N, _DS)
+    d2 = fdu.second_derivative_with_borders(_N, _DS)
 
     value = CV.ExactCurvature(_N, _DS).value(y)
     reference = d2 @ y * (1.0 + (d1 @ y) ** 2) ** -1.5
@@ -108,16 +110,6 @@ def test_exact_value_tends_to_the_approximate_one_for_small_slopes():
 
     assert np.allclose(exact, approximate, rtol=1.0e-10, atol=0.0)
     assert not np.array_equal(exact, approximate)
-
-
-@pytest.mark.parametrize("approx_curvature", [True, False])
-def test_boundary_nodes_are_empty(approx_curvature):
-    """Check the curvature vanishes at the end nodes, as ``D2`` does there."""
-    operator = CV.create(_N, _DS, approx_curvature)
-    value = operator.value(np.sin(_X))
-
-    assert value[0] == 0.0
-    assert value[-1] == 0.0
 
 
 @pytest.mark.parametrize("approx_curvature", [True, False])

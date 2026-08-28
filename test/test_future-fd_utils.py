@@ -15,6 +15,32 @@ def _plot(x, exact, sol):
     plt.show()
 
 
+def test_first_derivative_with_borders():
+    """Check the first derivative operator with borders"""
+    n = 150
+    ds = 0.01
+    x = np.arange(n) * ds
+    y = np.cos(x)
+
+    numerical = fdu.first_derivative_with_borders(n, ds) @ y
+    analytical = -np.sin(x)
+
+    assert np.allclose(numerical, analytical, rtol=1.0e-04, atol=1.0e-06)
+
+
+def test_seconde_derivative_with_borders():
+    """Check the first derivative operator with borders"""
+    n = 150
+    ds = 0.01
+    x = np.arange(n) * ds
+    y = np.cos(x)
+
+    numerical = fdu.second_derivative_with_borders(n, ds) @ y
+    analytical = -np.cos(x)
+
+    assert np.allclose(numerical, analytical, rtol=1.0e-04, atol=1.0e-06)
+
+
 def test_first_derivative(plot=False):
     """Check the error between the analytic and numerical solution of:
     y'(x) = sin(x) on [-1,2]
