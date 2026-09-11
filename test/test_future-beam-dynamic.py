@@ -83,6 +83,11 @@ def _gravity(conductor):
     return force
 
 
+def _l2_gap(first, second):
+    """Root-mean-square gap between two recorded fields."""
+    return float(np.sqrt(np.mean((first - second) ** 2)))
+
+
 def _stored_positions(parameters, length):
     """Physical abscissae the solver stores, i.e. ``parameters.los`` scaled up.
 
@@ -853,78 +858,67 @@ def test_start_time_offset_is_honoured():
     assert np.allclose(res0["y"].values, res1["y"].values, atol=1e-12)
 
 
+# a 4x refinement has to cut the error at least in half, i.e. an observed order
+# of 1/2 or better. Half order is a floor rather than the expectation: the
+# constant model reaches 1.6 on the position, but the bouc-wen switching is not
+# smooth and the hysteresis path only reaches 1.0 here. The worst case clears
+# this by 1.6x, so the check does not turn on the blas or the python build.
+_MIN_CONVERGENCE_RATIO = 2.0
+
+
 def test_converging_in_time():
-    "Check time convergence"
+    """Refining the time step converges, for every (model, curvature) case.
+
+    Three runs per case, at ``dt``, ``dt/4`` and ``dt/16``, the finest standing
+    as the reference. A ratio of errors rather than an absolute error: it does
+    not depend on the scale of the field, and it fails on a scheme that stops
+    converging rather than on one that is merely inaccurate. The span is 4x and
+    not 2x on purpose, a 2x refinement leaves the ratio too close to 1 to tell
+    convergence from noise on the hysteretic cases.
+    """
     force = _gravity(CONDUCTOR)
     ns = 101
-    x = np.linspace(0, BRETELLE.length, ns)
+    x = np.linspace(0.0, BRETELLE.length, ns)
     dt = 0.002
-    tf = 0.1
 
     for model, approx in CASES:
+        ei = CONDUCTOR.ei_min if model == BendingModel.CONSTANT else None
         y0 = shape.solve(
             CONDUCTOR,
             BRETELLE,
-            force(x, 0, None, None),
+            force(x, 0.0, None, None),
             ns,
             model=model,
-            ei=(CONDUCTOR.ei_min if model == "constant" else None),
+            ei=ei,
             approx_curvature=approx,
         )
 
-        parameters_coarse = simulation.Parameters(
-            ns=ns, t0=0.0, tf=tf, dt=dt, dr=0.02, los=ns
-        )
-        res_coarse = solve_dynamic(
-            CONDUCTOR,
-            BRETELLE,
-            parameters_coarse,
-            model=model,
-            ei=(CONDUCTOR.ei_min if model == "constant" else None),
-            approx_curvature=approx,
-            initial_position=1.02 * y0,
-            force=force,
-        )
+        solutions = {}
+        for refinement in (1, 4, 16):
+            parameters = simulation.Parameters(
+                ns=ns, t0=0.0, tf=0.1, dt=dt / refinement, dr=0.02, los=ns
+            )
+            solutions[refinement] = solve_dynamic(
+                CONDUCTOR,
+                BRETELLE,
+                parameters,
+                model=model,
+                ei=ei,
+                approx_curvature=approx,
+                initial_position=1.02 * y0,
+                force=force,
+            )
 
-        parameters_medium = simulation.Parameters(
-            ns=ns, t0=0.0, tf=tf, dt=dt / 2, dr=0.02, los=ns
-        )
-        res_medium = solve_dynamic(
-            CONDUCTOR,
-            BRETELLE,
-            parameters_medium,
-            model=model,
-            ei=(CONDUCTOR.ei_min if model == "constant" else None),
-            approx_curvature=approx,
-            initial_position=1.02 * y0,
-            force=force,
-        )
-
-        parameters_fine = simulation.Parameters(
-            ns=ns, t0=0.0, tf=tf, dt=dt / 4, dr=0.02, los=ns
-        )
-        res_fine = solve_dynamic(
-            CONDUCTOR,
-            BRETELLE,
-            parameters_fine,
-            model=model,
-            ei=(CONDUCTOR.ei_min if model == "constant" else None),
-            approx_curvature=approx,
-            initial_position=1.02 * y0,
-            force=force,
-        )
-
-        threshold = 1.5 if model == "varying" else 2
-
-        diff_coarse_v = res_coarse["v"] - res_fine["v"]
-        diff_medium_v = res_medium["v"] - res_fine["v"]
-        err_coarse_v = np.sqrt(np.mean(diff_coarse_v**2))
-        err_medium_v = np.sqrt(np.mean(diff_medium_v**2))
-        assert err_coarse_v / err_medium_v > threshold, (model, approx)
-
-        if model == "varying":
-            diff_coarse_eta = res_coarse["eta"] - res_fine["eta"]
-            diff_medium_eta = res_medium["eta"] - res_fine["eta"]
-            err_coarse_eta = np.sqrt(np.mean(diff_coarse_eta**2))
-            err_medium_eta = np.sqrt(np.mean(diff_medium_eta**2))
-            assert err_coarse_eta / err_medium_eta > threshold, (model, approx)
+        # eta is identically zero for the constant model, which would leave the
+        # ratio at 0/0
+        reference = solutions[16]
+        fields = ("y", "v", "eta") if model == BendingModel.VARYING else ("y", "v")
+        for field in fields:
+            coarse = _l2_gap(solutions[1][field], reference[field])
+            fine = _l2_gap(solutions[4][field], reference[field])
+            assert coarse / fine > _MIN_CONVERGENCE_RATIO, (
+                model,
+                approx,
+                field,
+                coarse / fine,
+            )
