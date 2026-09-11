@@ -8,6 +8,7 @@ conservation, hysteresis bounds, output layout).
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
+import pytest
 
 from slenderpy.future import simulation
 from slenderpy.future._constant import _GRAVITY
@@ -15,6 +16,7 @@ from slenderpy.future.beam import bending
 from slenderpy.future.beam.beam import BeamConst
 from slenderpy.future.beam.bending import BendingModel
 from slenderpy.future.beam.dynamic import solve_dynamic
+from slenderpy.future.beam.static import shape
 from slenderpy.future.boundary_condition import BoundaryCondition, clamped, hinged
 from slenderpy.future.components import Conductor, Span
 
@@ -753,6 +755,46 @@ def test_hysteresis_loop_stays_within_the_static_envelope():
     assert np.all(np.abs(mom) <= np.abs(law.moment(curv)) + law.plateau)
 
 
+@pytest.mark.parametrize("approx_curvature", [True, False])
+def test_hysteresis_lives_at_the_clamped_ends(approx_curvature):
+    """Cyclic loading of the varying model: eta moves at the end nodes too.
+
+    The end nodes are where the bending moment of a clamped span matters most,
+    and the curvature increment feeding eta has to reach them. Starting from
+    rest, eta is exactly zero everywhere, so a non-zero eta at the first and
+    last node is proof the hysteresis was integrated there as well.
+    """
+    ns = 101
+    f0 = 0.5 / BRETELLE.length * np.sqrt(BRETELLE.tension / CONDUCTOR.mass)
+    amplitude = 4.0 * _GRAVITY * CONDUCTOR.mass
+
+    def force(x, t, y, v):
+        return amplitude * np.sin(2.0 * np.pi * f0 * t) * np.ones_like(x)
+
+    parameters = simulation.Parameters(
+        ns=ns,
+        t0=0.0,
+        tf=1.0 / f0,
+        dt=1.0 / (f0 * 500),
+        dr=1.0 / (f0 * 50),
+        los=[0.25, 0.5, 0.75],
+    )
+    res = solve_dynamic(
+        CONDUCTOR,
+        BRETELLE,
+        parameters,
+        model=BendingModel.VARYING,
+        force=force,
+        approx_curvature=approx_curvature,
+        initial_position=np.zeros(ns),
+        initial_velocity=np.zeros(ns),
+    )
+
+    eta = res.state["eta"]
+    assert np.all(eta[[0, -1]] != 0.0), eta[[0, -1]]
+    assert np.abs(eta).max() <= 1.0 + 1e-09
+
+
 def test_non_convergence_returns_nan_and_no_state():
     """A step that cannot converge stops the run and leaves nan behind."""
     parameters = simulation.Parameters(ns=101, t0=0.0, tf=0.5, dt=0.005, dr=0.05)
@@ -809,3 +851,80 @@ def test_start_time_offset_is_honoured():
         force=force,
     )
     assert np.allclose(res0["y"].values, res1["y"].values, atol=1e-12)
+
+
+def test_converging_in_time():
+    "Check time convergence"
+    force = _gravity(CONDUCTOR)
+    ns = 101
+    x = np.linspace(0, BRETELLE.length, ns)
+    dt = 0.002
+    tf = 0.1
+
+    for model, approx in CASES:
+        y0 = shape.solve(
+            CONDUCTOR,
+            BRETELLE,
+            force(x, 0, None, None),
+            ns,
+            model=model,
+            ei=(CONDUCTOR.ei_min if model == "constant" else None),
+            approx_curvature=approx,
+        )
+
+        parameters_coarse = simulation.Parameters(
+            ns=ns, t0=0.0, tf=tf, dt=dt, dr=0.02, los=ns
+        )
+        res_coarse = solve_dynamic(
+            CONDUCTOR,
+            BRETELLE,
+            parameters_coarse,
+            model=model,
+            ei=(CONDUCTOR.ei_min if model == "constant" else None),
+            approx_curvature=approx,
+            initial_position=1.02 * y0,
+            force=force,
+        )
+
+        parameters_medium = simulation.Parameters(
+            ns=ns, t0=0.0, tf=tf, dt=dt / 2, dr=0.02, los=ns
+        )
+        res_medium = solve_dynamic(
+            CONDUCTOR,
+            BRETELLE,
+            parameters_medium,
+            model=model,
+            ei=(CONDUCTOR.ei_min if model == "constant" else None),
+            approx_curvature=approx,
+            initial_position=1.02 * y0,
+            force=force,
+        )
+
+        parameters_fine = simulation.Parameters(
+            ns=ns, t0=0.0, tf=tf, dt=dt / 4, dr=0.02, los=ns
+        )
+        res_fine = solve_dynamic(
+            CONDUCTOR,
+            BRETELLE,
+            parameters_fine,
+            model=model,
+            ei=(CONDUCTOR.ei_min if model == "constant" else None),
+            approx_curvature=approx,
+            initial_position=1.02 * y0,
+            force=force,
+        )
+
+        threshold = 1.5 if model == "varying" else 2
+
+        diff_coarse_v = res_coarse["v"] - res_fine["v"]
+        diff_medium_v = res_medium["v"] - res_fine["v"]
+        err_coarse_v = np.sqrt(np.mean(diff_coarse_v**2))
+        err_medium_v = np.sqrt(np.mean(diff_medium_v**2))
+        assert err_coarse_v / err_medium_v > threshold, (model, approx)
+
+        if model == "varying":
+            diff_coarse_eta = res_coarse["eta"] - res_fine["eta"]
+            diff_medium_eta = res_medium["eta"] - res_fine["eta"]
+            err_coarse_eta = np.sqrt(np.mean(diff_coarse_eta**2))
+            err_medium_eta = np.sqrt(np.mean(diff_medium_eta**2))
+            assert err_coarse_eta / err_medium_eta > threshold, (model, approx)

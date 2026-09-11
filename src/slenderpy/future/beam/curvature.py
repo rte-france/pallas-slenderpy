@@ -2,11 +2,12 @@
 
 Two models share the same interface: the approximate (small-slope) curvature
 ``D2 @ y``, and the exact geometric curvature
-``(D2 @ y) / (1 + (D1 @ y)**2)**(3/2)``. Both expose :meth:`Curvature.value`
-and :meth:`Curvature.jacobian`, the latter being the sparse
-``d(curvature)/dy`` used by the Newton iterations of the static and dynamic
-solvers. Use :func:`create` to pick one from the ``approx_curvature`` flag the
-solvers carry.
+``(D2 @ y) / (1 + (D1 @ y)**2)**(3/2)``. Both expose :meth:`Curvature.value`,
+:meth:`Curvature.jacobian` -- the sparse ``d(curvature)/dy`` used by the Newton
+iterations of the static and dynamic solvers -- and :meth:`Curvature.rate`, the
+same derivative applied to a deflection rate but kept valid at the end nodes.
+Use :func:`create` to pick one from the ``approx_curvature`` flag the solvers
+carry.
 """
 
 from __future__ import annotations
@@ -78,6 +79,28 @@ class Curvature(ABC):
             The ``n`` by ``n`` matrix ``d(curvature)/dy`` at ``y``.
         """
 
+    @abstractmethod
+    def rate(self, y: np.ndarray, v: np.ndarray) -> np.ndarray:
+        """Time derivative of :meth:`value` for a deflection rate ``v``.
+
+        This is ``d(curvature)/dy @ v`` built on the derivative matrices with
+        their border rows, so it holds at every node, the two ends included.
+        :meth:`jacobian` cannot be used for that: its border rows are empty, so
+        it would report a zero curvature rate at the end nodes.
+
+        Parameters
+        ----------
+        y : np.ndarray
+            Deflection at the ``n`` nodes.
+        v : np.ndarray
+            Deflection rate at the ``n`` nodes.
+
+        Returns
+        -------
+        np.ndarray
+            Curvature rate at the ``n`` nodes.
+        """
+
 
 class ApproximateCurvature(Curvature):
     """Small-slope curvature ``D2 @ y``, linear in ``y``."""
@@ -89,6 +112,10 @@ class ApproximateCurvature(Curvature):
     def jacobian(self, y: np.ndarray) -> sp.sparse.spmatrix:
         """Derivative of :meth:`value` with respect to ``y``, constant here."""
         return self.d2_no_borders
+
+    def rate(self, y: np.ndarray, v: np.ndarray) -> np.ndarray:
+        """Curvature rate, independent of ``y`` for this linear model."""
+        return self.d2_with_borders @ v
 
 
 class ExactCurvature(Curvature):
@@ -134,6 +161,21 @@ class ExactCurvature(Curvature):
             * sp.sparse.diags(slope * (self.d2_no_borders @ y) * inv_metric_25)
             @ self.d1_no_borders
         )
+
+    def rate(self, y: np.ndarray, v: np.ndarray) -> np.ndarray:
+        """Curvature rate at the deflection ``y``."""
+        slope = self.d1_with_borders @ y
+        metric = 1.0 + slope**2
+        # the derivative of jacobian(), with borders and applied to v: staying
+        # in vector form spares the assembly of a sparse product
+        return (
+            self.d2_with_borders @ v
+            - 3.0
+            * slope
+            * (self.d2_with_borders @ y)
+            * (self.d1_with_borders @ v)
+            / metric
+        ) / (metric * np.sqrt(metric))
 
 
 def create(n: int, ds: float, approx_curvature: bool) -> Curvature:

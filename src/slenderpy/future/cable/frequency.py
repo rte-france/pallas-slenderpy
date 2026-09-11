@@ -11,7 +11,7 @@ from slenderpy.future.cable.static.catenary import length as c_length
 from slenderpy.future.cable.static.nleq import _MAXITER, _RTOL
 from slenderpy.future.cable.static.nleq import length as n_length
 from slenderpy.future.cable.static.parabolic import length as p_length
-from slenderpy.future.cable.static.parabolic import sag
+from slenderpy.future.cable.static.parabolic import max_chord
 
 
 class FrequencyMethod(str, Enum):
@@ -116,9 +116,26 @@ def irvine_number(
     axs,
     g=_GRAVITY,
 ):
-    """Compute Irvine number."""
-    r = sag(lspan, tension, sld, linm, g=g) / lspan
-    return np.sqrt(64 * r**2 * lspan / (1 + 8 * r**2) * axs / tension)
+    """Compute the Irvine number of a span.
+
+    The Irvine number lambda is the dimensionless elasticity-to-sag ratio of
+    the linear theory of a suspended cable, lambda^2 = 64 r^2/(1 + 8 r^2) *
+    axs/tension with r the sag-to-span ratio. It governs the in-plane
+    frequencies through :func:`_irvine_frequencies`.
+
+    The sag ratio comes from the parabolic model, whose sag is
+    linm*g*lspan^2/(8*tension), so that 8*r is exactly lspan/a with a the
+    catenary parameter and the leading factor 64*r^2 is exact. A catenary sag
+    would not satisfy that identity and would perturb the leading term rather
+    than refine it, since in the derivation the sag only stands in for
+    linm*g*lspan/tension.
+
+    Like the theory it belongs to, the formula assumes a shallow, near-level
+    span. It is within 1% of the exact virtual-length definition for
+    abs(sld)/lspan below about 0.05, and degrades beyond that.
+    """
+    r = max_chord(lspan, tension, sld, linm, g=g) / lspan
+    return np.sqrt(64 * r**2 / (1 + 8 * r**2) * axs / tension)
 
 
 def _irvine_frequencies(
