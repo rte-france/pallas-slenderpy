@@ -21,6 +21,11 @@ def _finite_difference_jacobian(operator, y, h):
     return fdu.clean_rhs(2, jac)
 
 
+def _finite_difference_rate(operator, y, v, h):
+    """Central-difference derivative of ``operator.value`` along ``v``, at ``y``."""
+    return (operator.value(y + h * v) - operator.value(y - h * v)) / (2.0 * h)
+
+
 @pytest.mark.parametrize(
     "approx_curvature, expected",
     [(True, CV.ApproximateCurvature), (False, CV.ExactCurvature)],
@@ -123,6 +128,47 @@ def test_jacobian_against_finite_differences(approx_curvature):
 
     assert np.allclose(
         numerical, analytic, rtol=0.0, atol=1.0e-06 * np.abs(analytic).max()
+    )
+
+
+@pytest.mark.parametrize("approx_curvature", [True, False])
+def test_rate_against_finite_differences(approx_curvature):
+    """Check the curvature rate against a directional difference of the value."""
+    y = 0.5 * np.sin(_X)
+    v = np.cos(0.7 * _X)
+    operator = CV.create(_N, _DS, approx_curvature)
+
+    analytic = operator.rate(y, v)
+    # a larger step than in the jacobian test: the difference of the value is
+    # divided by the step, so the rounding of a second difference of the order
+    # of eps * max|y| / ds**2 has to stay small next to a rate of order one
+    numerical = _finite_difference_rate(operator, y, v, 1.0e-05)
+
+    assert np.allclose(
+        numerical, analytic, rtol=0.0, atol=1.0e-06 * np.abs(analytic).max()
+    )
+
+
+@pytest.mark.parametrize("approx_curvature", [True, False])
+def test_rate_does_not_vanish_at_the_end_nodes(approx_curvature):
+    """Check the rate keeps the border terms the jacobian drops.
+
+    The jacobian leaves its first and last rows empty, for the boundary
+    conditions of the solvers to fill. Taking it for the curvature rate would
+    freeze whatever a solver integrates from that rate at the two end nodes, so
+    the rate has to carry the border terms of :meth:`value` instead.
+    """
+    y = 0.5 * np.sin(_X)
+    v = np.cos(0.7 * _X)
+    operator = CV.create(_N, _DS, approx_curvature)
+
+    rate = operator.rate(y, v)
+    from_jacobian = operator.jacobian(y) @ v
+
+    assert np.all(rate[[0, -1]] != 0.0)
+    assert np.array_equal(from_jacobian[[0, -1]], np.zeros(2))
+    assert np.allclose(
+        rate[1:-1], from_jacobian[1:-1], rtol=0.0, atol=1.0e-12 * np.abs(rate).max()
     )
 
 

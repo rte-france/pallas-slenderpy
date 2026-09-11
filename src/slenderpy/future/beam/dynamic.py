@@ -77,7 +77,9 @@ def solve_dynamic(
 
     where ``dM/dchi`` is ``ei`` for the constant model and, for the varying one,
     the tangent of (3bis)-(4) over the step -- ``ei_max`` on the stiff branch,
-    down to ``ei_min`` once the hysteresis saturates. Iterating instead on a
+    down to ``ei_min`` once the hysteresis saturates -- with its hysteretic part
+    counted twice, since the ``eta`` path reaches ``v`` through ``dt`` where the
+    curvature path reaches it through ``dt/2``. Iterating instead on a
     fixed ``A`` (Picard, as slenderpy does) does not converge here: with
     ``ei_linear = ei_min`` in ``A`` and a true tangent of ``ei_max``, the fixed
     point has a gain of ``ei_max/ei_min``, about 76 for an ASTER 570.
@@ -86,9 +88,8 @@ def solve_dynamic(
 
     - the iteration is Newton on the exact tangent rather than a fixed-point
       iteration, for the reason above;
-    - ``d(chi)/dt`` in (4) is evaluated as ``(chi(n+1) - chi(n))/dt`` in both
-      curvature options, which is consistent with the trapezoidal update of
-      ``y``;
+    - ``d(chi)/dt`` in (4) is evaluated as ``d(chi)/dy @ v(n+1)`` in both
+      curvature options, i.e. fully implicit like the ``eta`` update it feeds.
     - a step that does not converge within ``max_iter`` stops the run: the
       snapshots already computed are kept, the remaining ones are left at nan and
       no final state is recorded. A non-finite state counts as a failure, so nan
@@ -289,18 +290,28 @@ def solve_dynamic(
                 """State and step residual reached by a candidate velocity."""
                 y = y_old + dt2 * (v_old + v)
                 chi = chi_operator.value(y)
-                eta = law.update_eta(eta_old, chi - chi_old)
+                # curvature increment driving the hysteresis, as the curvature
+                # rate at the end of the step times the step: the same fully
+                # implicit discretisation the eta update of the law is built on
+                dchi = dt * chi_operator.rate(y, v)
+                eta = law.update_eta(eta_old, dchi)
                 remainder = D2 @ law.dynamic_moment(chi, eta) - ei_D4 @ y
-                return y, chi, eta, A @ v - rhs + dt2 * (remainder_old + remainder)
+                residual = A @ v - rhs + dt2 * (remainder_old + remainder)
+                return y, chi, dchi, eta, residual
 
             v_new = v_old
-            y_new, chi_new, eta_new, step_residual = step_state(v_new)
+            y_new, chi_new, dchi_new, eta_new, step_residual = step_state(v_new)
             error = np.abs(step_residual).max()
             n_iter = 0
 
             while n_iter < max_iter and error > threshold:
-                # tangent bending stiffness of the law over the step
-                tangent = law.dynamic_tangent(eta_new, chi_new - chi_old)
+                # tangent bending stiffness of the law over the step. The
+                # moment reaches the velocity twice: once through the curvature,
+                # whose derivative carries dt2, and once through eta, whose
+                # increment carries dt, i.e. twice as much. Only the hysteretic
+                # part of dynamic_tangent takes the second path, so it is the
+                # only one weighted twice
+                tangent = 2.0 * law.dynamic_tangent(eta_new, dchi_new) - law.ei_linear
 
                 jacobian = jacobian_base + dt2**2 * fdu.product_band(
                     left_rows, right_rows(y_new), tangent
@@ -320,16 +331,16 @@ def solve_dynamic(
                 # giving up: only max_iter ends the iteration.
                 relaxation = 1.0
                 trial = step_state(v_new + increment)
-                while np.abs(trial[3]).max() >= error and relaxation > _MIN_RELAXATION:
+                while np.abs(trial[-1]).max() >= error and relaxation > _MIN_RELAXATION:
                     relaxation *= 0.5
                     trial = step_state(v_new + relaxation * increment)
 
-                if np.abs(trial[3]).max() >= error:
+                if np.abs(trial[-1]).max() >= error:
                     relaxation = 1.0
                     trial = step_state(v_new + increment)
 
                 v_new = v_new + relaxation * increment
-                y_new, chi_new, eta_new, step_residual = trial
+                y_new, chi_new, dchi_new, eta_new, step_residual = trial
                 error = np.abs(step_residual).max()
                 n_iter += 1
 
