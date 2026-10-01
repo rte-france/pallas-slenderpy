@@ -8,10 +8,9 @@ from slenderpy.future._constant import _GRAVITY
 from slenderpy.future.boundary_condition import hinged
 from slenderpy.future.components import Conductor, Span
 from slenderpy.future.beam.static.shape import solve
-from slenderpy.future.beam.dynamic import solve_dynamic 
+from slenderpy.future.beam.dynamic import solve_dynamic
 import slenderpy.future.beam.bending as BD
 import slenderpy.future.beam.curvature as CV
-
 
 
 def _plot_animation(x, sol_static, sol_dynamic, ymin, ymax, nb_time, dt):
@@ -43,13 +42,15 @@ def _plot_animation(x, sol_static, sol_dynamic, ymin, ymax, nb_time, dt):
     # _ani.save('test_case__bretelle.mp4', writer='ffmpeg', fps=50)
     plt.show()
 
+
 conductor = Conductor(
-        mass=1.57,
-        ei_min=28.28,
-        ei_max=2155.07,
-        beta_flexion=6.438e-07,
-    )
+    mass=1.57,
+    ei_min=28.28,
+    ei_max=2155.07,
+    beta_flexion=6.438e-07,
+)
 span = Span(length=440.0, tension=39e3, boundary_conditions=hinged())
+
 
 def static_gravity():
     nb_space = 400
@@ -132,7 +133,6 @@ def hyteresis():
         force=force,
         approx_curvature=False,
     )
-    
 
     y = res["y"]
     c = res["c"]
@@ -150,7 +150,7 @@ def hyteresis():
     _plot_animation(x, y_initial, y, -5, 5, parameters.nr, dr)
 
 
-# Add energies in new beam module 
+# Add energies in new beam module
 # def energy():
 #     lspan = 440
 #     nb_space = 440
@@ -240,10 +240,7 @@ def hyteresis():
 def bretelle():
     span = Span(length=1.53, tension=20.0, boundary_conditions=hinged())
     conductor = Conductor(
-        mass=2.879,
-        ei_min=67.7,
-        ei_max=5089.0,
-        beta_flexion=2.0e-5/20.
+        mass=2.879, ei_min=67.7, ei_max=5089.0, beta_flexion=2.0e-5 / 20.0
     )
     nb_space = 100
     x = np.linspace(0, span.length, nb_space)
@@ -279,7 +276,6 @@ def bretelle():
         force=force,
         approx_curvature=False,
     )
-
 
     y = res["y"]
     c = res["c"]
@@ -358,7 +354,7 @@ def damping():
         model="constant",
         approx_curvature=False,
     )
-    
+
     sol_static_proper_gravity = solve(
         conductor,
         span,
@@ -382,7 +378,7 @@ def damping():
 
     for zeta in [0.3, 0.5, 1.0, 2.0]:
         sol_dynamic = solve_dynamic(
-            conductor, 
+            conductor,
             span,
             model="constant",
             parameters=parameters,

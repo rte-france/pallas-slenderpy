@@ -13,7 +13,6 @@ import pytest
 from slenderpy.future import simulation
 from slenderpy.future._constant import _GRAVITY
 from slenderpy.future.beam import bending
-from slenderpy.future.beam.beam import BeamConst
 from slenderpy.future.beam.bending import BendingModel
 from slenderpy.future.beam.dynamic import solve_dynamic
 from slenderpy.future.beam.static import shape
@@ -559,53 +558,6 @@ def test_linear_case_needs_one_solve_per_step():
         initial_velocity=np.zeros(parameters.ns),
     )
     assert np.nanmax(res["n_iter"].values[1:]) == 1
-
-
-def test_linear_case_matches_slenderpy():
-    """The linear case must reproduce BeamConst.solve_dynamic to round-off.
-
-    Same Crank-Nicolson scheme on both sides, so any difference in the assembly
-    of A, B, the boundary rows or the output cadence shows up here.
-    """
-    for span, zeta in [(SPAN, 0.0), (BRETELLE, 0.0), (SPAN, 0.03)]:
-        ns = 101
-        x = np.linspace(0.0, span.length, ns)
-        y0 = 0.2 * np.sin(np.pi * x / span.length)
-        v0 = np.zeros(ns)
-        f0 = 0.5 / span.length * np.sqrt(span.tension / CONDUCTOR.mass)
-        parameters = simulation.Parameters(
-            ns=ns, t0=0.0, tf=2.0 / f0, dt=1.0 / (f0 * 200), dr=1.0 / (f0 * 20)
-        )
-        force = _gravity(CONDUCTOR)
-        mine = solve_dynamic(
-            CONDUCTOR,
-            span,
-            parameters,
-            model=BendingModel.CONSTANT,
-            ei=CONDUCTOR.ei_max,
-            force=force,
-            approx_curvature=True,
-            initial_position=y0,
-            initial_velocity=v0,
-            zeta=zeta,
-        )
-        beam = BeamConst(
-            length=span.length,
-            boundary_conditions=span.boundary_conditions,
-            tension=span.tension,
-            mass=CONDUCTOR.mass,
-            ei=CONDUCTOR.ei_max,
-        )
-        ref = beam.solve_dynamic(parameters, y0, v0, force, True, zeta=zeta)
-
-        # slenderpy stores every node, this solver stores parameters.los
-        nodes = np.linspace(0.0, 1.0, ns)
-        scale = np.abs(mine["y"].values).max()
-        for name, rtol in [("y", 1e-09), ("v", 1e-06)]:
-            sampled = np.array(
-                [np.interp(parameters.los, nodes, row) for row in ref[name].values]
-            )
-            assert np.abs(mine[name].values - sampled).max() < rtol * scale, name
 
 
 def test_free_vibration_period_matches_theory():

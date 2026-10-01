@@ -5,11 +5,14 @@ import pytest
 import scipy as sp
 
 from slenderpy.future.boundary_condition import hinged
-from slenderpy.future.beam.static.frequency import natural_frequencies_hinged, natural_frequency
+from slenderpy.future.beam.static.frequency import (
+    natural_frequencies_hinged,
+    natural_frequency,
+)
 from slenderpy.wind import air_volumic_mass
 from slenderpy.force import Excitation
 from slenderpy.future.components import Conductor, Span
-from slenderpy.future.beam.dynamic import solve_dynamic 
+from slenderpy.future.beam.dynamic import solve_dynamic
 from slenderpy.future.beam.static import shape
 from slenderpy.future.beam.bending import BendingModel
 from slenderpy.future import simulation
@@ -24,7 +27,7 @@ from slenderpy.future.stockbridge import (
     solve_imposed_acceleration,
     solve_imposed_force,
     solve_linearized_imposed_force,
-    solve_dynamic_with_sb
+    solve_dynamic_with_sb,
 )
 
 # Cable used by the manufactured-solution suite (kept at the original size
@@ -63,6 +66,7 @@ def _build_sb(mass_params, K, C):
         _CLAMP_DEFAULT, mass_params, _CABLE_FOTI, mass_params, _CABLE_FOTI, K, C
     )
     return sb, mass_right, mass_left, clamp
+
 
 CONDUCTOR = Conductor(
     mass=1.57,
@@ -352,7 +356,9 @@ def test_same_force_symmetry(clamp_params, cable_params):
         moment_of_inertia=0.001541,
     )
     sb = Stockbridge(clamp_params, mass_right, cable_params, mass_left, cable_params)
-    sb_miror = Stockbridge(clamp_params, mass_left, cable_params, mass_right, cable_params)
+    sb_miror = Stockbridge(
+        clamp_params, mass_left, cable_params, mass_right, cable_params
+    )
 
     nb = 50
     tf = 0.5
@@ -476,30 +482,43 @@ def test_linearized_energy_balance():
     # Energy balance bounded — relax the tolerance because Crank-Nicolson + the
     # cumulative integrator drift slightly during the transient.
     assert np.max(np.abs(residual)) < 0.5 * np.max(np.abs(E_kin + E_pot))
-    
+
 
 def test_reduced_amplitude_stokcbridge(sb):
     mode = 25
     strouhal = 0.2
     cl0 = 0.6
-    
-    freq = natural_frequencies_hinged(SPAN.length, SPAN.tension, CONDUCTOR.mass, CONDUCTOR.ei_max, mode)[-1]
+
+    freq = natural_frequencies_hinged(
+        SPAN.length, SPAN.tension, CONDUCTOR.mass, CONDUCTOR.ei_max, mode
+    )[-1]
     nb_space = 20 * mode
     dt = min(0.01 / freq, 1e-3)
     dr = 5 * dt
-    tf = 3.
+    tf = 3.0
     parameters = simulation.Parameters(
         ns=nb_space, tf=tf, dt=dt, dr=dr, los=nb_space, pp=True
     )
     x = np.linspace(0, SPAN.length, nb_space)
-    wind_speed = CONDUCTOR.diameter * mode * natural_frequency(SPAN.length, SPAN.tension, CONDUCTOR.mass) / strouhal
-    estimated_amplitude = (
-        SPAN.length * 0.5 * air_volumic_mass() * CONDUCTOR.diameter * cl0 * wind_speed**2
+    wind_speed = (
+        CONDUCTOR.diameter
+        * mode
+        * natural_frequency(SPAN.length, SPAN.tension, CONDUCTOR.mass)
+        / strouhal
     )
+    estimated_amplitude = (
+        SPAN.length
+        * 0.5
+        * air_volumic_mass()
+        * CONDUCTOR.diameter
+        * cl0
+        * wind_speed**2
+    )
+
     def force(x, t, y, v):
         return Excitation(
             f=freq,
-            a=4*estimated_amplitude,
+            a=4 * estimated_amplitude,
             s=(2 * mode - 1) * (SPAN.length + 0.5) / (2 * mode),
             L=SPAN.length,
             tf=tf,
@@ -524,7 +543,7 @@ def test_reduced_amplitude_stokcbridge(sb):
             "initial condition left": ic2,
         },
     }
-    
+
     for model, approx in CASES:
         ei = CONDUCTOR.ei_min if model == BendingModel.CONSTANT else None
         y0 = shape.solve(
@@ -536,7 +555,7 @@ def test_reduced_amplitude_stokcbridge(sb):
             ei=ei,
             approx_curvature=approx,
         )
-                
+
         res = solve_dynamic(
             CONDUCTOR,
             SPAN,
@@ -559,5 +578,6 @@ def test_reduced_amplitude_stokcbridge(sb):
             initial_position=y0,
         )
 
-        assert np.max(np.max(res['y'], axis=0) - np.min(res['y'], axis=0)) > np.max(np.max(res_stockbridge['y'], axis=0) - np.min(res_stockbridge['y'], axis=0)), (model, approx)
-
+        assert np.max(np.max(res["y"], axis=0) - np.min(res["y"], axis=0)) > np.max(
+            np.max(res_stockbridge["y"], axis=0) - np.min(res_stockbridge["y"], axis=0)
+        ), (model, approx)

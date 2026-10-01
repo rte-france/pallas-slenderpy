@@ -4,7 +4,10 @@ import scipy as sp
 
 from slenderpy import simtools
 from slenderpy.force import Excitation
-from slenderpy.future.beam.static.frequency import natural_frequencies_hinged, natural_frequency
+from slenderpy.future.beam.static.frequency import (
+    natural_frequencies_hinged,
+    natural_frequency,
+)
 from slenderpy.future.components import Conductor, Span
 from slenderpy.future.beam.static import shape
 from slenderpy.future.boundary_condition import hinged
@@ -279,13 +282,15 @@ def coupling_two_stockbridges():
     )
     x = np.linspace(0, LSPAN, nb_space)
 
-    wind_speed = DIAMETER * MODE * natural_frequency(LSPAN, TENSION, CABLE_MASS) / STROUHAL
+    wind_speed = (
+        DIAMETER * MODE * natural_frequency(LSPAN, TENSION, CABLE_MASS) / STROUHAL
+    )
     estimated_amplitude = (
         LSPAN * 0.5 * air_volumic_mass() * DIAMETER * CL0 * wind_speed**2
     )
 
     approx_curvature = True
-    model = 'varying' 
+    model = "varying"
     pos_stockbridge = LSPAN / (2 * MODE)
     id_pos_stockbridge = max(
         1, min(nb_space - 2, int(np.round(pos_stockbridge / LSPAN * (nb_space - 1))))
@@ -318,9 +323,8 @@ def coupling_two_stockbridges():
         model=model,
         force=force,
         approx_curvature=approx_curvature,
-        initial_position=y0
+        initial_position=y0,
     )
-
 
     sb = Stockbridge(CLAMP, MASS, CABLE, MASS, CABLE)
     ic1 = np.zeros(sb.mass_right.nb_unknowns)
@@ -341,27 +345,27 @@ def coupling_two_stockbridges():
     }
 
     res_cable2, _ = solve_dynamic_with_sb(
-            sb_dict,
-            conductor,
-            span,
-            parameters,
-            model=model,
-            force=force,
-            approx_curvature=approx_curvature,
-            initial_position=y0,
-        )
+        sb_dict,
+        conductor,
+        span,
+        parameters,
+        model=model,
+        force=force,
+        approx_curvature=approx_curvature,
+        initial_position=y0,
+    )
 
     t = parameters.time_vector_output()
 
     plt.figure()
     plt.title("max-min over the time")
     plt.plot(
-            x,
-            np.max(res_newton["y"] - res_newton["y"][0, :], axis=0)
-            - np.min(res_newton["y"] - res_newton["y"][0, :], axis=0),
-            label="without stockbridge",
-            color="blue",
-        )
+        x,
+        np.max(res_newton["y"] - res_newton["y"][0, :], axis=0)
+        - np.min(res_newton["y"] - res_newton["y"][0, :], axis=0),
+        label="without stockbridge",
+        color="blue",
+    )
     plt.plot(
         x,
         np.max(res_cable2["y"] - res_cable2["y"][0, :], axis=0)
