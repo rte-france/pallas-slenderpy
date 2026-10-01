@@ -5,8 +5,13 @@ import numpy as np
 import slenderpy.future.fd_utils as fdu
 from slenderpy import simtools
 from slenderpy.future._constant import _GRAVITY
-from slenderpy.future.beam.beam import BeamBW, BeamConst
 from slenderpy.future.boundary_condition import hinged
+from slenderpy.future.components import Conductor, Span
+from slenderpy.future.beam.static.shape import solve
+from slenderpy.future.beam.dynamic import solve_dynamic 
+import slenderpy.future.beam.bending as BD
+import slenderpy.future.beam.curvature as CV
+
 
 
 def _plot_animation(x, sol_static, sol_dynamic, ymin, ymax, nb_time, dt):
@@ -38,49 +43,48 @@ def _plot_animation(x, sol_static, sol_dynamic, ymin, ymax, nb_time, dt):
     # _ani.save('test_case__bretelle.mp4', writer='ffmpeg', fps=50)
     plt.show()
 
+conductor = Conductor(
+        mass=1.57,
+        ei_min=28.28,
+        ei_max=2155.07,
+        beta_flexion=6.438e-07,
+    )
+span = Span(length=440.0, tension=39e3, boundary_conditions=hinged())
 
 def static_gravity():
-    lspan = 440
     nb_space = 400
     x = np.linspace(0, 440, nb_space)
     final_time = 10.0
     dt = 1e-2
     dr = 1e-1
 
-    tension = 39e3
-    mass = 1.57
-    ei_max = 2155.07
-    ei_min = 28.28
-    chi0 = 0.03
-
     def force(x, t, y, v):
-        return -_GRAVITY * np.ones(nb_space) * mass
+        return -_GRAVITY * np.ones(nb_space) * conductor.mass
 
-    bc = hinged(0, 0, 0, 0)
     rhs = force(None, None, None, None)
-    beam = BeamBW(
-        length=lspan,
-        boundary_conditions=bc,
-        tension=tension,
-        mass=mass,
-        ei_max=ei_max,
-        ei_min=ei_min,
-        critical_curvature=chi0,
+
+    sol_static = solve(
+        conductor,
+        span,
+        rhs=rhs,
+        n=nb_space,
+        model="varying",
+        approx_curvature=True,
     )
-    sol_static = beam.solve_static(n=nb_space, rhs=rhs, approx_curvature=False)
 
     parameters = simtools.Parameters(
         ns=nb_space, tf=final_time, dt=dt, dr=dr, los=nb_space, pp=True
     )
 
-    sol_dynamic = beam.solve_dynamic(
+    sol_dynamic = solve_dynamic(
+        conductor,
+        span,
+        model="varying",
         parameters=parameters,
         initial_position=sol_static,
         initial_velocity=np.zeros(nb_space),
         force=force,
         approx_curvature=False,
-        it_picard=3,
-        tol_picard=1e-3,
     )
 
     y = sol_dynamic["y"]
@@ -89,29 +93,11 @@ def static_gravity():
 
 
 def hyteresis():
-    lspan = 440
     nb_space = 600
     x = np.linspace(0, 440, nb_space)
     final_time = 1.0
     dt = 1e-3
     dr = 1e-3
-
-    tension = 39e3
-    mass = 1.57
-    ei_max = 2155.07
-    ei_min = 28.28
-    chi0 = 0.03
-
-    bc = hinged(0, 0, 0, 0)
-    beam = BeamBW(
-        length=lspan,
-        boundary_conditions=bc,
-        tension=tension,
-        mass=mass,
-        ei_max=ei_max,
-        ei_min=ei_min,
-        critical_curvature=chi0,
-    )
 
     parameters = simtools.Parameters(
         ns=nb_space, tf=final_time, dt=dt, dr=dr, los=nb_space, pp=True
@@ -120,17 +106,15 @@ def hyteresis():
     def force(x, t, y, v):
         return np.zeros(nb_space)
 
-    ds = lspan / (nb_space - 1)
-    D1 = fdu.first_derivative(nb_space, ds)
-    D2 = fdu.second_derivative(nb_space, ds)
-
-    def curvature(y):
-        return D2 @ y / np.sqrt((np.ones(nb_space) + ((D1 @ y) ** 2)) ** 3)
+    ds = span.length / (nb_space - 1)
 
     freq = 15
-    y_initial = 3 * np.sin(2 * np.pi * freq * x / lspan)
-    initial_curvature = curvature(y_initial)
-    initial_moment = np.sign(initial_curvature) * beam._bending_moment(
+    y_initial = 3 * np.sin(2 * np.pi * freq * x / span.length)
+
+    operator = CV.create(nb_space, ds, approx_curvature=False)
+    bending = BD.create(conductor, span, "varying")
+    initial_curvature = operator.value(y_initial)
+    initial_moment = np.sign(initial_curvature) * bending.moment(
         np.abs(initial_curvature)
     )
     c0 = np.max(np.abs(initial_curvature))
@@ -138,22 +122,24 @@ def hyteresis():
 
     pos = nb_space // (4 * freq)
 
-    res = beam.solve_dynamic(
+    res = solve_dynamic(
+        conductor,
+        span,
+        model="varying",
         parameters=parameters,
         initial_position=y_initial,
         initial_velocity=np.zeros(nb_space),
         force=force,
         approx_curvature=False,
-        it_picard=3,
-        tol_picard=1e-3,
     )
+    
 
     y = res["y"]
     c = res["c"]
     M = res["M"]
 
     c1 = np.linspace(0, c0, 50)
-    M1 = beam._bending_moment(c1)
+    M1 = bending.moment(c1)
     plt.plot(c[:, pos], M[:, pos], label="Hysteresis")
     plt.plot(2 * c1 - c0, 2 * M1 - M0, color="orange", label="theoritical")
     plt.plot(2 * c1 - c0, -np.flip(2 * M1 - M0), color="orange")
@@ -164,185 +150,186 @@ def hyteresis():
     _plot_animation(x, y_initial, y, -5, 5, parameters.nr, dr)
 
 
-def energy():
-    lspan = 440
-    nb_space = 440
-    x = np.linspace(0, 440, nb_space)
-    final_time = 5.0
-    dt = 1e-3
-    dr = 1e-2
+# Add energies in new beam module 
+# def energy():
+#     lspan = 440
+#     nb_space = 440
+#     x = np.linspace(0, 440, nb_space)
+#     final_time = 5.0
+#     dt = 1e-3
+#     dr = 1e-2
 
-    tension = 39e3
-    mass = 1.57
-    ei_max = 2155.07
-    ei_min = 28.28
-    chi0 = 0.03
+#     tension = 39e3
+#     mass = 1.57
+#     ei_max = 2155.07
+#     ei_min = 28.28
+#     chi0 = 0.03
 
-    def force(x, t, y, v):
-        return -_GRAVITY * np.ones(nb_space) * mass
+#     def force(x, t, y, v):
+#         return -_GRAVITY * np.ones(nb_space) * mass
 
-    bc = hinged(0, 0, 0, 0)
-    rhs = -10 * np.ones(nb_space) * mass
-    beam = BeamBW(
-        length=lspan,
-        boundary_conditions=bc,
-        tension=tension,
-        mass=mass,
-        ei_min=ei_min,
-        ei_max=ei_max,
-        critical_curvature=chi0,
-    )
+#     bc = hinged(0, 0, 0, 0)
+#     rhs = -10 * np.ones(nb_space) * mass
+#     beam = BeamBW(
+#         length=lspan,
+#         boundary_conditions=bc,
+#         tension=tension,
+#         mass=mass,
+#         ei_min=ei_min,
+#         ei_max=ei_max,
+#         critical_curvature=chi0,
+#     )
 
-    sol_static = beam.solve_static(n=nb_space, rhs=rhs, approx_curvature=False)
+#     sol_static = beam.solve_static(n=nb_space, rhs=rhs, approx_curvature=False)
 
-    parameters = simtools.Parameters(
-        ns=nb_space, tf=final_time, dt=dt, dr=dr, los=nb_space, pp=True
-    )
+#     parameters = simtools.Parameters(
+#         ns=nb_space, tf=final_time, dt=dt, dr=dr, los=nb_space, pp=True
+#     )
 
-    res = beam.solve_dynamic(
-        parameters=parameters,
-        initial_position=sol_static,
-        initial_velocity=np.zeros(nb_space),
-        force=force,
-        approx_curvature=False,
-        it_picard=10,
-        tol_picard=1e-4,
-    )
+#     res = beam.solve_dynamic(
+#         parameters=parameters,
+#         initial_position=sol_static,
+#         initial_velocity=np.zeros(nb_space),
+#         force=force,
+#         approx_curvature=False,
+#         it_picard=10,
+#         tol_picard=1e-4,
+#     )
 
-    y = res["y"]
+#     y = res["y"]
 
-    e_kin = res["e_kin"]
-    e_bend = res["e_bend"]
-    e_dissip = res["e_dissip"]
-    e_tens = res["e_tens"]
-    e_ext = res["e_ext"]
-    e_bound_tens = res["e_bound_tens"]
+#     e_kin = res["e_kin"]
+#     e_bend = res["e_bend"]
+#     e_dissip = res["e_dissip"]
+#     e_tens = res["e_tens"]
+#     e_ext = res["e_ext"]
+#     e_bound_tens = res["e_bound_tens"]
 
-    times = parameters.time_vector_output()
-    labels = ["kinetic", "bending", "e_dissip", "tension", "exterior"]
+#     times = parameters.time_vector_output()
+#     labels = ["kinetic", "bending", "e_dissip", "tension", "exterior"]
 
-    plt.figure()
-    plt.plot(times, res["p_kin"], label="kinetic")
-    plt.plot(times, res["p_bend"], label="bending")
-    plt.plot(times, res["p_dissip"], label="dissip")
-    plt.plot(times, res["p_tens"], label="tension")
-    plt.plot(times, res["p_ext"], label="exterior")
-    plt.legend()
-    plt.title("power")
+#     plt.figure()
+#     plt.plot(times, res["p_kin"], label="kinetic")
+#     plt.plot(times, res["p_bend"], label="bending")
+#     plt.plot(times, res["p_dissip"], label="dissip")
+#     plt.plot(times, res["p_tens"], label="tension")
+#     plt.plot(times, res["p_ext"], label="exterior")
+#     plt.legend()
+#     plt.title("power")
 
-    plt.figure()
-    plt.plot(times, e_kin, label="kinetic")
-    plt.plot(times, e_bend, label="bending")
-    plt.plot(times, e_dissip, label="dissip")
-    plt.plot(times, e_tens, label="tension")
-    plt.plot(times, e_ext, label="exterior")
-    plt.plot(times, e_bound_tens, label="bound tension")
-    plt.plot(
-        times, e_kin + e_bend + e_dissip + e_tens - e_ext - e_bound_tens, label="total"
-    )
-    plt.legend()
-    plt.title("energy")
+#     plt.figure()
+#     plt.plot(times, e_kin, label="kinetic")
+#     plt.plot(times, e_bend, label="bending")
+#     plt.plot(times, e_dissip, label="dissip")
+#     plt.plot(times, e_tens, label="tension")
+#     plt.plot(times, e_ext, label="exterior")
+#     plt.plot(times, e_bound_tens, label="bound tension")
+#     plt.plot(
+#         times, e_kin + e_bend + e_dissip + e_tens - e_ext - e_bound_tens, label="total"
+#     )
+#     plt.legend()
+#     plt.title("energy")
 
-    plt.figure()
-    plt.stackplot(times, [e_kin, e_bend, e_dissip, e_tens, -e_ext], labels=labels)
-    plt.legend()
+#     plt.figure()
+#     plt.stackplot(times, [e_kin, e_bend, e_dissip, e_tens, -e_ext], labels=labels)
+#     plt.legend()
 
-    _plot_animation(x, sol_static, y, -10, 1, parameters.nr, dr)
+#     _plot_animation(x, sol_static, y, -10, 1, parameters.nr, dr)
 
 
 def bretelle():
-    lspan = 1.53
+    span = Span(length=1.53, tension=20.0, boundary_conditions=hinged())
+    conductor = Conductor(
+        mass=2.879,
+        ei_min=67.7,
+        ei_max=5089.0,
+        beta_flexion=2.0e-5/20.
+    )
     nb_space = 100
-    x = np.linspace(0, lspan, nb_space)
+    x = np.linspace(0, span.length, nb_space)
     final_time = 0.2
     dt = 1e-6
     dr = 1e-3
 
-    tension = 20.0
-    mass = 2.879
-    ei_max = 5089.0
-    ei_min = 67.7
-    chi0 = 2.0e-5
-
     def force(x, t, y, v):
-        return -_GRAVITY * np.ones(nb_space) * mass
+        return -_GRAVITY * np.ones(nb_space) * conductor.mass
 
-    bc = hinged(0, 0, 0, 0)
     rhs = force(None, None, None, None)
-    beam = BeamBW(
-        length=lspan,
-        boundary_conditions=bc,
-        tension=tension,
-        mass=mass,
-        ei_min=ei_min,
-        ei_max=ei_max,
-        critical_curvature=chi0,
+
+    sol_static = solve(
+        conductor,
+        span,
+        rhs=rhs,
+        n=nb_space,
+        model="varying",
+        approx_curvature=False,
     )
-    sol_static = beam.solve_static(n=nb_space, rhs=rhs, approx_curvature=False)
 
     parameters = simtools.Parameters(
         ns=nb_space, tf=final_time, dt=dt, dr=dr, los=nb_space, pp=True
     )
 
-    res = beam.solve_dynamic(
+    res = solve_dynamic(
+        conductor,
+        span,
+        model="varying",
         parameters=parameters,
         initial_position=sol_static,
-        initial_velocity=0.8 * np.sin(2 * np.pi * x / lspan),
+        initial_velocity=0.8 * np.sin(2 * np.pi * x / span.length),
         force=force,
         approx_curvature=False,
-        it_picard=30,
-        tol_picard=1e-5,
     )
+
 
     y = res["y"]
     c = res["c"]
-    e_kin = res["e_kin"]
-    e_bend = res["e_bend"]
-    e_dissip = res["e_dissip"]
-    e_tens = res["e_tens"]
-    e_ext = res["e_ext"]
-    e_bound_tens = res["e_bound_tens"]
+    # e_kin = res["e_kin"]
+    # e_bend = res["e_bend"]
+    # e_dissip = res["e_dissip"]
+    # e_tens = res["e_tens"]
+    # e_ext = res["e_ext"]
+    # e_bound_tens = res["e_bound_tens"]
 
     times = parameters.time_vector_output()
-    labels = ["kinetic", "bending", "dissip", "tension", "exterior"]
+    # labels = ["kinetic", "bending", "dissip", "tension", "exterior"]
 
-    plt.figure()
-    plt.plot(times, res["p_kin"], label="kinetic")
-    plt.plot(times, res["p_bend"], label="bending")
-    plt.plot(times, res["p_dissip"], label="dissip")
-    plt.plot(times, res["p_tens"], label="tension")
-    plt.plot(times, res["p_ext"], label="exterior")
-    plt.plot(times, res["p_bound_tens"], label="boud, tension")
-    plt.plot(
-        times,
-        res["p_kin"]
-        + res["p_bend"]
-        + res["p_tens"]
-        + res["p_dissip"]
-        - res["p_ext"]
-        - res["p_bound_tens"],
-        label="total",
-    )
-    plt.legend()
-    plt.title("power")
+    # plt.figure()
+    # plt.plot(times, res["p_kin"], label="kinetic")
+    # plt.plot(times, res["p_bend"], label="bending")
+    # plt.plot(times, res["p_dissip"], label="dissip")
+    # plt.plot(times, res["p_tens"], label="tension")
+    # plt.plot(times, res["p_ext"], label="exterior")
+    # plt.plot(times, res["p_bound_tens"], label="boud, tension")
+    # plt.plot(
+    #     times,
+    #     res["p_kin"]
+    #     + res["p_bend"]
+    #     + res["p_tens"]
+    #     + res["p_dissip"]
+    #     - res["p_ext"]
+    #     - res["p_bound_tens"],
+    #     label="total",
+    # )
+    # plt.legend()
+    # plt.title("power")
 
-    plt.figure()
-    plt.plot(times, e_kin, label="kinetic")
-    plt.plot(times, e_bend, label="bending")
-    plt.plot(times, e_dissip, label="dissip")
-    plt.plot(times, e_tens, label="tension")
-    plt.plot(times, e_ext, label="exterior")
-    plt.plot(times, e_bound_tens, label="boud, tension")
-    plt.plot(
-        times, e_kin + e_dissip + e_bend + e_tens - e_ext - e_bound_tens, label="total"
-    )
-    plt.legend()
-    plt.title("energy")
+    # plt.figure()
+    # plt.plot(times, e_kin, label="kinetic")
+    # plt.plot(times, e_bend, label="bending")
+    # plt.plot(times, e_dissip, label="dissip")
+    # plt.plot(times, e_tens, label="tension")
+    # plt.plot(times, e_ext, label="exterior")
+    # plt.plot(times, e_bound_tens, label="boud, tension")
+    # plt.plot(
+    #     times, e_kin + e_dissip + e_bend + e_tens - e_ext - e_bound_tens, label="total"
+    # )
+    # plt.legend()
+    # plt.title("energy")
 
-    plt.figure()
-    plt.stackplot(times, [e_kin, e_bend, e_dissip, e_tens, -e_ext], labels=labels)
-    plt.legend()
-    plt.title("Global energy balance")
+    # plt.figure()
+    # plt.stackplot(times, [e_kin, e_bend, e_dissip, e_tens, -e_ext], labels=labels)
+    # plt.legend()
+    # plt.title("Global energy balance")
 
     pos = nb_space // 4
     plt.figure()
@@ -353,29 +340,32 @@ def bretelle():
 
 
 def damping():
-    lspan = 440
     nb_space = 500
     final_time = 30.0
     dt = 1e-2
     dr = 1e-1
 
-    tension = 39e3
-    mass = 1.57
-    ei = 2155.07
-
     def force(x, t, y, v):
-        return -_GRAVITY * np.ones(nb_space) * mass
+        return -_GRAVITY * np.ones(nb_space) * conductor.mass
 
-    bc = hinged(0, 0, 0, 0)
-    rhs = -10 * np.ones(nb_space) * mass
-    beam = BeamConst(
-        length=lspan, boundary_conditions=bc, tension=tension, mass=mass, ei=ei
+    rhs = -10 * np.ones(nb_space) * conductor.mass
+
+    sol_static_more_gravity = solve(
+        conductor,
+        span,
+        rhs=rhs,
+        n=nb_space,
+        model="constant",
+        approx_curvature=False,
     )
-    sol_static_more_gravity = beam.solve_static(
-        n=nb_space, rhs=rhs, approx_curvature=False
-    )
-    sol_static_proper_gravity = beam.solve_static(
-        n=nb_space, rhs=force(None, None, None, None), approx_curvature=False
+    
+    sol_static_proper_gravity = solve(
+        conductor,
+        span,
+        rhs=force(None, None, None, None),
+        n=nb_space,
+        model="constant",
+        approx_curvature=False,
     )
 
     parameters = simtools.Parameters(
@@ -391,15 +381,16 @@ def damping():
     )
 
     for zeta in [0.3, 0.5, 1.0, 2.0]:
-        sol_dynamic = beam.solve_dynamic(
+        sol_dynamic = solve_dynamic(
+            conductor, 
+            span,
+            model="constant",
             parameters=parameters,
             initial_position=sol_static_more_gravity,
             initial_velocity=np.zeros(nb_space),
             force=force,
             approx_curvature=True,
             zeta=zeta,
-            it_picard=3,
-            tol_picard=1e-3,
         )
 
         plt.plot(time, sol_dynamic["y"][:, pos], label=f"zeta={zeta}")
@@ -414,6 +405,6 @@ def damping():
 if __name__ == "__main__":
     static_gravity()
     hyteresis()
-    energy()
+    # energy()
     bretelle()
     damping()
