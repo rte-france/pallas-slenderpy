@@ -73,12 +73,46 @@ fitted from experiments or CFD simulation.
 
 
 
-..
-   Simulation
-   ==========
+Simulation
+==========
 
-   Parameters
-   ----------
+The ``future`` solvers share :mod:`slenderpy.future.simulation`.
 
-   Results
-   -------
+Parameters
+----------
+
+:class:`~slenderpy.future.simulation.Parameters` holds the time stepping and
+the output configuration. The run has ``nt = round((tf - t0) / dt)`` steps of
+``dt = (tf - t0) / nt`` and a snapshot is stored every ``rr`` steps, so the
+effective output step is ``rr * dt``. A warning is raised when either
+effective step differs from the requested one, and the last output time may be
+slightly earlier than ``tf``.
+
+``los`` lists the positions where snapshots are stored, as span fractions
+(horizontal distance from support 1 over the span length) in [0, 1]; 0 and 1
+are the supports. An int ``n`` gives ``n`` evenly spaced positions, supports
+included.
+
+Results
+-------
+
+:class:`~slenderpy.future.simulation.Results` stores each variable on a
+``time`` x ``span_frac`` grid (scalars on ``time`` only), in a global frame:
+origin at support 1, ``x`` along the span, ``z`` upwards, ``y`` completing a
+right-handed triad, SI units.
+
+=============  =========================================  =====  ====
+name           meaning                                    cable  beam
+=============  =========================================  =====  ====
+``x``, ``y``   along-span and out-of-plane position (m)   yes    no
+``z``          vertical position (m)                      yes    yes
+``vz``         vertical velocity (m/s)                    no     yes
+``curvature``  bending curvature (1/m)                    no     yes
+``moment``     bending moment (N.m)                       no     yes
+``eta``        Bouc-Wen internal variable                 no     yes
+``n_iter``     Newton iterations of the step (scalar)     no     yes
+``dtension``   dynamic increment of axial force (N)       yes    no
+=============  =========================================  =====  ====
+
+The final state of a run, at full space resolution, is kept in
+``Results.state`` so that a run can be restarted from it.

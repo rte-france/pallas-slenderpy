@@ -298,6 +298,23 @@ def test_state_allows_a_restart():
     assert second["y"].values[-1, 0] == pytest.approx(
         whole["y"].values[-1, 0], abs=1.0e-06
     )
+    assert second.lot() == pytest.approx((2.0 + 0.01 * np.arange(201)).tolist())
+
+
+@pytest.mark.parametrize("sld", [0.0, 30.0])
+def test_supports_can_be_stored(sld):
+    """los may hold 0 and 1: the stored ends sit on the supports all along."""
+    cd, sp = _conductor(), _span(sld)
+    geom = dynamic._geometry(cd, sp, 101)
+    position = geom.equilibrium() + 0.02 * np.sin(np.pi * geom.s) * geom.en
+    res = dynamic.solve(
+        cd, sp, _parameters(tf=1.0, los=[0.0, 0.5, 1.0]), initial_position=position
+    )
+    assert res["x"].values[:, 0] == pytest.approx(0.0, abs=1.0e-06)
+    assert res["x"].values[:, -1] == pytest.approx(LSPAN, abs=1.0e-06)
+    assert res["y"].values[:, [0, -1]] == pytest.approx(0.0, abs=1.0e-09)
+    assert res["z"].values[:, 0] == pytest.approx(0.0, abs=1.0e-06)
+    assert res["z"].values[:, -1] == pytest.approx(sld, abs=1.0e-06)
 
 
 # --- agreement with the legacy solver --------------------------------------

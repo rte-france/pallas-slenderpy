@@ -227,9 +227,10 @@ def solve(
     parameters : simulation.Parameters
         Simulation parameters. ``ns`` sets the space discretisation, ``t0``,
         ``tf`` and the derived ``nt`` the time stepping, ``nr``/``rr`` the output
-        rate, ``los`` the normalised span positions to store and ``pp`` the
-        progress bar. The solve always runs on the ``ns`` nodes; ``los`` only
-        selects what is stored, by interpolation in the span coordinate.
+        rate, ``los`` the normalised span positions to store (supports 0 and 1
+        allowed) and ``pp`` the progress bar. The solve always runs on the
+        ``ns`` nodes; ``los`` only selects what is stored, by interpolation in
+        the span coordinate.
     force : callable, optional
         ``force(s, t, un, ub, vn, vb) -> (fn, fb)``, the local convention of
         :mod:`slenderpy.wind` and :mod:`slenderpy.force`, so those classes work
@@ -306,7 +307,7 @@ def solve(
     second = fdmu.d2M(ds)
     ut, dtension = _stretching(un, ub, first, ds, vt2)
 
-    dt = (parameters.tf - parameters.t0) / parameters.nt / time_scale
+    dt = parameters.dt / time_scale
     ht = 0.5 * dt
     damping = -2.0 * np.pi * np.sqrt(vt2) * zeta * ht
 

@@ -103,6 +103,8 @@ def solve_dynamic(
     span : Span
         Span geometry and loading; ``boundary_conditions`` must be set. For the
         varying model the critical curvature is ``beta_flexion * tension``.
+        ``span.sld`` is ignored: the end heights are the boundary-condition
+        values.
     parameters : simulation.Parameters
         Simulation parameters. ``ns`` sets the space discretisation, ``t0``,
         ``tf`` and the derived ``nt`` the time stepping, ``nr``/``rr`` the output
@@ -110,8 +112,8 @@ def solve_dynamic(
         solve itself always runs on the ``ns`` nodes; ``los`` only selects what
         is stored, by interpolation of the nodal fields, so a field read back
         from the result is a linear interpolation and no longer satisfies (2) to
-        (4) exactly unless its position falls on a node. ``los`` cannot hold the
-        two ends, which are in the final state instead.
+        (4) exactly unless its position falls on a node. ``los`` may hold the
+        supports 0 and 1, which are nodes.
     model : BendingModel, optional
         ``CONSTANT`` or ``VARYING``; accepts the enum member or its string value.
         Default ``CONSTANT``.
@@ -145,12 +147,14 @@ def solve_dynamic(
     Returns
     -------
     simulation.Results
-        Displacement ``y``, velocity ``v``, curvature ``c``, bending moment
-        ``M``, hysteresis variable ``eta`` (zero for the constant model) at the
-        positions of ``parameters.los``, and the per-step iteration count
-        ``n_iter``. Snapshots after a failed step are left at nan. The final
-        state, recorded with :meth:`simulation.Results.set_state`, keeps the same
-        five fields at full ``ns`` resolution.
+        Vertical position ``z``, vertical velocity ``vz``, ``curvature``,
+        bending ``moment`` and hysteresis variable ``eta`` (zero for the
+        constant model) at the positions of ``parameters.los``, and the
+        per-step iteration count ``n_iter``; names follow the output contract
+        of :mod:`slenderpy.future.simulation`. Snapshots after a failed step are
+        left at nan. The final state, recorded with
+        :meth:`simulation.Results.set_state`, keeps the same five fields, under
+        the same names, at full ``ns`` resolution.
     """
     model = BendingModel(model)
 
@@ -162,7 +166,7 @@ def solve_dynamic(
     # discretisation
     ns = parameters.ns
     ds = span.length / (ns - 1)
-    dt = (parameters.tf - parameters.t0) / parameters.nt
+    dt = parameters.dt
     dt2 = 0.5 * dt
     x = np.linspace(0.0, span.length, ns)
     bc = span.boundary_conditions
@@ -238,7 +242,7 @@ def solve_dynamic(
     eta_old = law.initial_eta(initial_bending_moment, chi_old)
 
     # output
-    lov = ["y", "v", "c", "M", "eta", "n_iter"]
+    lov = ["z", "vz", "curvature", "moment", "eta", "n_iter"]
     res = simulation.Results(
         lot=parameters.time_vector_output().tolist(),
         lov=lov,
@@ -378,10 +382,10 @@ def solve_dynamic(
     if converged:
         res.set_state(
             {
-                "y": y_old,
-                "v": v_old,
-                "c": chi_old,
-                "M": law.dynamic_moment(chi_old, eta_old),
+                "z": y_old,
+                "vz": v_old,
+                "curvature": chi_old,
+                "moment": law.dynamic_moment(chi_old, eta_old),
                 "eta": eta_old,
             }
         )

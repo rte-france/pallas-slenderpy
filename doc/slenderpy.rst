@@ -76,6 +76,14 @@ slenderpy.wind module
    :undoc-members:
    :show-inheritance:
 
+slenderpy.future.simulation module
+----------------------------------
+
+.. automodule:: slenderpy.future.simulation
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Module contents
 ---------------
 
