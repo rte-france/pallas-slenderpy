@@ -113,6 +113,13 @@ slenderpy.future.fatigue module
    :members:
    :show-inheritance:
 
+slenderpy.future.cable.static.shape module
+------------------------------------------
+
+.. automodule:: slenderpy.future.cable.static.shape
+   :members:
+   :show-inheritance:
+
 Module contents
 ---------------
 

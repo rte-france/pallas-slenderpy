@@ -153,3 +153,15 @@ interpolation between the stored positions, so store the fatigue position
 in ``los``. It returns a table of ranges, means and counts (1 per cycle, 0.5
 per half cycle); stress models, S-N curves and damage are left to a
 dedicated package.
+
+Static shapes
+-------------
+
+:func:`slenderpy.future.beam.static.shape.solve` and
+:func:`slenderpy.future.cable.static.shape.solve` give the static shape of
+the structure under a load, from the same equations as the dynamic solvers
+without the time derivatives; the dynamic solvers start from it by default.
+The cable is written around the catenary of
+:mod:`slenderpy.future.cable.static.catenary`, which already holds the
+weight: the static load and the dynamic ``force`` both come on top of it, so
+no load returns the catenary and passing the weight again would double it.

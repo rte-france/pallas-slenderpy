@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 from scipy.optimize import brentq
 
+from slenderpy.future._constant import _GRAVITY
 from slenderpy.future.cable import dynamic
 from slenderpy.future.cable.static import catenary
 from slenderpy.future.components import Conductor, Span
@@ -461,11 +462,14 @@ def test_scalar_force_is_broadcast():
 
 
 def test_vertical_force_stays_in_plane():
+    cd, sp = _conductor(), _span()
+    # from the catenary: the default start would be the static shape, at rest
     res = dynamic.solve(
-        _conductor(),
-        _span(),
+        cd,
+        sp,
         _parameters(tf=2.0, los=[0.5]),
         force=lambda x, t, y, z, vy, vz: (0.0, 2.0 * np.ones_like(x)),
+        initial_position=np.stack(dynamic.equilibrium(cd, sp, 101)),
     )
     assert np.abs(res["y"].values).max() < 1e-12
     assert np.ptp(res["z"].values[:, 0]) > 1e-03
@@ -518,6 +522,8 @@ def test_wind_drag_matches_the_legacy_solver():
         sp,
         Parameters(ns=ns, t0=0.0, tf=tf, dt=dt, dr=dr, los=[0.5], pp=False),
         force=WindDrag(diameter=DIAMETER, wind=ConstantWind(-10.0), air=Air()),
+        # legacy starts on the catenary, not on the static shape
+        initial_position=np.stack(dynamic.equilibrium(cd, sp, ns)),
     )
     geom = dynamic._geometry(cd, sp, ns)
     offset = new.state["position"] - geom.equilibrium()
@@ -531,3 +537,52 @@ def test_wind_drag_matches_the_legacy_solver():
         scale = np.abs(reference).max()
         assert scale > 1e-02, legacy_name
         assert np.abs(mine - reference).max() < rtol * scale, legacy_name
+
+
+def test_project_matches_the_triad():
+    from slenderpy.future.cable import _model
+
+    geom = _model._geometry(_conductor(), _span(30.0), 21)
+    fy, fz = 2.0 * np.ones(21), -3.0 * np.ones(21)
+    fn, fb = _model._project(fy, fz, geom)
+    force = np.stack([np.zeros(21), fy, fz])
+    assert fn == pytest.approx(np.sum(force * geom.en, axis=0))
+    assert fb == pytest.approx(np.sum(force * geom.eb, axis=0))
+
+
+def test_default_start_is_the_static_shape_under_the_force():
+    cd, sp = _conductor(), _span()
+    drag = WindDrag(diameter=DIAMETER, wind=ConstantWind(10.0), drag_coefficient=1.0)
+    res = dynamic.solve(cd, sp, _parameters(tf=1.0, los=[0.5]), force=drag)
+    y = res["y"].values[:, 0]
+    assert y[0] > 1e-02
+    assert np.abs(y - y[0]).max() < 1e-6 * y[0]
+
+
+def test_default_start_without_force_is_the_catenary():
+    cd, sp = _conductor(), _span(30.0)
+    res = dynamic.solve(cd, sp, _parameters(tf=0.1, los=[0.5]))
+    expected = np.stack(dynamic.equilibrium(cd, sp, 101))
+    assert res.state["position"] == pytest.approx(expected, abs=1e-12 * LSPAN)
+
+
+def test_default_start_with_a_scalar_force():
+    res = dynamic.solve(
+        _conductor(),
+        _span(),
+        _parameters(tf=0.2, los=[0.5]),
+        force=lambda x, t, y, z, vy, vz: (0.0, -1.0),
+    )
+    assert np.all(np.isfinite(res["z"].values))
+
+
+def test_default_start_without_static_shape_raises():
+    # an upward load as large as the weight leaves the cable slack
+    weight = MASS * _GRAVITY
+    with pytest.raises(ValueError, match="static shape"):
+        dynamic.solve(
+            _conductor(),
+            _span(),
+            _parameters(tf=0.1),
+            force=lambda x, t, y, z, vy, vz: (0.0, weight),
+        )

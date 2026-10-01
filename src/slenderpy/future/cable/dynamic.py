@@ -21,83 +21,28 @@ a two-to-one internal resonance, Nonlinear Dynamics 3, 1992.
 from __future__ import annotations
 
 import warnings
-from dataclasses import dataclass
 
 import numpy as np
 from scipy.linalg import solve_banded
 
-import slenderpy.future.fd_utils as fdu
 import slenderpy.future.simulation as simulation
 from slenderpy import _progress_bar as spb
 from slenderpy.future._constant import _GRAVITY
-from slenderpy.future.cable.static import catenary
+from slenderpy.future.cable._model import (
+    _Geometry,
+    _geometry,
+    _operators,
+    _project,
+    _stretching,
+    _to_global,
+    _to_local,
+)
+from slenderpy.future.cable.static import shape
 from slenderpy.future.components import Conductor, Span
 from slenderpy.future.force.core import ForceSum, Gravity
 
 # an end further than this (relative to the span) from its support is an error
 _END_TOLERANCE = 1.0e-09
-
-
-@dataclass(frozen=True)
-class _Geometry:
-    """Catenary equilibrium sampled on a grid uniform in arc length.
-
-    Attributes
-    ----------
-    s : arc fraction of each node, uniform in [0, 1].
-    ds : spacing of ``s``.
-    x, z : global horizontal and vertical coordinates of the nodes (m).
-    slope : dz/dx of the catenary at each node.
-    et, en, eb : tangent, normal and binormal unit vectors, shape (3, ns).
-    length : catenary length (m).
-    """
-
-    s: np.ndarray
-    ds: np.ndarray
-    x: np.ndarray
-    z: np.ndarray
-    slope: np.ndarray
-    et: np.ndarray
-    en: np.ndarray
-    eb: np.ndarray
-    length: float
-
-    def equilibrium(self) -> np.ndarray:
-        """Global position of the nodes at rest, shape (3, ns)."""
-        return np.stack([self.x, np.zeros_like(self.x), self.z])
-
-
-def _geometry(conductor: Conductor, span: Span, ns: int) -> _Geometry:
-    """Build the equilibrium geometry and its local triad."""
-    a = catenary._mechparam(span.tension, conductor.mass, g=_GRAVITY)
-    length = catenary.length(
-        span.length, span.tension, span.sld, conductor.mass, g=_GRAVITY
-    )
-    # xm is half the catenary offset, ie the abscissa shift of the low point
-    xm = 0.5 * (a * catenary._qfactor(length, span.sld) - span.length)
-
-    s = np.linspace(0.0, 1.0, ns)
-    x = a * np.arcsinh(length * s / a + np.sinh(xm / a)) - xm
-    # the two ends are exact by construction; keep them free of round-off
-    x[0], x[-1] = 0.0, span.length
-    # catenary.shape is declared floatArrayLike; it is an array for an array x
-    z = np.asarray(
-        catenary.shape(
-            x, span.length, span.tension, span.sld, conductor.mass, g=_GRAVITY
-        ),
-        dtype=float,
-    )
-
-    slope = np.sinh((x + xm) / a)
-    norm = np.sqrt(1.0 + slope**2)
-    zero = np.zeros_like(x)
-    et = np.stack([np.ones_like(x), zero, slope]) / norm
-    en = np.stack([-slope, zero, np.ones_like(x)]) / norm
-    eb = np.stack([zero, -np.ones_like(x), zero])
-
-    return _Geometry(
-        s=s, ds=np.diff(s), x=x, z=z, slope=slope, et=et, en=en, eb=eb, length=length
-    )
 
 
 def equilibrium(
@@ -140,70 +85,6 @@ def _check_position(position: np.ndarray, geom: _Geometry, span: Span) -> np.nda
             f"initial position and velocity must have shape (3, {ns}), got {array.shape}"
         )
     return array
-
-
-def _to_local(
-    position: np.ndarray | None, velocity: np.ndarray | None, geom: _Geometry
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Project a global position and velocity onto the local triad.
-
-    The tangential component of the displacement is dropped: the model derives
-    the tangential displacement from the stretching condition, so it cannot be
-    imposed. Returns dimensional ``(un, ub, vn, vb)``.
-    """
-    ns = len(geom.s)
-    if position is None:
-        un = np.zeros(ns)
-        ub = np.zeros(ns)
-    else:
-        offset = position - geom.equilibrium()
-        un = (offset * geom.en).sum(axis=0)
-        ub = (offset * geom.eb).sum(axis=0)
-
-    if velocity is None:
-        vn = np.zeros(ns)
-        vb = np.zeros(ns)
-    else:
-        vn = (velocity * geom.en).sum(axis=0)
-        vb = (velocity * geom.eb).sum(axis=0)
-
-    return un, ub, vn, vb
-
-
-def _to_global(
-    ut: np.ndarray, un: np.ndarray, ub: np.ndarray, geom: _Geometry
-) -> np.ndarray:
-    """Assemble the global position from a dimensional local state, shape (3, ns)."""
-    return geom.equilibrium() + ut * geom.et + un * geom.en + ub * geom.eb
-
-
-def _operators(ns):
-    """First and second derivatives in arc fraction on the uniform grid.
-
-    ``second`` acts on the interior nodes, the ends being pinned at zero.
-    ``first`` acts on all nodes; its end rows are first-order one-sided, as
-    in the legacy solver: second-order rows change dtension by a few percent
-    and are left for a separate check.
-    """
-    h = 1.0 / (ns - 1)
-    second = fdu.second_derivative(ns, h).tocsr()[1:-1, 1:-1]
-    first = fdu.first_derivative(ns, h).tolil()
-    first[0, :2] = [-1.0 / h, 1.0 / h]
-    first[-1, -2:] = [-1.0 / h, 1.0 / h]
-    return first.tocsr(), second
-
-
-def _stretching(un, ub, first, ds, vt2):
-    """Tangential offset and axial strain from the quasi-static condition."""
-    h = -un / vt2 + 0.5 * ((first * un) ** 2 + (first * ub) ** 2)
-    segment = 0.5 * (h[:-1] + h[1:]) * ds
-    ut = np.sum(segment) * np.linspace(0.0, 1.0, len(un)) - np.cumsum(
-        np.concatenate(([0.0], segment))
-    )
-    strain = (first * ut) + 0.5 * (
-        (first * ut) ** 2 + (first * un) ** 2 + (first * ub) ** 2
-    )
-    return ut, np.log(np.sqrt(1.0 + 2.0 * strain))
 
 
 def _holds_gravity(force) -> bool:
@@ -266,13 +147,17 @@ def solve(
         a sum holding one, raises ``ValueError`` (a plain function cannot be
         checked). Default a null force. It is evaluated at ``t`` and
         ``t+dt`` but both at the state of the previous step, so a
-        state-dependent force lags one step.
+        state-dependent force lags one step. The static solver
+        :func:`slenderpy.future.cable.static.shape.solve` takes its load with
+        the same convention.
     zeta : float, optional
         Damping ratio, by default 0. The damping coefficient is ``2 w0 zeta``
         with ``w0`` the first taut-string mode.
     initial_position : numpy.ndarray, optional
         Global ``(3, ns)`` position of the nodes at ``t0``. Default the
-        equilibrium, from :func:`equilibrium`. Both ends must sit on their
+        static shape under ``force`` at ``t0``, evaluated at rest, from
+        :func:`slenderpy.future.cable.static.shape.solve`; without force it is
+        the catenary equilibrium of :func:`equilibrium`. Both ends must sit on their
         support. The tangential component of the displacement is discarded: the
         model derives it from the stretching condition.
     initial_velocity : numpy.ndarray, optional
@@ -316,7 +201,24 @@ def solve(
     vt2 = span.tension / (weight * length)
     vl2 = conductor.axial_stiffness / (weight * length)
 
-    if initial_position is not None:
+    if force is None:
+
+        def force(x, t, y, z, vy, vz):
+            return 0.0, 0.0
+
+    if initial_position is None:
+        # static shape under the force at t0, evaluated at rest; both solvers
+        # take the load on top of the weight
+        rest = geom.equilibrium()
+        zeros = np.zeros(ns)
+        fy0, fz0 = force(geom.x, parameters.t0, rest[1], rest[2], zeros, zeros)
+        initial_position = shape.solve(conductor, span, fy0, fz0, ns)
+        if not np.all(np.isfinite(initial_position)):
+            raise ValueError(
+                "no static shape under the force at t0 (the cable would be "
+                "compressed or the solve did not converge): pass initial_position"
+            )
+    else:
         initial_position = _check_position(initial_position, geom, span)
         ends = initial_position[:, [0, -1]] - geom.equilibrium()[:, [0, -1]]
         if np.abs(ends).max() > _END_TOLERANCE * span.length:
@@ -342,16 +244,10 @@ def solve(
     ht = 0.5 * dt
     damping = -2.0 * np.pi * np.sqrt(vt2) * zeta * ht
 
-    if force is None:
-
-        def force(x, t, y, z, vy, vz):
-            return 0.0, 0.0
-
     def local_force(time, position, velocity):
         """Force at the nodes, projected on (en, eb), over the weight."""
         fy, fz = force(geom.x, time, position[1], position[2], velocity[1], velocity[2])
-        fn = fy * geom.en[1] + fz * geom.en[2]
-        fb = fy * geom.eb[1] + fz * geom.eb[2]
+        fn, fb = _project(fy, fz, geom)
         return fn / weight, fb / weight
 
     lov = ["x", "y", "z", "dtension"]
