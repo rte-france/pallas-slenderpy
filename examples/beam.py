@@ -2,15 +2,14 @@ import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
 
-import slenderpy.future.fd_utils as fdu
-from slenderpy import simtools
-from slenderpy.future._constant import _GRAVITY
-from slenderpy.future.boundary_condition import hinged
-from slenderpy.future.components import Conductor, Span
-from slenderpy.future.beam.static.shape import solve
-from slenderpy.future.beam.dynamic import solve_dynamic
 import slenderpy.future.beam.bending as BD
 import slenderpy.future.beam.curvature as CV
+from slenderpy import simtools
+from slenderpy.future._constant import _GRAVITY
+from slenderpy.future.beam.dynamic import solve_dynamic
+from slenderpy.future.beam.static.shape import solve
+from slenderpy.future.boundary_condition import hinged
+from slenderpy.future.components import Conductor, Span
 
 
 def _plot_animation(x, sol_static, sol_dynamic, ymin, ymax, nb_time, dt):

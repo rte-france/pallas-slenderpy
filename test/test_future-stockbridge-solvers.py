@@ -4,18 +4,17 @@ import numpy as np
 import pytest
 import scipy as sp
 
-from slenderpy.future.boundary_condition import hinged
+from slenderpy.force import Excitation
+from slenderpy.future import simulation
+from slenderpy.future.beam.bending import BendingModel
+from slenderpy.future.beam.dynamic import solve_dynamic
+from slenderpy.future.beam.static import shape
 from slenderpy.future.beam.static.frequency import (
     natural_frequencies_hinged,
     natural_frequency,
 )
-from slenderpy.wind import air_volumic_mass
-from slenderpy.force import Excitation
+from slenderpy.future.boundary_condition import hinged
 from slenderpy.future.components import Conductor, Span
-from slenderpy.future.beam.dynamic import solve_dynamic
-from slenderpy.future.beam.static import shape
-from slenderpy.future.beam.bending import BendingModel
-from slenderpy.future import simulation
 from slenderpy.future.stockbridge import (
     Clamp,
     ClampParameters,
@@ -24,11 +23,12 @@ from slenderpy.future.stockbridge import (
     MessengerCableParameters,
     Side,
     Stockbridge,
+    solve_dynamic_with_sb,
     solve_imposed_acceleration,
     solve_imposed_force,
     solve_linearized_imposed_force,
-    solve_dynamic_with_sb,
 )
+from slenderpy.wind import air_volumic_mass
 
 # Cable used by the manufactured-solution suite (kept at the original size
 # so the analytic tolerances still hold).

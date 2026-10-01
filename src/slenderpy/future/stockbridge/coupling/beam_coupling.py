@@ -5,15 +5,14 @@ from typing import Optional
 import numpy as np
 import scipy as sp
 
-from slenderpy import _progress_bar as spb
-import slenderpy.future.fd_utils as fdu
 import slenderpy.future.beam.bending as bending
 import slenderpy.future.beam.curvature as curvature
+import slenderpy.future.fd_utils as fdu
+from slenderpy import _progress_bar as spb
 from slenderpy.future import simulation
 from slenderpy.future.beam.bending import BendingModel
 from slenderpy.future.beam.static import shape
-from slenderpy.future.components import Span, Conductor
-
+from slenderpy.future.components import Conductor, Span
 from slenderpy.future.stockbridge.core.stockbridge import Result
 
 # smallest newton relaxation factor tried before declaring the step useless

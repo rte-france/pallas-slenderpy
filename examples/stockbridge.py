@@ -2,15 +2,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
 
+import slenderpy.future.beam.dynamic as dynamic
 from slenderpy import simtools
 from slenderpy.force import Excitation
+from slenderpy.future.beam.static import shape
 from slenderpy.future.beam.static.frequency import (
     natural_frequencies_hinged,
     natural_frequency,
 )
-from slenderpy.future.components import Conductor, Span
-from slenderpy.future.beam.static import shape
 from slenderpy.future.boundary_condition import hinged
+from slenderpy.future.components import Conductor, Span
 from slenderpy.future.stockbridge import (
     ClampParameters,
     MassParameters,
@@ -26,7 +27,6 @@ from slenderpy.future.stockbridge import (
     solve_linearized_imposed_force,
 )
 from slenderpy.wind import air_volumic_mass
-import slenderpy.future.beam.dynamic as dynamic
 
 MASS = MassParameters(
     length_to_clamp=0.1875,
