@@ -19,6 +19,7 @@ from slenderpy.future.beam.dynamic import solve_dynamic
 from slenderpy.future.beam.static import shape
 from slenderpy.future.boundary_condition import BoundaryCondition, clamped, hinged
 from slenderpy.future.components import Conductor, Span
+from slenderpy.future.force.core import Gravity, PointExcitation
 
 CONDUCTOR = Conductor(
     mass=1.57,
@@ -76,11 +77,7 @@ def _plot_animation(x, exact, sol, ymin, ymax, nb_time, final_time):
 
 def _gravity(conductor):
     """Return a constant self-weight force per unit length."""
-
-    def force(x, t, y, v):
-        return -_GRAVITY * conductor.mass * np.ones_like(x)
-
-    return force
+    return Gravity(conductor.mass)
 
 
 def _l2_gap(first, second):
@@ -134,8 +131,8 @@ def test_manufactured_constant_approx_static_bc(plot=False):
     def exact_time_derivative(x, t):
         return -np.sin(t) * x**2 * (x - lspan) ** 2
 
-    def force(x, t, y, v):
-        return (
+    def force(x, t, y, z, vy, vz):
+        return 0.0, (
             -mass * np.cos(t) * x**2 * (x - lspan) ** 2
             + ei * 24.0 * f(t)
             - tension * f(t) * (12 * x**2 - 12 * lspan * x + 2 * lspan**2)
@@ -203,8 +200,8 @@ def test_manufactured_constant_approx_dynamic_bc(plot=False):
     def exact_time_derivative(x, t):
         return 2 * np.pi * np.cosh(x - 2) * np.cos(2 * np.pi * t)
 
-    def force(x, t, y, v):
-        return (
+    def force(x, t, y, z, vy, vz):
+        return 0.0, (
             -4 * np.pi**2 * mass * exact(x, t)
             + ei * exact(x, t)
             - tension * exact(x, t)
@@ -274,8 +271,8 @@ def test_manufactured_constant_exact(plot=False):
     lspan = lmax - lmin
     x = np.linspace(lmin, lmax, nb_space)
 
-    def force(x, t, y, v):
-        return (
+    def force(x, t, y, z, vy, vz):
+        return 0.0, (
             mass * np.cosh(x + t)
             + ei
             * (
@@ -365,8 +362,8 @@ def test_manufactured_varying_approx(plot=False):
     lspan = lmax - lmin
     x = np.linspace(lmin, lmax, nb_space)
 
-    def force(x, t, y, v):
-        return (
+    def force(x, t, y, z, vy, vz):
+        return 0.0, (
             mass * np.cosh(x + t) + ei_max * np.cosh(x + t) - tension * np.cosh(x + t)
         )
 
@@ -446,8 +443,8 @@ def test_manufactured_varying_exact(plot=False):
     lspan = lmax - lmin
     x = np.linspace(lmin, lmax, nb_space)
 
-    def force(x, t, y, v):
-        return (
+    def force(x, t, y, z, vy, vz):
+        return 0.0, (
             mass * np.cosh(x + t)
             + ei_max
             * (
@@ -596,7 +593,11 @@ def test_linear_case_matches_slenderpy():
             mass=CONDUCTOR.mass,
             ei=CONDUCTOR.ei_max,
         )
-        ref = beam.solve_dynamic(parameters, y0, v0, force, True, zeta=zeta)
+
+        def legacy_force(x, t, y, v):
+            return np.zeros_like(x) + force(x, t, 0.0, y, 0.0, v)[1]
+
+        ref = beam.solve_dynamic(parameters, y0, v0, legacy_force, True, zeta=zeta)
 
         # slenderpy stores every node, this solver stores parameters.los
         nodes = np.linspace(0.0, 1.0, ns)
@@ -729,8 +730,8 @@ def test_hysteresis_loop_stays_within_the_static_envelope():
     f0 = 0.5 / BRETELLE.length * np.sqrt(BRETELLE.tension / CONDUCTOR.mass)
     amplitude = 4.0 * _GRAVITY * CONDUCTOR.mass
 
-    def force(x, t, y, v):
-        return amplitude * np.sin(2.0 * np.pi * f0 * t) * np.ones_like(x)
+    def force(x, t, y, z, vy, vz):
+        return 0.0, amplitude * np.sin(2.0 * np.pi * f0 * t) * np.ones_like(x)
 
     parameters = simulation.Parameters(
         ns=ns,
@@ -776,8 +777,8 @@ def test_hysteresis_lives_at_the_clamped_ends(approx_curvature):
     f0 = 0.5 / BRETELLE.length * np.sqrt(BRETELLE.tension / CONDUCTOR.mass)
     amplitude = 4.0 * _GRAVITY * CONDUCTOR.mass
 
-    def force(x, t, y, v):
-        return amplitude * np.sin(2.0 * np.pi * f0 * t) * np.ones_like(x)
+    def force(x, t, y, z, vy, vz):
+        return 0.0, amplitude * np.sin(2.0 * np.pi * f0 * t) * np.ones_like(x)
 
     parameters = simulation.Parameters(
         ns=ns,
@@ -864,6 +865,26 @@ def test_supports_can_be_stored():
     assert np.ptp(z[:, 1]) > 0.0
 
 
+def test_scalar_force_is_broadcast():
+    """A force may return scalars: Gravity returns (0, -g m)."""
+    parameters = simulation.Parameters(ns=51, t0=0.0, tf=0.2, dt=0.004, dr=0.04)
+    res = solve_dynamic(CONDUCTOR, BRETELLE, parameters, force=Gravity(CONDUCTOR.mass))
+    assert np.all(np.isfinite(res["z"].values))
+    assert res["z"].values[0, len(parameters.los) // 2] < 0.0
+
+
+def test_sum_of_forces_drives_the_beam():
+    parameters = simulation.Parameters(ns=51, t0=0.0, tf=0.4, dt=0.004, dr=0.04)
+    gravity = Gravity(CONDUCTOR.mass)
+    excitation = PointExcitation(
+        frequency=5.0, amplitude=10.0, position=0.5 * BRETELLE.length
+    )
+    alone = solve_dynamic(CONDUCTOR, BRETELLE, parameters, force=gravity)
+    both = solve_dynamic(CONDUCTOR, BRETELLE, parameters, force=gravity + excitation)
+    assert np.all(np.isfinite(both["z"].values))
+    assert np.abs(both["z"].values - alone["z"].values).max() > 1e-6
+
+
 def test_start_time_offset_is_honoured():
     """t0 != 0 must not change the time step, unlike tf/nt."""
     common = dict(ns=51, dt=0.004, dr=0.04)
@@ -912,7 +933,7 @@ def test_converging_in_time():
         y0 = shape.solve(
             CONDUCTOR,
             BRETELLE,
-            force(x, 0.0, None, None),
+            np.zeros_like(x) + force(x, 0.0, 0.0, 0.0, 0.0, 0.0)[1],
             ns,
             model=model,
             ei=ei,

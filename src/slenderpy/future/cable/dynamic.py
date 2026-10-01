@@ -32,6 +32,7 @@ from slenderpy import fdm_utils as fdmu
 from slenderpy.future._constant import _GRAVITY
 from slenderpy.future.cable.static import catenary
 from slenderpy.future.components import Conductor, Span
+from slenderpy.future.force.core import ForceSum, Gravity
 
 # an end further than this (relative to the span) from its support is an error
 _END_TOLERANCE = 1.0e-09
@@ -189,6 +190,12 @@ def _stretching(un, ub, first, ds, vt2):
     return ut, np.log(np.sqrt(1.0 + 2.0 * strain))
 
 
+def _holds_gravity(force) -> bool:
+    """Whether a force is, or sums, a Gravity."""
+    terms = force.terms if isinstance(force, ForceSum) else (force,)
+    return any(isinstance(term, Gravity) for term in terms)
+
+
 def solve(
     conductor: Conductor,
     span: Span,
@@ -232,13 +239,17 @@ def solve(
         ``ns`` nodes; ``los`` only selects what is stored, by interpolation in
         the span coordinate.
     force : callable, optional
-        ``force(s, t, un, ub, vn, vb) -> (fn, fb)``, the local convention of
-        :mod:`slenderpy.wind` and :mod:`slenderpy.force`, so those classes work
-        unchanged. ``s`` is the span fraction of each node, ``un``, ``ub``,
-        ``vn`` and ``vb`` are dimensional local displacements (m) and velocities
-        (m/s), and the two returned arrays are forces per unit length (N/m)
-        along the normal and the binormal. Default a null force. It is evaluated
-        at ``t`` and ``t+dt`` but both at the state of the previous step, so a
+        ``force(x, t, y, z, vy, vz) -> (fy, fz)``, the interface of
+        :mod:`slenderpy.future.force.core`: ``x`` the horizontal position of
+        each node (m), ``y``, ``z``, ``vy``, ``vz`` its global position (m)
+        and velocity (m/s), and ``(fy, fz)`` the force per unit length (N/m)
+        along global ``y`` and ``z`` (scalars allowed). The force is projected
+        on the local normal and binormal; its tangential part is dropped.
+        The weight must not be included: it is already in the catenary
+        equilibrium, so a :class:`~slenderpy.future.force.core.Gravity`, or
+        a sum holding one, raises ``ValueError`` (a plain function cannot be
+        checked). Default a null force. It is evaluated at ``t`` and
+        ``t+dt`` but both at the state of the previous step, so a
         state-dependent force lags one step.
     zeta : float, optional
         Damping ratio, by default 0. The damping coefficient is ``2 w0 zeta``
@@ -271,6 +282,11 @@ def solve(
     """
     if conductor.axial_stiffness is None:
         raise ValueError("conductor.axial_stiffness is required for a cable solve")
+    if force is not None and _holds_gravity(force):
+        raise ValueError(
+            "a cable force must not include Gravity: the weight is already in "
+            "the catenary equilibrium the model is written around"
+        )
 
     ns = parameters.ns
     geom = _geometry(conductor, span, ns)
@@ -313,8 +329,15 @@ def solve(
 
     if force is None:
 
-        def force(s, t, un, ub, vn, vb):
-            return np.zeros_like(s), np.zeros_like(s)
+        def force(x, t, y, z, vy, vz):
+            return 0.0, 0.0
+
+    def local_force(time, position, velocity):
+        """Force at the nodes, projected on (en, eb), over the weight."""
+        fy, fz = force(geom.x, time, position[1], position[2], velocity[1], velocity[2])
+        fn = fy * geom.en[1] + fz * geom.en[2]
+        fb = fy * geom.eb[1] + fz * geom.eb[2]
+        return fn / weight, fb / weight
 
     lov = ["x", "y", "z", "dtension"]
     res = simulation.Results(
@@ -360,25 +383,11 @@ def solve(
             )
             warned = True
 
-        # dimensional state for the force, then back to non-dimensional
-        fn1, fb1 = force(
-            span_fraction,
-            t * time_scale,
-            un * length,
-            ub * length,
-            vn * speed_scale,
-            vb * speed_scale,
-        )
-        fn2, fb2 = force(
-            span_fraction,
-            (t + dt) * time_scale,
-            un * length,
-            ub * length,
-            vn * speed_scale,
-            vb * speed_scale,
-        )
-        fn1, fb1 = fn1 / weight, fb1 / weight
-        fn2, fb2 = fn2 / weight, fb2 / weight
+        # global state of the previous step, shared by both evaluations
+        position = _to_global(ut * length, un * length, ub * length, geom)
+        velocity = (vn * geom.en + vb * geom.eb) * speed_scale
+        fn1, fb1 = local_force(t * time_scale, position, velocity)
+        fn2, fb2 = local_force((t + dt) * time_scale, position, velocity)
 
         rhs_n = (
             (dt * wave) * second * (un[1:-1] + 0.5 * ht * vn[1:-1])

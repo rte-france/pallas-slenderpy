@@ -84,6 +84,28 @@ slenderpy.future.simulation module
    :undoc-members:
    :show-inheritance:
 
+slenderpy.future.force.core module
+----------------------------------
+
+.. automodule:: slenderpy.future.force.core
+   :members:
+   :show-inheritance:
+
+slenderpy.future.force.air module
+---------------------------------
+
+.. automodule:: slenderpy.future.force.air
+   :members:
+   :show-inheritance:
+
+slenderpy.future.force.wind module
+----------------------------------
+
+.. automodule:: slenderpy.future.force.wind
+   :exclude-members: drag_coefficient
+   :members:
+   :show-inheritance:
+
 Module contents
 ---------------
 

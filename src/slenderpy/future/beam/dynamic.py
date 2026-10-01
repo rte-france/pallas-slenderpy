@@ -121,9 +121,13 @@ def solve_dynamic(
         Constant model only: overrides the constant bending stiffness. When
         ``None`` (default), ``conductor.ei_max`` is used.
     force : callable, optional
-        Function of ``(x, t, y, v)`` returning the external force per unit
-        length. Default a null force. It is evaluated at the state of the
-        previous step, so a state-dependent force is lagged by one step.
+        ``force(x, t, y, z, vy, vz) -> (fy, fz)``, the interface of
+        :mod:`slenderpy.future.force.core`, e.g.
+        ``Gravity(conductor.mass) + PointExcitation(...)``. The beam is
+        planar: it is called with ``y = vy = 0`` and only ``fz`` (N/m, may be
+        a scalar) is used. Default a null force. It is evaluated at the state
+        of the previous step, so a state-dependent force is lagged by one
+        step.
     approx_curvature : bool, optional
         ``True`` (default) uses the approximate curvature ``D2 @ y``; ``False``
         uses the exact geometric curvature.
@@ -212,8 +216,14 @@ def solve_dynamic(
 
     if force is None:
 
-        def force(x, t, y, v):
-            return np.zeros_like(x)
+        def force(x, t, y, z, vy, vz):
+            return 0.0, 0.0
+
+    # the beam is planar: y and vy are zero, only fz is used
+    zeros = np.zeros(ns)
+
+    def vertical_force(t, z, vz):
+        return zeros + force(x, t, zeros, z, zeros, vz)[1]
 
     # initial state
     if initial_velocity is None:
@@ -222,7 +232,7 @@ def solve_dynamic(
         initial_position = shape.solve(
             conductor,
             span,
-            force(x, parameters.t0, np.zeros(ns), np.zeros(ns)),
+            vertical_force(parameters.t0, zeros, zeros),
             ns,
             model=model,
             ei=ei,
@@ -271,7 +281,7 @@ def solve_dynamic(
 
     for step in range(parameters.nt):
         t_new = t_old + dt
-        load = force(x, t_old, y_old, v_old) + force(x, t_new, y_old, v_old)
+        load = vertical_force(t_old, y_old, v_old) + vertical_force(t_new, y_old, v_old)
         rhs_bc = (
             np.zeros(ns) if bc.dynamic_values is None else bc.update_rhs(ns, x, t_new)
         )

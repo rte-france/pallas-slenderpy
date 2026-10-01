@@ -7,6 +7,9 @@ from scipy.optimize import brentq
 from slenderpy.future.cable import dynamic
 from slenderpy.future.cable.static import catenary
 from slenderpy.future.components import Conductor, Span
+from slenderpy.future.force.air import Air
+from slenderpy.future.force.core import Gravity, PointExcitation
+from slenderpy.future.force.wind import ConstantWind, WindDrag
 from slenderpy.future.simulation import Parameters
 
 G = 9.81
@@ -408,18 +411,110 @@ def test_cfl_violation_warns():
         dynamic.solve(cd, sp, pm)
 
 
-def test_force_uses_the_local_convention():
-    """force(s, t, un, ub, vn, vb) -> (fn, fb), s being the span fraction."""
-    cd, sp = _conductor(), _span()
-    pm = _parameters(tf=2.0, los=[0.5])
+@pytest.mark.parametrize(
+    "force",
+    [
+        Gravity(MASS),
+        PointExcitation(frequency=1.0, amplitude=1.0, position=200.0) + Gravity(MASS),
+    ],
+)
+def test_gravity_is_refused(force):
+    with pytest.raises(ValueError, match="equilibrium"):
+        dynamic.solve(_conductor(), _span(), _parameters(tf=0.1), force=force)
+
+
+def test_force_receives_the_global_state():
+    cd, sp = _conductor(), _span(30.0)
     seen = {}
 
-    def force(s, t, un, ub, vn, vb):
-        seen["s"] = s
-        return np.zeros_like(s), 2.0 * np.ones_like(s)
+    def force(x, t, y, z, vy, vz):
+        seen.update(x=x, z=z)
+        return 0.0, 0.0
 
-    res = dynamic.solve(cd, sp, pm, force=force)
-    assert seen["s"][0] == pytest.approx(0.0)
-    assert seen["s"][-1] == pytest.approx(1.0)
-    # a steady binormal force pushes the cable out of plane, ie towards -y
-    assert res["y"].values[-1, 0] < -1.0e-03
+    dynamic.solve(cd, sp, _parameters(tf=0.1), force=force)
+    assert seen["x"][0] == pytest.approx(0.0)
+    assert seen["x"][-1] == pytest.approx(LSPAN)
+    assert seen["z"][-1] == pytest.approx(30.0)
+
+
+def test_scalar_force_is_broadcast():
+    res = dynamic.solve(
+        _conductor(),
+        _span(),
+        _parameters(tf=1.0, los=[0.5]),
+        force=lambda x, t, y, z, vy, vz: (0.0, 1.0),
+    )
+    assert np.all(np.isfinite(res["z"].values))
+
+
+def test_vertical_force_stays_in_plane():
+    res = dynamic.solve(
+        _conductor(),
+        _span(),
+        _parameters(tf=2.0, los=[0.5]),
+        force=lambda x, t, y, z, vy, vz: (0.0, 2.0 * np.ones_like(x)),
+    )
+    assert np.abs(res["y"].values).max() < 1e-12
+    assert np.ptp(res["z"].values[:, 0]) > 1e-03
+
+
+def test_horizontal_force_moves_out_of_plane():
+    cd, sp = _conductor(), _span()
+    pm = _parameters(tf=2.0, los=[0.5])
+    rest = dynamic.solve(cd, sp, pm)
+    res = dynamic.solve(
+        cd, sp, pm, force=lambda x, t, y, z, vy, vz: (2.0 * np.ones_like(x), 0.0)
+    )
+    y = res["y"].values[:, 0]
+    assert y[-1] > 1e-03
+    # the in-plane response comes only through the strain, at second order
+    drift = np.abs(res["z"].values[:, 0] - rest["z"].values[:, 0]).max()
+    assert drift < 0.1 * np.abs(y).max()
+
+
+def test_wind_drag_pushes_the_cable_downwind():
+    drag = WindDrag(diameter=DIAMETER, wind=ConstantWind(15.0), drag_coefficient=1.0)
+    res = dynamic.solve(
+        _conductor(), _span(), _parameters(tf=2.0, los=[0.5]), force=drag
+    )
+    assert res["y"].values[-1, 0] > 1e-03
+
+
+def test_wind_drag_matches_the_legacy_solver():
+    """Legacy cable under AutoDrag against the future cable under WindDrag.
+
+    Legacy blows along +b, which is -y here. Not to round-off: legacy feeds the
+    force the local vn, the future solver the global vz = vn / N and projects
+    back with another 1 / N, so the in-plane damping differs by N**2.
+    """
+    from slenderpy import cable, simtools
+    from slenderpy.wind import AutoDrag
+
+    cd, sp = _conductor(), _span(0.0)
+    ns, tf, dt, dr = 101, 4.0, 2.0e-03, 1.0e-02
+    cb = cable.SCable(
+        mass=MASS, diameter=DIAMETER, EA=AXS, length=LSPAN, tension=TENSION, h=0.0
+    )
+    legacy = cable.solve(
+        cb,
+        simtools.Parameters(ns=ns, t0=0.0, tf=tf, dt=dt, dr=dr, los=[0.5], pp=False),
+        force=AutoDrag(u=10.0, d=DIAMETER),
+    )
+    new = dynamic.solve(
+        cd,
+        sp,
+        Parameters(ns=ns, t0=0.0, tf=tf, dt=dt, dr=dr, los=[0.5], pp=False),
+        force=WindDrag(diameter=DIAMETER, wind=ConstantWind(-10.0), air=Air()),
+    )
+    geom = dynamic._geometry(cd, sp, ns)
+    offset = new.state["position"] - geom.equilibrium()
+    # measured gaps: 3e-06 binormal, 1.4e-04 normal (the N**2 damping factor)
+    for direction, legacy_name, rtol in [
+        (geom.eb, "ub", 1e-04),
+        (geom.en, "un", 1e-03),
+    ]:
+        mine = np.sum(offset * direction, axis=0)
+        reference = legacy.state[legacy_name]
+        scale = np.abs(reference).max()
+        assert scale > 1e-02, legacy_name
+        assert np.abs(mine - reference).max() < rtol * scale, legacy_name

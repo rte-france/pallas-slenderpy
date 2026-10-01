@@ -116,3 +116,28 @@ name           meaning                                    cable  beam
 
 The final state of a run, at full space resolution, is kept in
 ``Results.state`` so that a run can be restarted from it.
+
+Forces
+------
+
+A force is any callable ``force(x, t, y, z, vy, vz) -> (fy, fz)`` returning
+the force per unit length (N/m) along the global ``y`` and ``z`` axes, from
+the horizontal position ``x`` of the nodes, the time and the global position
+and velocity of the structure. The beam uses ``fz`` only; the cable projects
+both components on its local normal and binormal.
+
+:mod:`slenderpy.future.force` provides:
+
+- :class:`~slenderpy.future.force.core.Gravity`, the weight, for the beam
+  only: the cable equilibrium already holds it and the cable solver refuses
+  it;
+- :class:`~slenderpy.future.force.core.PointExcitation`, a sinusoidal
+  vertical force applied at one node;
+- :class:`~slenderpy.future.force.wind.WindDrag`, the drag of a
+  :class:`~slenderpy.future.force.wind.ConstantWind`,
+  :class:`~slenderpy.future.force.wind.UniformTurbulentWind` or
+  :class:`~slenderpy.future.force.wind.TurbulentWindField`, with a constant
+  drag coefficient or :func:`~slenderpy.future.force.air.cylinder_drag` of
+  the local Reynolds number.
+
+Provided forces add up: ``PointExcitation(...) + Gravity(mass) + WindDrag(...)``.
