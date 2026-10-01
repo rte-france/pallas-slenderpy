@@ -2,10 +2,29 @@
 (:class:`Results`) and the helpers to plot (:func:`multiplot`) and transform
 (:func:`spectrum`) them.
 
-Ported from :mod:`slenderpy.simtools` with bug fixes and modernization. The
-public API is kept compatible so existing solvers can migrate with an import
-swap. ``Results`` is backed by an :class:`xarray.Dataset` with a ``time`` x
-``curv`` (curvilinear abscissa) layout.
+Ported from :mod:`slenderpy.simtools` with bug fixes and modernization.
+``Results`` is backed by an :class:`xarray.Dataset` with a ``time`` x
+``span_frac`` layout, ``span_frac`` being the horizontal distance from support 1
+over the span length, in [0, 1].
+
+Output contract
+---------------
+Every ``future`` solver returns its results in one global frame: origin at
+support 1, ``x`` along the span, ``z`` upwards, ``y`` completing a right-handed
+triad; SI units. Shared variable names:
+
+=============  =========================================  =====  ====
+name           meaning                                    cable  beam
+=============  =========================================  =====  ====
+``x``, ``y``   along-span and out-of-plane position (m)   yes    no
+``z``          vertical position (m)                      yes    yes
+``vz``         vertical velocity (m/s)                    no     yes
+``curvature``  bending curvature (1/m)                    no     yes
+``moment``     bending moment (N.m)                       no     yes
+``eta``        Bouc-Wen internal variable                 no     yes
+``n_iter``     Newton iterations of the step (scalar)     no     yes
+``dtension``   dynamic increment of axial force (N)       yes    no
+=============  =========================================  =====  ====
 """
 
 from __future__ import annotations
@@ -23,29 +42,42 @@ import xarray as xr
 
 # Coordinate names in the underlying dataset.
 _TIME = "time"
-_CURV = "curv"
+_SPAN_FRAC = "span_frac"
+
+# Absolute tolerance to match a stored position, in span fraction.
+_POSITION_ATOL = 1.0e-12
 
 # Default figure font sizes.
 _TITLE_SIZE = 12
 _LABEL_SIZE = 10
 
+# Relative gap above which an effective time step is reported as adjusted.
+_STEP_RTOL = 1.0e-09
+
 
 def _check_los(los):
-    """Check input los (list of positions of interest)."""
+    """Check input los (list of positions of interest, as span fractions)."""
     if not isinstance(los, list):
         raise TypeError("input los must be a list")
 
-    tmp = []
     for s in los:
-        if not isinstance(s, float):
-            raise TypeError("los elements must be floats")
-        if s in tmp:
-            raise ValueError("los elements must be unique")
-        if s <= 0.0 or s >= 1.0:
-            raise ValueError("los elements must be in ]0,1[ range")
-        if len(tmp) > 0 and s <= tmp[-1]:
-            raise ValueError("los elements must be in ascending order")
-        tmp.append(s)
+        if isinstance(s, bool) or not isinstance(s, (int, float)):
+            raise TypeError("los elements must be real numbers")
+        # written so that nan fails too
+        if not 0.0 <= s <= 1.0:
+            raise ValueError("los elements must be in [0, 1] range")
+    for previous, current in zip(los, los[1:]):
+        if current <= previous:
+            raise ValueError("los elements must be unique and in ascending order")
+
+
+def _warn_if_adjusted(name, requested, effective, detail=""):
+    """Warn when an effective step differs from the requested one."""
+    if abs(effective - requested) > _STEP_RTOL * abs(requested):
+        warnings.warn(
+            f"{name} adjusted from {requested:.6g} to {effective:.6g}{detail}",
+            stacklevel=3,
+        )
 
 
 class Parameters:
@@ -76,24 +108,35 @@ class Parameters:
         dr : float, optional
             Output step (s), must be at least dt. The default is 0.01.
         los : list or int, optional
-            Positions of interest, where snapshots are recorded. A list of
-            floats in ]0, 1[, ascending and unique. A positive int >= 2 gives
-            that many evenly spaced interior points; an int < 2 gives [0.5].
-            The default is 11.
+            Positions of interest, where snapshots are recorded, as span
+            fractions (horizontal distance from support 1 over the span
+            length). A list of real numbers in [0, 1], ascending and unique;
+            0 and 1 are the supports. A positive int >= 2 gives that many
+            evenly spaced points, both supports included; an int < 2 gives
+            [0.5]. The default is 11.
         pp : bool or dict, optional
             If a bool, whether to print progress. If a dict, tqdm progress-bar
             args. The default is False.
+
+        Notes
+        -----
+        The number of steps is ``nt = round((tf - t0) / dt)`` and the step
+        actually used is stored as ``dt = (tf - t0) / nt``. Snapshots are taken
+        every ``rr`` steps, so the effective output step is ``rr * dt``. A
+        ``UserWarning`` is raised when either effective step differs from the
+        requested one.
         """
         if isinstance(los, int):
             if los >= 2:
-                los = np.linspace(0.0, 1.0, los + 2)[1:-1].tolist()
+                los = np.linspace(0.0, 1.0, los).tolist()
             else:
                 los = [0.5]
         Parameters._check_input(ns, t0, tf, dt, dr, los, pp)
 
-        t0, tf, dt, dr = float(t0), float(tf), float(dt), float(dr)
-        nt = int(round((tf - t0) / dt))
-        nr = int(round((tf - t0) / dr))
+        requested_dt, requested_dr = float(dt), float(dr)
+        t0, tf = float(t0), float(tf)
+        nt = int(round((tf - t0) / requested_dt))
+        nr = int(round((tf - t0) / requested_dr))
 
         # Reconcile the number of outputs with an integer output rate.
         if nr > nt or nr < 1:
@@ -107,10 +150,14 @@ class Parameters:
         self.t0 = t0  # start time (s)
         self.tf = tf  # final time (s)
         self.nt = nt  # number of time steps
+        self.dt = (tf - t0) / nt  # time step actually used (s)
         self.nr = nr  # number of (time) outputs
         self.rr = rr  # output rate (one output every rr steps)
         self.pp = pp  # print progress (or progress-bar args)
-        self.los = los  # curvilinear abscissas of interest
+        self.los = [float(s) for s in los]  # span fractions of interest
+
+        _warn_if_adjusted("dt", requested_dt, self.dt)
+        _warn_if_adjusted("dr", requested_dr, rr * self.dt, f" (rr={rr})")
 
     @staticmethod
     def _check_input(ns, t0, tf, dt, dr, los, pp):
@@ -144,8 +191,13 @@ class Parameters:
         return np.linspace(self.t0, self.tf, 1 + self.nt)
 
     def time_vector_output(self) -> np.ndarray:
-        """Get the simulation output times."""
-        return np.linspace(self.t0, self.tf, 1 + self.nr)
+        """Get the simulation output times.
+
+        Entry ``k`` is the time of the snapshot taken after step ``k * rr``.
+        When ``nt`` is not a multiple of ``rr`` the last output time is earlier
+        than ``tf``.
+        """
+        return self.t0 + self.rr * self.dt * np.arange(self.nr + 1)
 
 
 class Results:
@@ -174,7 +226,8 @@ class Results:
             Dimensionality of each variable: 1 (scalar) or 2 (vector over
             positions). Defaults to 2 for every variable.
         los : list of float, optional
-            Positions of interest. The default is None.
+            Positions of interest, as span fractions in [0, 1]. The default is
+            None.
         filename : str, optional
             File to read. The default is None.
         """
@@ -190,13 +243,13 @@ class Results:
         """Build a zero dataset from input lists."""
         if lov_dims is None:
             lov_dims = 2 * np.ones(len(lov))
-        crd = {_TIME: lot, _CURV: los}
+        crd = {_TIME: lot, _SPAN_FRAC: los}
         dct = {}
         self.lov_dims = {}
         for index, v in enumerate(lov):
             if lov_dims[index] == 2:
                 dct[v] = (
-                    [_TIME, _CURV],
+                    [_TIME, _SPAN_FRAC],
                     np.nan * np.zeros((len(lot), len(los))),
                 )
             elif lov_dims[index] == 1:
@@ -208,7 +261,7 @@ class Results:
 
     def los(self):
         """Get a list of positions of interest."""
-        val = self.data[_CURV].values
+        val = self.data[_SPAN_FRAC].values
         if val.ndim == 0:
             return []
         return list(val)
@@ -260,7 +313,7 @@ class Results:
         self,
         lov: list[str] | None = None,
         los: list[float] | None = None,
-        tmin: float = 0.0,
+        tmin: float = -np.inf,
         tmax: float = np.inf,
     ) -> None:
         """Drop variables, positions of interest or crop time to save space.
@@ -272,9 +325,11 @@ class Results:
         lov : list of str, optional
             Variables to drop. If None nothing is dropped. The default is None.
         los : list of float, optional
-            Positions to drop. If None nothing is dropped. The default is None.
+            Positions to drop, matched to the stored ones up to round-off. If
+            None nothing is dropped. The default is None.
         tmin : float, optional
-            New first time; earlier recorded times are removed. The default is 0.
+            New first time; earlier recorded times are removed. The default is
+            -inf.
         tmax : float, optional
             New last time; later recorded times are removed. The default is inf.
 
@@ -289,23 +344,23 @@ class Results:
         aot = np.array(self.lot())
         ttk = np.where((aot >= tmin) & (aot <= tmax))[0].tolist()
 
-        vtk = self.los()
-        itk = list(range(len(vtk)))
-        if los is not None and len(los) > 0:
+        stored = np.asarray(self.los(), dtype=float)
+        keep = np.ones(stored.size, dtype=bool)
+        if los is not None:
             for s in los:
-                if s not in vtk:
-                    raise ValueError(f"var {s} not found")
+                match = np.isclose(stored, s, rtol=0.0, atol=_POSITION_ATOL)
+                if not match.any():
+                    raise ValueError(f"position {s} not found")
+                keep &= ~match
+        itk = np.flatnonzero(keep)
 
-                itk.remove(vtk.index(s))
-                vtk.remove(s)
-
-        crd = {_TIME: aot[ttk], _CURV: vtk}
+        crd = {_TIME: aot[ttk], _SPAN_FRAC: stored[keep]}
         dct = {}
         for v in self.lov():
             tmp = self.data[v].values
             if self.lov_dims[v] == 2:
                 tmp = tmp[ttk, :][:, itk]
-                dct[v] = ([_TIME, _CURV], tmp)
+                dct[v] = ([_TIME, _SPAN_FRAC], tmp)
             else:
                 tmp = tmp[ttk]
                 dct[v] = ([_TIME], tmp)
@@ -320,7 +375,7 @@ class Results:
         """Convert data to json format."""
         out = {
             _TIME: self.data[_TIME].values.tolist(),
-            _CURV: self.data[_CURV].values.tolist(),
+            _SPAN_FRAC: self.data[_SPAN_FRAC].values.tolist(),
         }
         for v in self.lov():
             if self.lov_dims[v] == 2:

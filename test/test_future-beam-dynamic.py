@@ -161,7 +161,7 @@ def test_manufactured_constant_approx_static_bc(plot=False):
         initial_position=exact(x, 0),
         initial_velocity=exact_time_derivative(x, 0),
     )
-    y = res["y"].values
+    y = res["z"].values
 
     if plot:
         _plot_animation(
@@ -242,7 +242,7 @@ def test_manufactured_constant_approx_dynamic_bc(plot=False):
         initial_position=exact(x, 0),
         initial_velocity=exact_time_derivative(x, 0),
     )
-    y = res["y"].values
+    y = res["z"].values
 
     if plot:
         _plot_animation(
@@ -326,7 +326,7 @@ def test_manufactured_constant_exact(plot=False):
         initial_position=exact(x, 0),
         initial_velocity=exact_time_derivative(x, 0),
     )
-    y = res["y"].values
+    y = res["z"].values
 
     if plot:
         _plot_animation(
@@ -412,7 +412,7 @@ def test_manufactured_varying_approx(plot=False):
         initial_position=exact(x, 0),
         initial_velocity=exact_time_derivative(x, 0),
     )
-    y = res["y"].values
+    y = res["z"].values
 
     if plot:
         _plot_animation(
@@ -499,7 +499,7 @@ def test_manufactured_varying_exact(plot=False):
         initial_position=exact(x, 0),
         initial_velocity=exact_time_derivative(x, 0),
     )
-    y = res["y"].values
+    y = res["z"].values
 
     if plot:
         _plot_animation(
@@ -538,8 +538,8 @@ def test_static_state_is_a_fixed_point():
             force=_gravity(CONDUCTOR),
             approx_curvature=approx,
         )
-        y = res["y"].values
-        v = res["v"].values
+        y = res["z"].values
+        v = res["vz"].values
         assert np.all(np.isfinite(y)), (model, approx)
         drift = np.abs(y - y[0, :]).max()
         assert drift < 1e-9 * np.abs(y[0, :]).max(), (model, approx, drift)
@@ -593,7 +593,7 @@ def test_free_vibration_period_matches_theory():
     )
 
     # period from the sign changes of the mid-span displacement
-    mid = res["y"].values[:, 0]
+    mid = res["z"].values[:, 0]
     time = np.asarray(res.lot())
     crossings = np.nonzero(np.diff(np.sign(mid)))[0]
     zeros = time[crossings] - mid[crossings] * (
@@ -625,7 +625,7 @@ def test_undamped_run_conserves_amplitude():
         approx_curvature=True,
         initial_position=y0,
     )
-    mid = np.abs(res["y"].values[:, 0])
+    mid = np.abs(res["z"].values[:, 0])
     first = mid[: len(mid) // 5].max()
     last = mid[-len(mid) // 5 :].max()
     assert abs(last - first) / first < 5e-3, (first, last)
@@ -656,7 +656,7 @@ def test_damping_follows_the_expected_envelope():
         zeta=zeta,
     )
     time = np.asarray(res.lot())
-    mid = res["y"].values[:, 0]
+    mid = res["z"].values[:, 0]
 
     # envelope sampled at the maxima of |mid|, fitted in log space
     peaks = (
@@ -698,8 +698,8 @@ def test_hysteresis_loop_stays_within_the_static_envelope():
         approx_curvature=True,
         initial_position=np.zeros(ns),
     )
-    curv = res["c"].values
-    mom = res["M"].values
+    curv = res["curvature"].values
+    mom = res["moment"].values
     eta = res["eta"].values
     assert np.all(np.isfinite(mom))
     assert np.abs(eta).max() <= 1.0 + 1e-09, np.abs(eta).max()
@@ -769,7 +769,7 @@ def test_non_convergence_returns_nan_and_no_state():
         tol=1e-30,
     )
     assert res.state is None
-    assert np.isnan(res["y"].values[-1, :]).all()
+    assert np.isnan(res["z"].values[-1, :]).all()
 
 
 def test_output_layout():
@@ -778,17 +778,39 @@ def test_output_layout():
         ns=51, t0=0.0, tf=0.4, dt=0.004, dr=0.04, los=[0.2, 0.5, 0.8]
     )
     res = solve_dynamic(CONDUCTOR, BRETELLE, parameters, force=_gravity(CONDUCTOR))
-    assert set(res.lov()) == {"y", "v", "c", "M", "eta", "n_iter"}
+    assert set(res.lov()) == {"z", "vz", "curvature", "moment", "eta", "n_iter"}
     assert res.los() == parameters.los
-    assert res["y"].values.shape == (parameters.nr + 1, len(parameters.los))
+    assert res["z"].values.shape == (parameters.nr + 1, len(parameters.los))
     assert res["n_iter"].values.shape == (parameters.nr + 1,)
     assert len(res.lot()) == parameters.nr + 1
     assert res.compute_time is not None
 
     # the final state keeps the full discretisation whatever los holds
     assert res.state is not None
-    for name in ("y", "v", "c", "M", "eta"):
+    for name in ("z", "vz", "curvature", "moment", "eta"):
         assert res.state[name].shape == (parameters.ns,), name
+
+
+def test_supports_can_be_stored():
+    """los may hold 0 and 1: the clamped ends stay put, the moment is recorded."""
+    parameters = simulation.Parameters(
+        ns=51, t0=0.0, tf=0.4, dt=0.004, dr=0.04, los=[0.0, 0.5, 1.0]
+    )
+    x = np.linspace(0.0, BRETELLE.length, parameters.ns)
+    # zero value and slope at both ends, compatible with clamped()
+    y0 = 0.01 * np.sin(np.pi * x / BRETELLE.length) ** 2
+    res = solve_dynamic(
+        CONDUCTOR,
+        BRETELLE,
+        parameters,
+        force=_gravity(CONDUCTOR),
+        initial_position=y0,
+    )
+    z = res["z"].values
+    assert np.abs(z[:, [0, -1]]).max() < 1e-10
+    assert np.isfinite(res["moment"].values[:, [0, -1]]).all()
+    # the mid-span moves, so the run is not trivially at rest
+    assert np.ptp(z[:, 1]) > 0.0
 
 
 def test_start_time_offset_is_honoured():
@@ -807,7 +829,8 @@ def test_start_time_offset_is_honoured():
         simulation.Parameters(t0=10.0, tf=10.4, **common),
         force=force,
     )
-    assert np.allclose(res0["y"].values, res1["y"].values, atol=1e-12)
+    assert np.allclose(res0["z"].values, res1["z"].values, atol=1e-12)
+    assert res1.lot() == pytest.approx((10.0 + 0.04 * np.arange(11)).tolist())
 
 
 # a 4x refinement has to cut the error at least in half, i.e. an observed order
@@ -864,7 +887,7 @@ def test_converging_in_time():
         # eta is identically zero for the constant model, which would leave the
         # ratio at 0/0
         reference = solutions[16]
-        fields = ("y", "v", "eta") if model == BendingModel.VARYING else ("y", "v")
+        fields = ("z", "vz", "eta") if model == BendingModel.VARYING else ("z", "vz")
         for field in fields:
             coarse = _l2_gap(solutions[1][field], reference[field])
             fine = _l2_gap(solutions[4][field], reference[field])

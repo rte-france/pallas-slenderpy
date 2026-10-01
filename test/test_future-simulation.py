@@ -1,6 +1,7 @@
 """Tests for slenderpy.future.simulation (Agg backend, no display)."""
 
 import json
+import warnings
 
 import matplotlib
 
@@ -33,16 +34,18 @@ def test_parameters_derived_counts():
 def test_parameters_defaults():
     p = Parameters()
     assert p.ns == 11
-    assert len(p.los) == 11
-    assert all(0.0 < s < 1.0 for s in p.los)
-    assert p.los == sorted(p.los)
+    assert p.los == pytest.approx(np.linspace(0.0, 1.0, 11).tolist())
 
 
-def test_parameters_los_int_becomes_interior_points():
+def test_parameters_los_int_includes_the_supports():
     p = Parameters(los=5)
-    assert len(p.los) == 5
-    assert all(0.0 < s < 1.0 for s in p.los)
-    assert p.los == sorted(p.los)
+    assert p.los == pytest.approx([0.0, 0.25, 0.5, 0.75, 1.0])
+
+
+def test_parameters_los_accepts_supports_and_ints():
+    p = Parameters(los=[0, 0.5, 1])
+    assert p.los == [0.0, 0.5, 1.0]
+    assert all(isinstance(s, float) for s in p.los)
 
 
 def test_parameters_los_single_point():
@@ -77,6 +80,57 @@ def test_parameters_int_tf_default_rest():
     assert isinstance(p.tf, float)
 
 
+def test_parameters_effective_dt():
+    with pytest.warns(UserWarning):
+        p = Parameters(tf=1.0, dt=0.03, dr=0.06)
+    assert p.nt == 33
+    assert p.dt == pytest.approx(1.0 / 33)
+
+
+@pytest.mark.parametrize(
+    "t0, tf, dt, dr",
+    [(0.0, 1.0, 0.01, 0.03), (0.0, 1.0, 0.01, 0.07), (2.0, 3.0, 0.01, 0.03)],
+)
+def test_parameters_output_times_match_snapshot_steps(t0, tf, dt, dr):
+    p = Parameters(t0=t0, tf=tf, dt=dt, dr=dr)
+    # a snapshot is taken after every rr steps, starting from t0
+    expected = p.time_vector()[:: p.rr][: p.nr + 1]
+    assert p.time_vector_output() == pytest.approx(expected)
+    assert p.time_vector_output()[-1] <= tf
+
+
+def test_parameters_warns_when_dt_is_adjusted():
+    # the output step is adjusted too here, so look for the dt warning among all
+    with pytest.warns(UserWarning) as record:
+        Parameters(tf=1.0, dt=0.03, dr=0.06)
+    assert any("dt adjusted" in str(w.message) for w in record)
+
+
+def test_parameters_warns_when_dr_is_adjusted():
+    with pytest.warns(UserWarning, match="dr adjusted"):
+        Parameters(tf=1.0, dt=0.01, dr=0.025)
+
+
+def test_parameters_dr_longer_than_run_warns():
+    with pytest.warns(UserWarning, match="dr adjusted"):
+        p = Parameters(tf=1.0, dt=0.01, dr=5.0)
+    assert p.nr == p.nt
+    assert p.rr == 1
+
+
+def test_parameters_exact_steps_do_not_warn():
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        Parameters(tf=1.0, dt=0.01, dr=0.1)
+
+
+def test_parameters_dr_equal_dt_is_exact():
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        p = Parameters(tf=1.0, dt=0.01, dr=0.01)
+    assert p.time_vector_output() == pytest.approx(p.time_vector())
+
+
 @pytest.mark.parametrize(
     "kwargs",
     [
@@ -90,6 +144,9 @@ def test_parameters_int_tf_default_rest():
         {"los": [0.5, 0.2]},  # not ascending
         {"los": [0.5, 0.5]},  # duplicate
         {"pp": "yes"},  # wrong type
+        {"los": [-0.1, 0.5]},  # los < 0
+        {"los": [0.5, float("nan")]},  # not a number
+        {"los": [0.0, True]},  # bool is not a position
     ],
 )
 def test_parameters_invalid(kwargs):
@@ -189,11 +246,42 @@ def test_results_to_json_roundtrip():
 
     out = json.loads(res.to_json())
     assert out["time"] == pytest.approx(lot)
-    assert out["curv"] == pytest.approx(los)
+    assert out["span_frac"] == pytest.approx(los)
     assert out["scalar"] == pytest.approx([1.0, 2.0, 3.0])
     # vector is stored as a list over positions of time-series.
     assert len(out["vector"]) == len(los)
     assert out["vector"][0] == pytest.approx([0.0, 1.0, 2.0])
+
+
+def test_results_position_coordinate_is_span_frac():
+    res, *_ = _make_results()
+    assert "span_frac" in res.data.coords
+    assert "curv" not in res.data.coords
+
+
+def test_results_update_reaches_the_supports():
+    res = Results(lot=[0.0], lov=["a"], los=[0.0, 0.5, 1.0])
+    res.update(0, np.array([0.0, 1.0]), ["a"], [np.array([2.0, 4.0])])
+    assert res["a"][0].values == pytest.approx([2.0, 3.0, 4.0])
+
+
+def test_results_drop_matches_positions_up_to_round_off():
+    los = np.linspace(0.0, 1.0, 4).tolist()
+    res = Results(lot=[0.0, 1.0], lov=["a"], los=los)
+    res.drop(los=[1.0 / 3.0 + 1.0e-15])
+    assert res.los() == pytest.approx([0.0, 2.0 / 3.0, 1.0])
+
+
+def test_results_drop_unknown_position_raises():
+    res = Results(lot=[0.0, 1.0], lov=["a"], los=[0.25, 0.5])
+    with pytest.raises(ValueError):
+        res.drop(los=[0.5 + 1.0e-06])
+
+
+def test_results_drop_keeps_negative_times_by_default():
+    res = Results(lot=[-1.0, 0.0, 1.0], lov=["a"], los=[0.5])
+    res.drop()
+    assert res.lot() == pytest.approx([-1.0, 0.0, 1.0])
 
 
 # --- spectrum --------------------------------------------------------------
