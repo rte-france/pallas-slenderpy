@@ -578,6 +578,6 @@ def test_reduced_amplitude_stokcbridge(sb):
             initial_position=y0,
         )
 
-        assert np.max(np.max(res["y"], axis=0) - np.min(res["y"], axis=0)) > np.max(
+        assert np.max(np.max(res["z"], axis=0) - np.min(res["z"], axis=0)) > np.max(
             np.max(res_stockbridge["y"], axis=0) - np.min(res_stockbridge["y"], axis=0)
         ), (model, approx)
