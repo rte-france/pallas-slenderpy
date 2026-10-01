@@ -26,9 +26,9 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.linalg import solve_banded
 
+import slenderpy.future.fd_utils as fdu
 import slenderpy.future.simulation as simulation
 from slenderpy import _progress_bar as spb
-from slenderpy import fdm_utils as fdmu
 from slenderpy.future._constant import _GRAVITY
 from slenderpy.future.cable.static import catenary
 from slenderpy.future.components import Conductor, Span
@@ -177,6 +177,22 @@ def _to_global(
     return geom.equilibrium() + ut * geom.et + un * geom.en + ub * geom.eb
 
 
+def _operators(ns):
+    """First and second derivatives in arc fraction on the uniform grid.
+
+    ``second`` acts on the interior nodes, the ends being pinned at zero.
+    ``first`` acts on all nodes; its end rows are first-order one-sided, as
+    in the legacy solver: second-order rows change dtension by a few percent
+    and are left for a separate check.
+    """
+    h = 1.0 / (ns - 1)
+    second = fdu.second_derivative(ns, h).tocsr()[1:-1, 1:-1]
+    first = fdu.first_derivative(ns, h).tolil()
+    first[0, :2] = [-1.0 / h, 1.0 / h]
+    first[-1, -2:] = [-1.0 / h, 1.0 / h]
+    return first.tocsr(), second
+
+
 def _stretching(un, ub, first, ds, vt2):
     """Tangential offset and axial strain from the quasi-static condition."""
     h = -un / vt2 + 0.5 * ((first * un) ** 2 + (first * ub) ** 2)
@@ -314,13 +330,12 @@ def solve(
     un, ub, vn, vb = _to_local(initial_position, initial_velocity, geom)
     un, ub = un / length, ub / length
     vn, vb = vn / speed_scale, vb / speed_scale
-    # the ends are pinned; d2M assumes zero there
+    # the ends are pinned; the second derivative acts on the interior only
     un[0], un[-1], ub[0], ub[-1] = 0.0, 0.0, 0.0, 0.0
     vn[0], vn[-1], vb[0], vb[-1] = 0.0, 0.0, 0.0, 0.0
 
     ds = geom.ds
-    first = fdmu.d1M(ds)
-    second = fdmu.d2M(ds)
+    first, second = _operators(ns)
     ut, dtension = _stretching(un, ub, first, ds, vt2)
 
     dt = parameters.dt / time_scale

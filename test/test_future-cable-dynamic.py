@@ -323,6 +323,19 @@ def test_supports_can_be_stored(sld):
 # --- agreement with the legacy solver --------------------------------------
 
 
+@pytest.mark.parametrize("ns", [11, 101, 401])
+def test_operators_match_the_legacy_ones(ns):
+    """Built from future.fd_utils, they must equal legacy d1M and d2M."""
+    from slenderpy import fdm_utils
+
+    ds = np.diff(np.linspace(0.0, 1.0, ns))
+    first, second = dynamic._operators(ns)
+    for mine, legacy in ((first, fdm_utils.d1M(ds)), (second, fdm_utils.d2M(ds))):
+        legacy = legacy.toarray()
+        assert mine.shape == legacy.shape
+        assert np.abs(mine.toarray() - legacy).max() < 1e-12 * np.abs(legacy).max()
+
+
 def test_matches_the_legacy_solver():
     """Same model, same scheme: the local state must agree to round-off."""
     from slenderpy import cable, simtools
