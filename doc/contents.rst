@@ -141,3 +141,15 @@ both components on its local normal and binormal.
   the local Reynolds number.
 
 Provided forces add up: ``PointExcitation(...) + Gravity(mass) + WindDrag(...)``.
+
+Fatigue
+-------
+
+:func:`~slenderpy.future.fatigue.count_cycles` counts the rainflow cycles
+(ASTM E1049-85, no mean correction) of a position-dependent result, e.g.
+``z`` or ``moment``, at a distance from a support, such as the
+Poffenberger-Swart point 89 mm from a clamp. The result is read by linear
+interpolation between the stored positions, so store the fatigue position
+in ``los``. It returns a table of ranges, means and counts (1 per cycle, 0.5
+per half cycle); stress models, S-N curves and damage are left to a
+dedicated package.

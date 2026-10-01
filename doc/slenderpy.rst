@@ -106,6 +106,13 @@ slenderpy.future.force.wind module
    :members:
    :show-inheritance:
 
+slenderpy.future.fatigue module
+-------------------------------
+
+.. automodule:: slenderpy.future.fatigue
+   :members:
+   :show-inheritance:
+
 Module contents
 ---------------
 
