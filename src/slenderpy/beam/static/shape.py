@@ -4,10 +4,10 @@ The solver is a free function taking the ``Conductor`` and ``Span`` dataclasses
 from [](`slenderpy.components`). The two constitutive ingredients come
 from their own modules and are chosen independently:
 
-    - the bending law, constant or Bouc-Wen, from
-      [](`slenderpy.beam.bending`);
-    - the curvature model, approximate or exact, from
-      [](`slenderpy.beam.curvature`).
+- the bending law, constant or Bouc-Wen, from
+  [](`slenderpy.beam.bending`);
+- the curvature model, approximate or exact, from
+  [](`slenderpy.beam.curvature`).
 
 The nonlinear system is solved with a damped Newton iteration on the analytic
 Jacobian assembled from ``law.tangent`` and ``chi.jacobian``. A

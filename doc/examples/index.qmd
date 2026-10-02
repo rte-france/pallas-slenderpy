@@ -22,8 +22,3 @@ Cable:
   against the taut-string one.
 - [Wind fatigue](cable_wind_fatigue.qmd): a turbulent wind run and the
   rainflow count at the Poffenberger-Swart point.
-
-Stockbridge (experimental):
-
-- [Stockbridge damper](stockbridge.qmd): the damper solvers, and a span with
-  two dampers.

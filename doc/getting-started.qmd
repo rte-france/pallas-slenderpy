@@ -8,9 +8,6 @@ title: "Getting started"
 python -m pip install "slenderpy @ git+https://github.com/rte-france/pallas-slenderpy"
 ```
 
-The examples and the documentation also use matplotlib
-(`pip install "slenderpy[examples] @ git+..."`).
-
 ## The building blocks
 
 Every solver takes the same two descriptions of the structure, both frozen

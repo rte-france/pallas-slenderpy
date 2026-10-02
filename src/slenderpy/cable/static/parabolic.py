@@ -35,12 +35,18 @@ def shape(
 
     Parameters
     ----------
-    x : horizontal position (m, should be in [0, lspan] range)
-    lspan : span length (m)
-    tension : mechanical tension (N)
-    sld : support level difference (m)
-    linm : linear mass (kg.m**-1)
-    g : gravitational acceleration (m.s**-2)
+    x
+        Horizontal position (m, should be in [0, lspan] range).
+    lspan
+        Span length (m).
+    tension
+        Mechanical tension (N).
+    sld
+        Support level difference (m).
+    linm
+        Linear mass (kg.m**-1).
+    g
+        Gravitational acceleration (m.s**-2).
 
     Returns
     -------
@@ -72,11 +78,16 @@ def length(
 
     Parameters
     ----------
-    lspan : span length (m)
-    tension : mechanical tension (N)
-    sld : support level difference (m)
-    linm : linear mass (kg.m**-1)
-    g : gravitational acceleration (m.s**-2)
+    lspan
+        Span length (m).
+    tension
+        Mechanical tension (N).
+    sld
+        Support level difference (m).
+    linm
+        Linear mass (kg.m**-1).
+    g
+        Gravitational acceleration (m.s**-2).
 
     Returns
     -------
@@ -103,11 +114,16 @@ def argsag(
 
     Parameters
     ----------
-    lspan : span length (m)
-    tension : mechanical tension (N)
-    sld : support level difference (m)
-    linm : linear mass (kg.m**-1)
-    g : gravitational acceleration (m.s**-2)
+    lspan
+        Span length (m).
+    tension
+        Mechanical tension (N).
+    sld
+        Support level difference (m).
+    linm
+        Linear mass (kg.m**-1).
+    g
+        Gravitational acceleration (m.s**-2).
 
     Returns
     -------
@@ -138,11 +154,16 @@ def sag(
 
     Parameters
     ----------
-    lspan : span length (m)
-    tension : mechanical tension (N)
-    sld : support level difference (m)
-    linm : linear mass (kg.m**-1)
-    g : gravitational acceleration (m.s**-2)
+    lspan
+        Span length (m).
+    tension
+        Mechanical tension (N).
+    sld
+        Support level difference (m).
+    linm
+        Linear mass (kg.m**-1).
+    g
+        Gravitational acceleration (m.s**-2).
 
     Returns
     -------
@@ -176,11 +197,16 @@ def max_chord(
 
     Parameters
     ----------
-    lspan : span length (m)
-    tension : mechanical tension (N)
-    sld : support level difference (m)
-    linm : linear mass (kg.m**-1)
-    g : gravitational acceleration (m.s**-2)
+    lspan
+        Span length (m).
+    tension
+        Mechanical tension (N).
+    sld
+        Support level difference (m).
+    linm
+        Linear mass (kg.m**-1).
+    g
+        Gravitational acceleration (m.s**-2).
 
     Returns
     -------
@@ -204,12 +230,18 @@ def stress(
 
     Parameters
     ----------
-    x : horizontal position (m, should be in [0, lspan] range)
-    lspan : span length (m)
-    tension : mechanical tension (N)
-    sld : support level difference (m)
-    linm : linear mass (kg.m**-1)
-    g : gravitational acceleration (m.s**-2)
+    x
+        Horizontal position (m, should be in [0, lspan] range).
+    lspan
+        Span length (m).
+    tension
+        Mechanical tension (N).
+    sld
+        Support level difference (m).
+    linm
+        Linear mass (kg.m**-1).
+    g
+        Gravitational acceleration (m.s**-2).
 
     Returns
     -------
@@ -236,11 +268,16 @@ def mean_stress(
 
     Parameters
     ----------
-    lspan : span length (m)
-    tension : mechanical tension (N)
-    sld : support level difference (m)
-    linm : linear mass (kg.m**-1)
-    g : gravitational acceleration (m.s**-2)
+    lspan
+        Span length (m).
+    tension
+        Mechanical tension (N).
+    sld
+        Support level difference (m).
+    linm
+        Linear mass (kg.m**-1).
+    g
+        Gravitational acceleration (m.s**-2).
 
     Returns
     -------
@@ -273,14 +310,22 @@ def thermal_expansion_tension(
 
     Parameters
     ----------
-    lspan : span length (m)
-    tension_i : initial mechanical tension (N)
-    sld : support level difference (m)
-    temperature_i : initial temperature of cable (K)
-    temperature_f : final temperature of cable (K)
-    linm_i : initial linear mass (kg.m**-1)
-    alpha : thermal expansion coefficient (K**-1)
-    g : gravitational acceleration (m.s**-2)
+    lspan
+        Span length (m).
+    tension_i
+        Initial mechanical tension (N).
+    sld
+        Support level difference (m).
+    temperature_i
+        Initial temperature of cable (K).
+    temperature_f
+        Final temperature of cable (K).
+    linm_i
+        Initial linear mass (kg.m**-1).
+    alpha
+        Thermal expansion coefficient (K**-1).
+    g
+        Gravitational acceleration (m.s**-2).
 
     Returns
     -------
@@ -322,14 +367,22 @@ def thermal_expansion_temperature(
 
     Parameters
     ----------
-    lspan : span length (m)
-    tension_i : initial mechanical tension (N)
-    tension_f : final mechanical tension (N)
-    sld : support level difference (m)
-    temperature_i : initial temperature of cable (K)
-    linm_i : initial linear mass (kg.m**-1)
-    alpha : thermal expansion coefficient (K**-1)
-    g : gravitational acceleration (m.s**-2)
+    lspan
+        Span length (m).
+    tension_i
+        Initial mechanical tension (N).
+    tension_f
+        Final mechanical tension (N).
+    sld
+        Support level difference (m).
+    temperature_i
+        Initial temperature of cable (K).
+    linm_i
+        Initial linear mass (kg.m**-1).
+    alpha
+        Thermal expansion coefficient (K**-1).
+    g
+        Gravitational acceleration (m.s**-2).
 
     Returns
     -------

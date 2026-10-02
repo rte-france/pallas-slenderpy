@@ -28,7 +28,8 @@ parameters = simulation.Parameters(ns=101, t0=0.0, tf=60.0, dt=2e-3, dr=1e-2, lo
 - `los`: the positions where snapshots are stored, as **span fractions**
   (horizontal distance from support 1 divided by the span length), in
   `[0, 1]`; `0` and `1` are the supports. An integer `n` gives `n` evenly
-  spaced positions, supports included.
+  spaced positions, supports included; an integer below 2 gives mid-span
+  only, `[0.5]`.
 - `pp`: show a progress bar.
 
 The solvers always compute on the `ns` nodes; `los` only selects what is

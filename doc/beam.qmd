@@ -27,7 +27,7 @@ $$
 \chi_{exact}(y) = \frac{\partial^2 y}{\partial x ^2 } \frac{1}{\left(1 + \frac{\partial y}{\partial x}^2 \right)^{3/2}}
 $$
 
-By making a taylor expansion at order 1 of this formula, under the assumption of small displacements, we get the following approximation for the curvature:
+By making a Taylor expansion at order 1 of this formula, under the assumption of small displacements, we get the following approximation for the curvature:
 
 $$
 \chi_{approx}(y) = \frac{\partial^2 y}{\partial x ^2 }
@@ -173,8 +173,8 @@ the remaining ones are left at ``nan``.
 
 ## Boundary Conditions
 
-For all the previsous resolutions, there are always four boundary conditions. Two for each side of the beam.
-Considereing the left side of the beam at $x=0$ and the right side at $x=L$, the boundary conditions supported are under the form:
+For all the previous resolutions, there are always four boundary conditions. Two for each side of the beam.
+Considering the left side of the beam at $x=0$ and the right side at $x=L$, the boundary conditions supported are under the form:
 
 $$
 \begin{aligned}

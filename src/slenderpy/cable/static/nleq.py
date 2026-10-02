@@ -32,11 +32,16 @@ def _xpos(s, tension, linw, axs, lve):
 
     Parameters
     ----------
-    s : curvilinear abscissa along cable (m)
-    tension : mechanical tension (N)
-    linw : linear weight (N.m**-1)
-    axs : axial stiffness (N)
-    lve : left vertical effort (N)
+    s
+        Curvilinear abscissa along cable (m).
+    tension
+        Mechanical tension (N).
+    linw
+        Linear weight (N.m**-1).
+    axs
+        Axial stiffness (N).
+    lve
+        Left vertical effort (N).
 
     Returns
     -------
@@ -57,11 +62,16 @@ def _ypos(s, tension, linw, axs, lve):
 
     Parameters
     ----------
-    s : curvilinear abscissa along cable (m)
-    tension : mechanical tension (N)
-    linw : linear weight (N.m**-1)
-    axs : axial stiffness (N)
-    lve : left vertical effort (N)
+    s
+        Curvilinear abscissa along cable (m).
+    tension
+        Mechanical tension (N).
+    linw
+        Linear weight (N.m**-1).
+    axs
+        Axial stiffness (N).
+    lve
+        Left vertical effort (N).
 
     Returns
     -------
@@ -96,14 +106,22 @@ def solve(
 
     Parameters
     ----------
-    lspan : span length (m)
-    tension : mechanical tension (N)
-    sld : support level difference (m)
-    linm : linear mass (kg.m**-1)
-    axs : axial stiffness (N)
-    g : gravitational acceleration (m.s**-2)
-    rtol : relative tolerance for quasi-newton algorithm
-    maxiter : maximum number of iterations in quasi-newton algorithm
+    lspan
+        Span length (m).
+    tension
+        Mechanical tension (N).
+    sld
+        Support level difference (m).
+    linm
+        Linear mass (kg.m**-1).
+    axs
+        Axial stiffness (N).
+    g
+        Gravitational acceleration (m.s**-2).
+    rtol
+        Relative tolerance for quasi-newton algorithm.
+    maxiter
+        Maximum number of iterations in quasi-newton algorithm.
 
     Returns
     -------
@@ -162,17 +180,26 @@ def shape(
 
     Parameters
     ----------
-    s : curvilinear abscissa along cable (m)
-    lspan : span length (m)
-    tension : mechanical tension (N)
-    sld : support level difference (m)
-    linm : linear mass (kg.m**-1)
-    axs : axial stiffness (N)
+    s
+        Curvilinear abscissa along cable (m).
+    lspan
+        Span length (m).
+    tension
+        Mechanical tension (N).
+    sld
+        Support level difference (m).
+    linm
+        Linear mass (kg.m**-1).
+    axs
+        Axial stiffness (N).
     lcab: cable length before applying load (m)
     lve: left vertical effort (N)
-    g : gravitational acceleration (m.s**-2)
-    rtol : relative tolerance for quasi-newton algorithm
-    maxiter : maximum number of iterations in quasi-newton algorithm
+    g
+        Gravitational acceleration (m.s**-2).
+    rtol
+        Relative tolerance for quasi-newton algorithm.
+    maxiter
+        Maximum number of iterations in quasi-newton algorithm.
 
     Returns
     -------
@@ -224,17 +251,26 @@ def stress(
 
     Parameters
     ----------
-    s : curvilinear abscissa along cable (m)
-    lspan : span length (m)
-    tension : mechanical tension (N)
-    sld : support level difference (m)
-    linm : linear mass (kg.m**-1)
-    axs : axial stiffness (N)
+    s
+        Curvilinear abscissa along cable (m).
+    lspan
+        Span length (m).
+    tension
+        Mechanical tension (N).
+    sld
+        Support level difference (m).
+    linm
+        Linear mass (kg.m**-1).
+    axs
+        Axial stiffness (N).
     lcab: cable length before applying load (m)
     lve: left vertical effort (N)
-    g : gravitational acceleration (m.s**-2)
-    rtol : relative tolerance for quasi-newton algorithm
-    maxiter : maximum number of iterations in quasi-newton algorithm
+    g
+        Gravitational acceleration (m.s**-2).
+    rtol
+        Relative tolerance for quasi-newton algorithm.
+    maxiter
+        Maximum number of iterations in quasi-newton algorithm.
 
     Returns
     -------
@@ -272,16 +308,24 @@ def mean_stress(
 
     Parameters
     ----------
-    lspan : span length (m)
-    tension : mechanical tension (N)
-    sld : support level difference (m)
-    linm : linear mass (kg.m**-1)
-    axs : axial stiffness (N)
+    lspan
+        Span length (m).
+    tension
+        Mechanical tension (N).
+    sld
+        Support level difference (m).
+    linm
+        Linear mass (kg.m**-1).
+    axs
+        Axial stiffness (N).
     lcab: cable length before applying load (m)
     lve: left vertical effort (N)
-    g : gravitational acceleration (m.s**-2)
-    rtol : relative tolerance for quasi-newton algorithm
-    maxiter : maximum number of iterations in quasi-newton algorithm
+    g
+        Gravitational acceleration (m.s**-2).
+    rtol
+        Relative tolerance for quasi-newton algorithm.
+    maxiter
+        Maximum number of iterations in quasi-newton algorithm.
 
     Returns
     -------
@@ -316,16 +360,24 @@ def length(
 
     Parameters
     ----------
-    lspan : span length (m)
-    tension : mechanical tension (N)
-    sld : support level difference (m)
-    linm : linear mass (kg.m**-1)
-    axs : axial stiffness (N)
+    lspan
+        Span length (m).
+    tension
+        Mechanical tension (N).
+    sld
+        Support level difference (m).
+    linm
+        Linear mass (kg.m**-1).
+    axs
+        Axial stiffness (N).
     lcab: cable length before applying load (m)
     lve: left vertical effort (N)
-    g : gravitational acceleration (m.s**-2)
-    rtol : relative tolerance for quasi-newton algorithm
-    maxiter : maximum number of iterations in quasi-newton algorithm
+    g
+        Gravitational acceleration (m.s**-2).
+    rtol
+        Relative tolerance for quasi-newton algorithm.
+    maxiter
+        Maximum number of iterations in quasi-newton algorithm.
 
     Returns
     -------
@@ -372,16 +424,24 @@ def argsag(
 
     Parameters
     ----------
-    lspan : span length (m)
-    tension : mechanical tension (N)
-    sld : support level difference (m)
-    linm : linear mass (kg.m**-1)
-    axs : axial stiffness (N)
+    lspan
+        Span length (m).
+    tension
+        Mechanical tension (N).
+    sld
+        Support level difference (m).
+    linm
+        Linear mass (kg.m**-1).
+    axs
+        Axial stiffness (N).
     lcab: cable length before applying load (m)
     lve: left vertical effort (N)
-    g : gravitational acceleration (m.s**-2)
-    rtol : relative tolerance for quasi-newton algorithm
-    maxiter : maximum number of iterations in quasi-newton algorithm
+    g
+        Gravitational acceleration (m.s**-2).
+    rtol
+        Relative tolerance for quasi-newton algorithm.
+    maxiter
+        Maximum number of iterations in quasi-newton algorithm.
 
     Returns
     -------
@@ -422,16 +482,24 @@ def sag(
 
     Parameters
     ----------
-    lspan : span length (m)
-    tension : mechanical tension (N)
-    sld : support level difference (m)
-    linm : linear mass (kg.m**-1)
-    axs : axial stiffness (N)
+    lspan
+        Span length (m).
+    tension
+        Mechanical tension (N).
+    sld
+        Support level difference (m).
+    linm
+        Linear mass (kg.m**-1).
+    axs
+        Axial stiffness (N).
     lcab: cable length before applying load (m)
     lve: left vertical effort (N)
-    g : gravitational acceleration (m.s**-2)
-    rtol : relative tolerance for quasi-newton algorithm
-    maxiter : maximum number of iterations in quasi-newton algorithm
+    g
+        Gravitational acceleration (m.s**-2).
+    rtol
+        Relative tolerance for quasi-newton algorithm.
+    maxiter
+        Maximum number of iterations in quasi-newton algorithm.
 
     Returns
     -------
@@ -495,16 +563,24 @@ def max_chord(
 
     Parameters
     ----------
-    lspan : span length (m)
-    tension : mechanical tension (N)
-    sld : support level difference (m)
-    linm : linear mass (kg.m**-1)
-    axs : axial stiffness (N)
+    lspan
+        Span length (m).
+    tension
+        Mechanical tension (N).
+    sld
+        Support level difference (m).
+    linm
+        Linear mass (kg.m**-1).
+    axs
+        Axial stiffness (N).
     lcab: cable length before applying load (m)
     lve: left vertical effort (N)
-    g : gravitational acceleration (m.s**-2)
-    rtol : relative tolerance for quasi-newton algorithm
-    maxiter : maximum number of iterations in quasi-newton algorithm
+    g
+        Gravitational acceleration (m.s**-2).
+    rtol
+        Relative tolerance for quasi-newton algorithm.
+    maxiter
+        Maximum number of iterations in quasi-newton algorithm.
 
     Returns
     -------
@@ -546,17 +622,28 @@ def thermal_expansion_tension(
 
     Parameters
     ----------
-    lspan : span length (m)
-    tension_i : initial mechanical tension (N)
-    sld : support level difference (m)
-    temperature_i : initial temperature of cable (K)
-    temperature_f : final temperature of cable (K)
-    linm_i : initial linear mass (kg.m**-1)
-    axs : axial stiffness (N)
-    alpha : thermal expansion coefficient (K**-1)
-    g : gravitational acceleration (m.s**-2)
-    rtol : relative tolerance for quasi-newton algorithm
-    maxiter : maximum number of iterations in quasi-newton algorithm
+    lspan
+        Span length (m).
+    tension_i
+        Initial mechanical tension (N).
+    sld
+        Support level difference (m).
+    temperature_i
+        Initial temperature of cable (K).
+    temperature_f
+        Final temperature of cable (K).
+    linm_i
+        Initial linear mass (kg.m**-1).
+    axs
+        Axial stiffness (N).
+    alpha
+        Thermal expansion coefficient (K**-1).
+    g
+        Gravitational acceleration (m.s**-2).
+    rtol
+        Relative tolerance for quasi-newton algorithm.
+    maxiter
+        Maximum number of iterations in quasi-newton algorithm.
 
     Returns
     -------
@@ -618,17 +705,28 @@ def thermal_expansion_temperature(
 
     Parameters
     ----------
-    lspan : span length (m)
-    tension_i : initial mechanical tension (N)
-    tension_f : final mechanical tension (N)
-    sld : support level difference (m)
-    temperature_i : initial temperature of cable (K)
-    linm_i : initial linear mass (kg.m**-1)
-    axs : axial stiffness (N)
-    alpha : thermal expansion coefficient (K**-1)
-    g : gravitational acceleration (m.s**-2)
-    rtol : relative tolerance for quasi-newton algorithm
-    maxiter : maximum number of iterations in quasi-newton algorithm
+    lspan
+        Span length (m).
+    tension_i
+        Initial mechanical tension (N).
+    tension_f
+        Final mechanical tension (N).
+    sld
+        Support level difference (m).
+    temperature_i
+        Initial temperature of cable (K).
+    linm_i
+        Initial linear mass (kg.m**-1).
+    axs
+        Axial stiffness (N).
+    alpha
+        Thermal expansion coefficient (K**-1).
+    g
+        Gravitational acceleration (m.s**-2).
+    rtol
+        Relative tolerance for quasi-newton algorithm.
+    maxiter
+        Maximum number of iterations in quasi-newton algorithm.
 
     Returns
     -------

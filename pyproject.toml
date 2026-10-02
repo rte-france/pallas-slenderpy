@@ -67,3 +67,6 @@ select = ["E", "F", "I"]
 # Line length is enforced by `ruff format`; E501 would only add manual
 # wrapping of docstrings/comments the formatter intentionally leaves alone.
 ignore = ["E501"]
+
+[tool.coverage.run]
+omit = ["*/slenderpy/legacy/*"]

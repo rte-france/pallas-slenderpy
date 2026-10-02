@@ -19,12 +19,18 @@ def tension(
 
     Parameters
     ----------
-    weight : cable weight (N)
-    tension_i : initial mechanical tension (N)
-    temperature_i : initial temperature of cable (K)
-    temperature_f : final temperature of cable (K)
-    axs : axial stiffness (N)
-    alpha : thermal expansion coefficient (K**-1)
+    weight
+        Cable weight (N).
+    tension_i
+        Initial mechanical tension (N).
+    temperature_i
+        Initial temperature of cable (K).
+    temperature_f
+        Final temperature of cable (K).
+    axs
+        Axial stiffness (N).
+    alpha
+        Thermal expansion coefficient (K**-1).
 
     Returns
     -------
@@ -60,12 +66,18 @@ def temperature(
 
     Parameters
     ----------
-    weight : cable weight (N)
-    tension_i : initial mechanical tension (N)
-    tension_f : final mechanical tension (N)
-    temperature_i : initial temperature of cable (K)
-    axs : axial stiffness (N)
-    alpha : thermal expansion coefficient (K**-1)
+    weight
+        Cable weight (N).
+    tension_i
+        Initial mechanical tension (N).
+    tension_f
+        Final mechanical tension (N).
+    temperature_i
+        Initial temperature of cable (K).
+    axs
+        Axial stiffness (N).
+    alpha
+        Thermal expansion coefficient (K**-1).
 
     Returns
     -------

@@ -37,7 +37,7 @@ class Mass:
             Discretisation and constitutive parameters of the
             messenger cable.
         side : Side
-            [](`~slenderpy.stockbridge.core.mass.Side`) enum indicating left or right.
+            [](`~slenderpy.stockbridge.core.side.Side`) enum indicating left or right.
         """
         self.length_to_clamp = mass_parameters.length_to_clamp
         self.length_to_centroid = mass_parameters.length_to_centroid

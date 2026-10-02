@@ -42,6 +42,10 @@ branch is published with the documentation, at
 https://rte-france.github.io/pallas-slenderpy/coverage/; until the docs
 workflow has run once, the coverage badge of the README shows as broken.
 
+The docs workflow (`.github/workflows/docs.yml`) builds the site on every
+pull request and deploys it from `main`. Deploying requires the repository
+setting Settings > Pages > Source: GitHub Actions.
+
 ## Documentation
 
 The documentation is a [Quarto](https://quarto.org/) website in `doc/`; the
@@ -65,6 +69,7 @@ limit. Either enable long paths, or point the uv cache and the temporary
 directory to short paths before `uv sync` (PowerShell):
 
 ```powershell
+New-Item -ItemType Directory -Force C:/q/c, C:/q/t
 $env:UV_CACHE_DIR = "C:/q/c"; $env:TMP = "C:/q/t"; $env:TEMP = "C:/q/t"
 ```
 
@@ -74,8 +79,7 @@ including the docs workflow, which never runs them. When a page or its
 example script changes, re-render that page locally (a single page is always
 executed), for example `uv run quarto render examples/cable_dynamic.qmd`,
 and commit the updated `doc/_freeze/`. A project render only checks the page
-source: a change to an example script alone is not detected. The
-stockbridge example takes over an hour to run.
+source: a change to an example script alone is not detected.
 
 A new public module must be added to the `quartodoc` sections of
 `doc/_quarto.yml`; `test/test_documentation.py` fails otherwise.

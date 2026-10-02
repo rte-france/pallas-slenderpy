@@ -301,7 +301,7 @@ class WindDrag(Force):
         Any object with ``velocity(x, t) -> (wy, wz)``.
     drag_coefficient
         Constant drag coefficient, or a function of the
-        Reynolds number. Default [](`~slenderpy.force.wind.cylinder_drag`).
+        Reynolds number. Default [](`~slenderpy.force.air.cylinder_drag`).
     air
         Air state, for the density and the viscosity.
     """

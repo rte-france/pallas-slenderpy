@@ -138,7 +138,7 @@ def solve_dynamic(
         uses the exact geometric curvature.
     initial_position : np.ndarray, optional
         Initial position. Default the static shape under ``force`` at ``t0``,
-        from [](`~slenderpy.beam.dynamic.shape.solve`) with the same model and curvature option.
+        from [](`~slenderpy.beam.static.shape.solve`) with the same model and curvature option.
     initial_velocity : np.ndarray, optional
         Initial velocity. Default at rest.
     initial_bending_moment : np.ndarray, optional

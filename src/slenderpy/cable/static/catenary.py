@@ -31,6 +31,26 @@ def length(
     linm: floatArrayLike,
     g: floatArrayLike = _GRAVITY,
 ):
+    """Arc length of the catenary between the two supports.
+
+    Parameters
+    ----------
+    lspan : float or array
+        Span length (m).
+    tension : float or array
+        Horizontal component of the tension (N).
+    sld : float or array
+        Support level difference (m), height of support 2 above support 1.
+    linm : float or array
+        Linear mass (kg/m).
+    g : float or array, optional
+        Gravitational acceleration (m/s**2).
+
+    Returns
+    -------
+    float or array
+        Cable length (m).
+    """
     a = _mechparam(tension, linm, g=g)
     larc = _length(lspan, a, sld)
     return larc
@@ -58,6 +78,31 @@ def shape(
     linm: floatArrayLike,
     g: floatArrayLike = _GRAVITY,
 ) -> floatArrayLike:
+    """Vertical position of the catenary.
+
+    Array arguments must broadcast together.
+
+    Parameters
+    ----------
+    x : float or array
+        Horizontal distance from support 1 (m), in ``[0, lspan]``.
+    lspan : float or array
+        Span length (m).
+    tension : float or array
+        Horizontal component of the tension (N).
+    sld : float or array
+        Support level difference (m), height of support 2 above support 1.
+    linm : float or array
+        Linear mass (kg/m).
+    g : float or array, optional
+        Gravitational acceleration (m/s**2).
+
+    Returns
+    -------
+    float or array
+        Height (m) relative to support 1; ``0`` at ``x = 0`` and ``sld`` at
+        ``x = lspan``.
+    """
     _, a, x0 = _lax0(lspan, tension, sld, linm, g)
     return 2.0 * a * np.sinh(0.5 * (x + x0) / a) * np.sinh(0.5 * x / a)
 
@@ -69,6 +114,26 @@ def argsag(
     linm: floatArrayLike,
     g: floatArrayLike = _GRAVITY,
 ) -> floatArrayLike:
+    """Horizontal position of the lowest point of the cable.
+
+    Parameters
+    ----------
+    lspan : float or array
+        Span length (m).
+    tension : float or array
+        Horizontal component of the tension (N).
+    sld : float or array
+        Support level difference (m), height of support 2 above support 1.
+    linm : float or array
+        Linear mass (kg/m).
+    g : float or array, optional
+        Gravitational acceleration (m/s**2).
+
+    Returns
+    -------
+    float or array
+        Distance from support 1 (m), clipped to ``[0, lspan]``.
+    """
     _, _, x0 = _lax0(lspan, tension, sld, linm, g)
     return np.minimum(np.maximum(-0.5 * x0, 0.0), lspan)
 
@@ -80,6 +145,26 @@ def sag(
     linm: floatArrayLike,
     g: floatArrayLike = _GRAVITY,
 ) -> floatArrayLike:
+    """Sag, the vertical distance from the chord to the lowest point.
+
+    Parameters
+    ----------
+    lspan : float or array
+        Span length (m).
+    tension : float or array
+        Horizontal component of the tension (N).
+    sld : float or array
+        Support level difference (m), height of support 2 above support 1.
+    linm : float or array
+        Linear mass (kg/m).
+    g : float or array, optional
+        Gravitational acceleration (m/s**2).
+
+    Returns
+    -------
+    float or array
+        Sag (m), positive below the chord.
+    """
     x = argsag(lspan, tension, sld, linm, g)
     return sld * x / lspan - shape(x, lspan, tension, sld, linm, g=g)
 
@@ -91,22 +176,46 @@ def max_chord(
     linm: floatArrayLike,
     g: floatArrayLike = _GRAVITY,
 ) -> floatArrayLike:
+    """Largest vertical distance between the chord and the cable.
+
+    Parameters
+    ----------
+    lspan : float or array
+        Span length (m).
+    tension : float or array
+        Horizontal component of the tension (N).
+    sld : float or array
+        Support level difference (m), height of support 2 above support 1.
+    linm : float or array
+        Linear mass (kg/m).
+    g : float or array, optional
+        Gravitational acceleration (m/s**2).
+
+    Returns
+    -------
+    float or array
+        Distance (m), reached where the cable is parallel to the chord.
+    """
     _, a, x0 = _lax0(lspan, tension, sld, linm, g)
     x = a * np.arcsinh(sld / lspan) - 0.5 * x0
     return sld * x / lspan - shape(x, lspan, tension, sld, linm, g=g)
 
 
 def stress():
+    """Not implemented for the catenary; raises ``NotImplementedError``."""
     raise NotImplementedError
 
 
 def mean_stress():
+    """Not implemented for the catenary; raises ``NotImplementedError``."""
     raise NotImplementedError
 
 
 def thermal_expansion_tension():
+    """Not implemented for the catenary; raises ``NotImplementedError``."""
     raise NotImplementedError
 
 
 def thermal_expansion_temperature():
+    """Not implemented for the catenary; raises ``NotImplementedError``."""
     raise NotImplementedError
