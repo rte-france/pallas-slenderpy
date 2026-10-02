@@ -122,9 +122,9 @@ def d2M_cst(
         Matrix size.
     ds : float
         Discretization step.
-    bcl : slenderpy.fdm_utils.BoundaryCondition
+    bcl : slenderpy.legacy.fdm_utils.BoundaryCondition
         Left boundary condition.
-    bcr : slenderpy.fdm_utils.BoundaryCondition
+    bcr : slenderpy.legacy.fdm_utils.BoundaryCondition
         Right boundary condition.
 
     Returns
@@ -165,9 +165,9 @@ def d4M_cst(
         Matrix size.
     ds : float
         Discretization step.
-    bcl : slenderpy.fdm_utils.BoundaryCondition
+    bcl : slenderpy.legacy.fdm_utils.BoundaryCondition
         Left boundary condition.
-    bcr : slenderpy.fdm_utils.BoundaryCondition
+    bcr : slenderpy.legacy.fdm_utils.BoundaryCondition
         Right boundary condition.
 
     Returns

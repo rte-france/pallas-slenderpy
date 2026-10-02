@@ -1,4 +1,4 @@
-"""The package root exposes what slenderpy exposed."""
+"""The package root exposes what slenderpy.future exposed."""
 
 import slenderpy
 

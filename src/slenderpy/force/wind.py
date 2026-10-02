@@ -4,7 +4,7 @@ A wind model provides ``velocity(x, t) -> (wy, wz)``, the wind velocity (m/s)
 at the horizontal positions ``x`` (m) and time ``t`` (s), in the global frame
 of :mod:`slenderpy.force.core`. The mean wind blows along ``+y``.
 
-The turbulent models are ported from :mod:`slenderpy.turbwind`.
+The turbulent models are ported from :mod:`slenderpy.legacy.turbwind`.
 """
 
 from __future__ import annotations
@@ -80,7 +80,7 @@ class UniformTurbulentWind:
 
     A Von Karman along-wind signal generated at init on the time window, then
     normalised to exactly ``mean`` and ``std``. Ported from
-    :class:`slenderpy.turbwind.RandomWind1D`; with ``t_start = 0`` both give
+    :class:`slenderpy.legacy.turbwind.RandomWind1D`; with ``t_start = 0`` both give
     the same signal for the same seed. Between samples the speed is linearly
     interpolated; outside the window it is held at its end values.
 
@@ -140,7 +140,7 @@ class UniformTurbulentWind:
 class TurbulentWindField:
     """Turbulent wind field along the span, along-wind and vertical components.
 
-    Ported from :class:`slenderpy.turbwind.TurbWind3D`, restricted to the
+    Ported from :class:`slenderpy.legacy.turbwind.TurbWind3D`, restricted to the
     along-wind ``u`` (giving ``wy``) and vertical ``w`` (giving ``wz``)
     components; the along-span component is tangential and, the legacy cross
     spectral matrix being block diagonal, dropping it leaves ``u`` and ``w``

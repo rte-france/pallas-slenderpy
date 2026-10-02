@@ -1,6 +1,6 @@
 """Air properties and the drag coefficient of a circular cylinder.
 
-Formulas ported from :mod:`slenderpy.wind`.
+Formulas ported from :mod:`slenderpy.legacy.wind`.
 """
 
 from __future__ import annotations

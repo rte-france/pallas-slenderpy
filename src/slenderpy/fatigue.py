@@ -6,7 +6,7 @@ e.g. the Poffenberger-Swart point 89 mm from a clamp. Stress models, S-N
 curves and damage are out of scope: the counted cycles feed a separate
 package.
 
-The counting is ported from :mod:`slenderpy.fatigue`, without its Goodman
+The counting is ported from :mod:`slenderpy.legacy.fatigue`, without its Goodman
 correction.
 """
 

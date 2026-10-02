@@ -2,7 +2,7 @@
 (:class:`Results`) and the helpers to plot (:func:`multiplot`) and transform
 (:func:`spectrum`) them.
 
-Ported from :mod:`slenderpy.simtools` with bug fixes and modernization.
+Ported from :mod:`slenderpy.legacy.simtools` with bug fixes and modernization.
 ``Results`` is backed by an :class:`xarray.Dataset` with a ``time`` x
 ``span_frac`` layout, ``span_frac`` being the horizontal distance from support 1
 over the span length, in [0, 1].
@@ -545,7 +545,7 @@ def spectrum(res: Results) -> Results:
     The returned Results stores frequencies (Hz) in place of times, keeping the
     same variables, dimensions and positions. Values are the one-sided modulus
     ``abs(fft(x) / n)`` over the first ``n // 2`` bins, the DC bin included;
-    this 1/n normalization is the same convention as :mod:`slenderpy.simtools`,
+    this 1/n normalization is the same convention as :mod:`slenderpy.legacy.simtools`,
     so a unit-amplitude sine peaks at 0.5.
 
     Parameters

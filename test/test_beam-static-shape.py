@@ -259,8 +259,8 @@ def test_rhs_length_mismatch_raises():
 def test_bending_model_is_reexported():
     """The model selector lives in `bending`; `shape` re-exports it unchanged.
 
-    The constitutive laws themselves are covered by test_future-beam-bending.py
-    and test_future-beam-curvature.py; here only the wiring is checked.
+    The constitutive laws themselves are covered by test_beam-bending.py
+    and test_beam-curvature.py; here only the wiring is checked.
     """
     assert shape.BendingModel is bending.BendingModel
 

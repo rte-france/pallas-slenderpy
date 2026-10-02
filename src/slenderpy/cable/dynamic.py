@@ -6,11 +6,11 @@ non-dimensionalised by the cable length, on a grid uniform in arc length. The
 tangential displacement is not a degree of freedom; it follows from the
 quasi-static stretching condition.
 
-Ported from :func:`slenderpy.cable.solve`, with the interface moved to global
+Ported from :func:`slenderpy.legacy.cable.solve`, with the interface moved to global
 coordinates: the initial conditions and the results are absolute positions in a
 fixed frame, and positions of interest are normalised span positions, as in
 :mod:`slenderpy.beam.dynamic`. The frame is the one described at
-:func:`slenderpy.cable.tnb2xyz`: ``ex`` horizontal and ``ez`` vertical in the
+:func:`slenderpy.legacy.cable.tnb2xyz`: ``ex`` horizontal and ``ez`` vertical in the
 plane of the two supports and the cable at rest, ``ey`` completing a
 right-handed set.
 

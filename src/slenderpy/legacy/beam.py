@@ -456,9 +456,9 @@ def solve_cst(
     c0 : float, optional
         Curvature to compute bending stiffness. The default is None. If set to
         None a zero value will be used.
-    bcl : slenderpy.fdm_utils.BoundaryCondition
+    bcl : slenderpy.legacy.fdm_utils.BoundaryCondition
         Left boundary condition.
-    bcr : slenderpy.fdm_utils.BoundaryCondition
+    bcr : slenderpy.legacy.fdm_utils.BoundaryCondition
         Right boundary condition.
     zt : float, optional
         Fluid-friction coefficient. The default is 0.
@@ -514,9 +514,9 @@ def solve_ft(
     m0 : numpy.ndarray, optional
         Initial moment. The default is None. If set to None a zero vmomentelocity
         will be used.
-    bcl : slenderpy.fdm_utils.BoundaryCondition
+    bcl : slenderpy.legacy.fdm_utils.BoundaryCondition
         Left boundary condition.
-    bcr : slenderpy.fdm_utils.BoundaryCondition
+    bcr : slenderpy.legacy.fdm_utils.BoundaryCondition
         Right boundary condition.
     zt : float, optional
         Fluid-friction coefficient. The default is 0.
@@ -533,7 +533,7 @@ def solve_ft(
     for i in range(len(vrl)):
         if not isinstance(vrl[i], fdu.BoundaryCondition):
             raise TypeError(
-                f"input {vrn[i]} must be a slenderpy.fdm_utils." "BoundaryCondition"
+                f"input {vrn[i]} must be a slenderpy.legacy.fdm_utils.BoundaryCondition"
             )
 
     # space
@@ -661,9 +661,9 @@ def static_gravity_var(
     ----------
     bm : slenderpy.beam.Beam
         A beam object.
-    bl : slenderpy.fdm_utils.BoundaryCondition
+    bl : slenderpy.legacy.fdm_utils.BoundaryCondition
         Left boundary condition.
-    br : slenderpy.fdm_utils.BoundaryCondition
+    br : slenderpy.legacy.fdm_utils.BoundaryCondition
         Right boundary condition.
     c0 : float, optional
         Initial curvature to compute bending stiffness. The default is 0.
@@ -720,9 +720,9 @@ def static_gravity_cst(
     ----------
     bm : slenderpy.beam.Beam
         A beam object.
-    bl : slenderpy.fdm_utils.BoundaryCondition
+    bl : slenderpy.legacy.fdm_utils.BoundaryCondition
         Left boundary condition.
-    br : slenderpy.fdm_utils.BoundaryCondition
+    br : slenderpy.legacy.fdm_utils.BoundaryCondition
         Right boundary condition.
     c0 : float, optional
         Initial curvature to compute bending stiffness. The default is 0.
@@ -749,9 +749,9 @@ def static_gravity_ft(
     ----------
     bm : slenderpy.beam.Beam
         A beam object.
-    bl : slenderpy.fdm_utils.BoundaryCondition
+    bl : slenderpy.legacy.fdm_utils.BoundaryCondition
         Left boundary condition.
-    br : slenderpy.fdm_utils.BoundaryCondition
+    br : slenderpy.legacy.fdm_utils.BoundaryCondition
         Right boundary condition.
     ns : int, optional
         Number of discretization points. The default is 1001.
