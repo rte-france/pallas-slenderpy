@@ -1,0 +1,111 @@
+project:
+  type: website
+  output-dir: _site
+
+website:
+  title: "slenderpy"
+  repo-url: https://github.com/rte-france/pallas-slenderpy
+  repo-actions: [source, issue]
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - href: getting-started.qmd
+        text: Getting started
+      - text: User guide
+        menu:
+          - simulation.qmd
+          - cable.qmd
+          - beam.qmd
+          - forces.qmd
+          - fatigue.qmd
+          - stockbridge.qmd
+      - href: examples/index.qmd
+        text: Examples
+      - href: reference/index.qmd
+        text: API
+      - href: legacy.qmd
+        text: Legacy
+      - href: coverage/index.html
+        text: Coverage
+  page-footer:
+    center: "slenderpy, Mozilla Public License 2.0"
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    code-copy: true
+    html-math-method: mathjax
+
+execute:
+  freeze: auto
+
+filters:
+  - interlinks
+
+interlinks:
+  sources:
+    python:
+      url: https://docs.python.org/3/
+    numpy:
+      url: https://numpy.org/doc/stable/
+
+quartodoc:
+  package: slenderpy
+  dir: reference
+  parser: numpy
+  title: API reference
+  render_interlinks: true
+  options:
+    children: embedded
+  sections:
+    - title: Components and simulation
+      desc: Data classes, boundary conditions, simulation parameters and results.
+      contents:
+        - components
+        - boundary_condition
+        - simulation
+        - fd_utils
+    - title: Cable
+      desc: Static closed forms, static shape under a load, dynamics and frequencies.
+      contents:
+        - cable.static.catenary
+        - cable.static.parabolic
+        - cable.static.nleq
+        - cable.static.blondel
+        - cable.static.shape
+        - cable.dynamic
+        - cable.frequency
+    - title: Beam
+      desc: Bending laws, curvature, static shape, frequencies and dynamics.
+      contents:
+        - beam.bending
+        - beam.curvature
+        - beam.static.shape
+        - beam.static.frequency
+        - beam.dynamic
+    - title: Forces
+      desc: The force interface, gravity, point excitation, air, wind and drag.
+      contents:
+        - force.core
+        - force.air
+        - force.wind
+    - title: Fatigue
+      desc: Rainflow cycle counting of simulation results.
+      contents:
+        - fatigue
+    - title: Stockbridge (experimental)
+      desc: Stockbridge dampers and their coupling with a beam.
+      contents:
+        - stockbridge
+        - stockbridge.core.clamp
+        - stockbridge.core.mass
+        - stockbridge.core.parameters
+        - stockbridge.core.side
+        - stockbridge.core.stockbridge
+        - stockbridge.coupling.beam_coupling
+        - stockbridge.solvers.imposed_acceleration
+        - stockbridge.solvers.imposed_force
+        - stockbridge.solvers.linearized
+        - stockbridge.plotting

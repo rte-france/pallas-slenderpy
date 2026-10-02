@@ -35,6 +35,15 @@ examples = [
 test = [
     "pylint",
     "pytest",
+    "pytest-cov",
+    "pyyaml",
+]
+docs = [
+    "quarto-cli",
+    "quartodoc",
+    "griffe<2",
+    "jupyter",
+    "matplotlib",
 ]
 lint = [
     "mypy ~= 1.13.0",
