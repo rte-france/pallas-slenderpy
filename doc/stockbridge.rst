@@ -10,7 +10,7 @@ The cable is characterized by its length, and the following parameters:
   
 These three parameters are not constant along the cable, we distinguish 3 different zones. 
 The boundary zones (near the clamp and near the mass) that are characterized by the same parameters, and the middle zone that is characterized by different parameters.
-The user can set the length of the boundary zones thanks to the argument :code:`ratio_boundary1` and :code:`ratio_boundary2` of the class :class:`~slenderpy.future.stockbridge.core.Parameters.MessengerCableParameters`.
+The user can set the length of the boundary zones thanks to the argument :code:`ratio_boundary1` and :code:`ratio_boundary2` of the class :class:`~slenderpy.stockbridge.core.Parameters.MessengerCableParameters`.
 The ratio being the length of the boundary zone divided by the total length of the messenger cable.
 
 The motion of the mass :math:`i` is fully described by its vertical displacement  acement at tip :math:`x_i` and its rotation :math:`\varphi_i`.

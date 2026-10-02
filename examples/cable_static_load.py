@@ -8,10 +8,10 @@ position of the nodes.
 import matplotlib.pyplot as plt
 import numpy as np
 
-from slenderpy.future.cable import dynamic
-from slenderpy.future.cable.static import shape
-from slenderpy.future.components import Conductor, Span
-from slenderpy.future.force.wind import ConstantWind, WindDrag
+from slenderpy.cable import dynamic
+from slenderpy.cable.static import shape
+from slenderpy.components import Conductor, Span
+from slenderpy.force.wind import ConstantWind, WindDrag
 
 conductor = Conductor(mass=1.571, diameter=0.0313, axial_stiffness=3.76e07)
 span = Span(length=400.0, tension=3.7e04)

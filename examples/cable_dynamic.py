@@ -8,9 +8,9 @@ frequency sits above the taut-string one.
 import matplotlib.pyplot as plt
 import numpy as np
 
-from slenderpy.future import simulation
-from slenderpy.future.cable import dynamic, frequency
-from slenderpy.future.components import Conductor, Span
+from slenderpy import simulation
+from slenderpy.cable import dynamic, frequency
+from slenderpy.components import Conductor, Span
 
 conductor = Conductor(mass=1.571, diameter=0.0313, axial_stiffness=3.76e07)
 span = Span(length=400.0, tension=3.7e04)

@@ -9,13 +9,13 @@ the static envelope of the law.
 import matplotlib.pyplot as plt
 import numpy as np
 
-from slenderpy.future import simulation
-from slenderpy.future.beam import bending
-from slenderpy.future.beam.dynamic import solve_dynamic
-from slenderpy.future.beam.static import shape
-from slenderpy.future.boundary_condition import clamped
-from slenderpy.future.components import Conductor, Span
-from slenderpy.future.force.core import Gravity
+from slenderpy import simulation
+from slenderpy.beam import bending
+from slenderpy.beam.dynamic import solve_dynamic
+from slenderpy.beam.static import shape
+from slenderpy.boundary_condition import clamped
+from slenderpy.components import Conductor, Span
+from slenderpy.force.core import Gravity
 
 conductor = Conductor(mass=1.57, ei_min=28.28, ei_max=2155.07, beta_flexion=6.438e-07)
 span = Span(length=20.0, tension=2.0e03, boundary_conditions=clamped())

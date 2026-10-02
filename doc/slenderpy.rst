@@ -4,126 +4,126 @@ slenderpy package
 Submodules
 ----------
 
-slenderpy.beam module
----------------------
+slenderpy.legacy.beam module
+----------------------------
 
-.. automodule:: slenderpy.beam
+.. automodule:: slenderpy.legacy.beam
    :members:
    :undoc-members:
    :show-inheritance:
 
-slenderpy.cable module
-----------------------
+slenderpy.legacy.cable module
+-----------------------------
 
-.. automodule:: slenderpy.cable
+.. automodule:: slenderpy.legacy.cable
    :members:
    :undoc-members:
    :show-inheritance:
 
-slenderpy.cable\_wakeosc module
+slenderpy.legacy.cable\_wakeosc module
+--------------------------------------
+
+.. automodule:: slenderpy.legacy.cable_wakeosc
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+slenderpy.legacy.fatigue module
 -------------------------------
 
-.. automodule:: slenderpy.cable_wakeosc
+.. automodule:: slenderpy.legacy.fatigue
    :members:
    :undoc-members:
    :show-inheritance:
 
-slenderpy.fatigue module
-------------------------
-
-.. automodule:: slenderpy.fatigue
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-slenderpy.fdm\_utils module
----------------------------
-
-.. automodule:: slenderpy.fdm_utils
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-slenderpy.force module
-----------------------
-
-.. automodule:: slenderpy.force
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-slenderpy.simtools module
--------------------------
-
-.. automodule:: slenderpy.simtools
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-slenderpy.turbwind module
--------------------------
-
-.. automodule:: slenderpy.turbwind
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-slenderpy.wind module
----------------------
-
-.. automodule:: slenderpy.wind
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-slenderpy.future.simulation module
+slenderpy.legacy.fdm\_utils module
 ----------------------------------
 
-.. automodule:: slenderpy.future.simulation
+.. automodule:: slenderpy.legacy.fdm_utils
    :members:
    :undoc-members:
    :show-inheritance:
 
-slenderpy.future.force.core module
+slenderpy.legacy.force module
+-----------------------------
+
+.. automodule:: slenderpy.legacy.force
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+slenderpy.legacy.simtools module
+--------------------------------
+
+.. automodule:: slenderpy.legacy.simtools
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+slenderpy.legacy.turbwind module
+--------------------------------
+
+.. automodule:: slenderpy.legacy.turbwind
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+slenderpy.legacy.wind module
+----------------------------
+
+.. automodule:: slenderpy.legacy.wind
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+slenderpy.simulation module
 ----------------------------------
 
-.. automodule:: slenderpy.future.force.core
+.. automodule:: slenderpy.simulation
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+slenderpy.force.core module
+----------------------------------
+
+.. automodule:: slenderpy.force.core
    :members:
    :show-inheritance:
 
-slenderpy.future.force.air module
+slenderpy.force.air module
 ---------------------------------
 
-.. automodule:: slenderpy.future.force.air
+.. automodule:: slenderpy.force.air
    :members:
    :show-inheritance:
 
-slenderpy.future.force.wind module
+slenderpy.force.wind module
 ----------------------------------
 
-.. automodule:: slenderpy.future.force.wind
+.. automodule:: slenderpy.force.wind
    :exclude-members: drag_coefficient
    :members:
    :show-inheritance:
 
-slenderpy.future.fatigue module
+slenderpy.fatigue module
 -------------------------------
 
-.. automodule:: slenderpy.future.fatigue
+.. automodule:: slenderpy.fatigue
    :members:
    :show-inheritance:
 
-slenderpy.future.beam.static.shape module
+slenderpy.beam.static.shape module
 -----------------------------------------
 
-.. automodule:: slenderpy.future.beam.static.shape
+.. automodule:: slenderpy.beam.static.shape
    :members:
    :show-inheritance:
 
-slenderpy.future.cable.static.shape module
+slenderpy.cable.static.shape module
 ------------------------------------------
 
-.. automodule:: slenderpy.future.cable.static.shape
+.. automodule:: slenderpy.cable.static.shape
    :members:
    :show-inheritance:
 

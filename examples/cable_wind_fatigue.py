@@ -7,10 +7,10 @@ reads the out-of-plane position at the Poffenberger-Swart point, stored in
 
 import matplotlib.pyplot as plt
 
-from slenderpy.future import fatigue, simulation
-from slenderpy.future.cable import dynamic
-from slenderpy.future.components import Conductor, Span
-from slenderpy.future.force.wind import UniformTurbulentWind, WindDrag
+from slenderpy import fatigue, simulation
+from slenderpy.cable import dynamic
+from slenderpy.components import Conductor, Span
+from slenderpy.force.wind import UniformTurbulentWind, WindDrag
 
 conductor = Conductor(mass=1.571, diameter=0.0313, axial_stiffness=3.76e07)
 span = Span(length=400.0, tension=3.7e04)

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from slenderpy.future.stockbridge import (
+from slenderpy.stockbridge import (
     Clamp,
     ClampParameters,
     Mass,

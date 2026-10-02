@@ -1,221 +1,191 @@
-"""A set of function for fatigue post-processing."""
+"""Cycle counting of simulation results for fatigue post-processing.
+
+Counts the vibration cycles of a position-dependent output of a cable or
+beam run at a fatigue position given as a distance from a support,
+e.g. the Poffenberger-Swart point 89 mm from a clamp. Stress models, S-N
+curves and damage are out of scope: the counted cycles feed a separate
+package.
+
+The counting is ported from :mod:`slenderpy.fatigue`, without its Goodman
+correction.
+"""
+
+from __future__ import annotations
+
+import math
 
 import numpy as np
 import pandas as pd
 
-from slenderpy import cable
+import slenderpy.simulation as simulation
+from slenderpy.components import Span
+
+# Output columns of count_cycles.
+_COLUMNS = ["range", "mean", "count"]
+
+# Weight of a residual half cycle (legacy uc_mult default).
+_HALF_CYCLE = 0.5
 
 
-def _compress(s):
-    """Compress signal to remove unnecessary points in cycle count process."""
-    dm = np.sign(s[1:-1] - s[:-2])
-    dp = np.sign(s[2:] - s[1:-1])
-    ix = np.where(dm != dp)[0]
-    return np.concatenate(([0], 1 + ix, [len(s) - 1]))
+def _compress(signal):
+    """Indices of the turning points of a signal, both ends included.
+
+    Repeated consecutive samples are collapsed first, keeping the first of
+    each run: the legacy version kept them, and the zero range they form made
+    the rainflow stack drop the true peak, losing cycles.
+    """
+    # prepending nan keeps the first sample, nan differing from everything
+    distinct = np.flatnonzero(np.diff(signal, prepend=np.nan) != 0.0)
+    values = signal[distinct]
+    before = np.sign(values[1:-1] - values[:-2])
+    after = np.sign(values[2:] - values[1:-1])
+    turning = np.where(before != after)[0]
+    return distinct[np.concatenate(([0], 1 + turning, [len(values) - 1]))]
 
 
-def _rainflow(array_ext, flm=0, l_ult=1e16, uc_mult=0.5):
-    """Rainflow counting of a signal's turning points with Goodman correction.
+def _rainflow(turning_points):
+    """Rainflow count of a sequence of turning points.
 
-    From https://stackoverflow.com/questions/6107702/rainflow-counting-algorithm?,
-    slightly modified.
+    Four-point stack algorithm of the legacy counter (ASTM E1049-85): a range
+    that holds the first point of the stack is a half cycle, any other closed
+    range a full cycle, and the ranges left on the stack at the end are half
+    cycles. On the output of :func:`_compress`, which collapses repeated
+    samples, a zero range cannot occur; zero ranges are still skipped, as a
+    guard for direct calls.
 
     Parameters
     ----------
-    array_ext : numpy.ndarray
-        Array of turning points.
-    flm : float, optional
-        Fixed-load mean. The default is 0.
-    l_ult : float, optional
-        Ultimate load. The default is 1e16.
-    uc_mult : float, optional
-        Partial-load scaling. The default is 0.5.
+    turning_points : numpy.ndarray
+        Turning points of the signal, see :func:`_compress`.
 
     Returns
     -------
-    array_out : numpy.ndarray
-        (5, n_cycle) array of rainflow values (1) load range, (2) range mean,
-        (3) Goodman-adjusted range, (4) cycle count, (5) Goodman-adjusted range
-        with flm.
-
+    list of tuple
+        ``(range, mean, count)`` per extracted cycle, in extraction order;
+        ``count`` is 1 for a full cycle and 0.5 for a half cycle.
     """
-    flmargin = l_ult - np.fabs(flm)  # fixed load margin
-    tot_num = array_ext.size  # total size of input array
-    array_out = np.zeros((5, tot_num - 1))  # initialize output array
-
-    pr = 0  # index of input array
-    po = 0  # index of output array
-    j = -1  # index of temporary array "a"
-    a = np.empty(array_ext.shape)  # temporary array for algorithm
-
-    # loop through each turning point stored in input array
-    for i in range(tot_num):
-        j += 1  # increment "a" counter
-        a[j] = array_ext[pr]  # put turning point into temporary array
-        pr += 1  # increment input array pointer
-
-        while (j >= 2) & (np.fabs(a[j - 1] - a[j - 2]) <= np.fabs(a[j] - a[j - 1])):
-            lrange = np.fabs(a[j - 1] - a[j - 2])
-
-            # partial range
-            if j == 2:
-                mean = (a[0] + a[1]) / 2.0
-                adj_range = lrange * flmargin / (l_ult - np.fabs(mean))
-                adj_zero_mean_range = lrange * l_ult / (l_ult - np.fabs(mean))
-                a[0] = a[1]
-                a[1] = a[2]
-                j = 1
-                if lrange > 0:
-                    array_out[0, po] = lrange
-                    array_out[1, po] = mean
-                    array_out[2, po] = adj_range
-                    array_out[3, po] = uc_mult
-                    array_out[4, po] = adj_zero_mean_range
-                    po += 1
-
-            # full range
+    rows = []
+    stack = []
+    for point in turning_points:
+        stack.append(float(point))
+        while len(stack) >= 3 and abs(stack[-2] - stack[-3]) <= abs(
+            stack[-1] - stack[-2]
+        ):
+            lrange = abs(stack[-2] - stack[-3])
+            mean = 0.5 * (stack[-2] + stack[-3])
+            if len(stack) == 3:
+                count = _HALF_CYCLE
+                del stack[0]
             else:
-                mean = (a[j - 1] + a[j - 2]) / 2.0
-                adj_range = lrange * flmargin / (l_ult - np.fabs(mean))
-                adj_zero_mean_range = lrange * l_ult / (l_ult - np.fabs(mean))
-                a[j - 2] = a[j]
-                j = j - 2
-                if lrange > 0:
-                    array_out[0, po] = lrange
-                    array_out[1, po] = mean
-                    array_out[2, po] = adj_range
-                    array_out[3, po] = 1.00
-                    array_out[4, po] = adj_zero_mean_range
-                    po += 1
+                count = 1.0
+                del stack[-3:-1]
+            if lrange > 0.0:
+                rows.append((lrange, mean, count))
 
-    # partial range
-    for i in range(j):
-        lrange = np.fabs(a[i] - a[i + 1])
-        mean = (a[i] + a[i + 1]) / 2.0
-        adj_range = lrange * flmargin / (l_ult - np.fabs(mean))
-        adj_zero_mean_range = lrange * l_ult / (l_ult - np.fabs(mean))
-        if lrange > 0:
-            array_out[0, po] = lrange
-            array_out[1, po] = mean
-            array_out[2, po] = adj_range
-            array_out[3, po] = uc_mult
-            array_out[4, po] = adj_zero_mean_range
-            po += 1
+    for first, second in zip(stack, stack[1:]):
+        lrange = abs(first - second)
+        if lrange > 0.0:
+            rows.append((lrange, 0.5 * (first + second), _HALF_CYCLE))
 
-    # get rid of unused entries
-    array_out = array_out[:, :po]
-
-    return array_out
+    return rows
 
 
-def count_cycles(res, cb, xb=89.0e-03, pos="left", var="un", add_cat=True):
-    """Count vibration cycles in simulation outputs.
+def count_cycles(
+    res: simulation.Results,
+    variable: str,
+    span: Span,
+    distance: float,
+    support: str = "left",
+) -> pd.DataFrame:
+    """Rainflow cycles of a result at a distance from a support.
 
-    Given a cable object and simulation results, a post-processing chain is
-    applied to get a cycle history for a variable and a position. The steps in
-    the chain are: projection in a fixed triad, signal interpolation at given
-    value, adding equilibrium position (catenary equation), signal compression
-    and cycle count.
+    The variable is read at the span fraction ``distance / span.length`` from
+    support 1 (``"left"``) or ``1 - distance / span.length`` from support 2
+    (``"right"``), interpolated linearly between the two stored positions
+    around it, so the signal is only as accurate as ``parameters.los`` is
+    dense there: store the fatigue position itself in ``los`` when possible.
+    It is then compressed to its turning points and counted with the
+    rainflow method (ASTM E1049-85), without mean correction.
 
-    If the of space points in the input results are too far from xb, the
-    interpolation will contain large errors.
+    Both supports sit at a constant height, so counting ``z`` near a clamp
+    gives the Poffenberger-Swart ``Yb`` ranges; the means carry the static
+    offset.
 
     Parameters
     ----------
-    res : slenderpy.simulation.Results
-        Input results from a cable simulation.
-    cb : slenderpy.cable.SCable
-        The cable object used to generate the results.
-    xb : float, optional
-        Distance (m) from end where to estimate offsets. The default is 89 mm,
-        a common value in fatigue experiments.
-    var : str, optional
-        Key which indicates on which variable to perform the cycle count. The
-        default is 'un'.
-    add_cat : bool, optional
-        Add or not catenary equation for cycle range mean. The default is True.
+    res : simulation.Results
+        Results of a cable or beam run.
+    variable : str
+        Position-dependent variable of ``res``, e.g. ``"z"``, ``"y"``,
+        ``"curvature"``, ``"moment"``.
+    span : Span
+        Span of the run; only its length is used.
+    distance : float
+        Horizontal distance (m) from the support to the fatigue position.
+    support : str, optional
+        ``"left"`` (support 1) or ``"right"`` (support 2). Default ``"left"``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Columns ``range``, ``mean`` and ``count``, one row per extracted
+        cycle (``count`` 1) or half cycle (``count`` 0.5), in extraction
+        order and not aggregated: ``frame.groupby("range")["count"].sum()``
+        gives the totals. Empty, with the same columns, when the signal holds
+        no cycle.
 
     Raises
     ------
-    RuntimeError
-        DESCRIPTION.
-
-    Returns
-    -------
-    dc : pandas.DataFrame
-        A dataframe of length the number of cycles computed; the columns are (for
-        for each cyle): the load range (m), the range mean (m) and the cycle count.
-
+    ValueError
+        If ``variable`` is not a position-dependent variable of ``res``, if
+        ``support`` is not ``"left"`` or ``"right"``, if ``distance`` is not
+        within ``[0, span.length]``, if the fatigue position lies outside the
+        stored positions, or if the signal holds nan.
     """
-    prj = cable.tnb2xyz(res, cb)
-    if var == "un":
-        prv = "uz"
-    elif var == "ub":
-        prv = "uy"
+    if variable not in res.lov():
+        raise ValueError(f"variable {variable!r} is not in the results {res.lov()}")
+    if res.lov_dims[variable] != 2:
+        raise ValueError(f"variable {variable!r} does not depend on the position")
+    if support not in ("left", "right"):
+        raise ValueError(f"support must be 'left' or 'right', got {support!r}")
+    if not (math.isfinite(distance) and 0.0 <= distance <= span.length):
+        raise ValueError(
+            f"distance must be within [0, {span.length}] m, got {distance}"
+        )
 
-    # normalize xb
-    if pos == "left":
-        left = True
-    elif pos == "right":
-        left = False
-    else:
-        raise ValueError("Input pos must be left or right")
+    fraction = distance / span.length
+    if support == "right":
+        fraction = 1.0 - fraction
 
-    if left:
-        sb = xb / cb.Lp
-    else:
-        sb = 1.0 - xb / cb.Lp
-
-    # get offset at xb
-    los = np.array(prj.los())
-    if left:
-        tmp = np.where(np.logical_and(los > sb, los < 0.5))[0]
-    else:
-        tmp = np.where(np.logical_and(los < sb, los > 0.5))[0]
-
-    # ..
-    if len(tmp) == 0:
-        raise RuntimeError("not enough data in res.los()")
-    else:
-        if left:
-            tmp = tmp[0]
-        else:
-            tmp = tmp[-1]
-    # ..
-    if left:
-        sp = los[tmp]
-        yp = prj.data[prv][:, tmp].values
-        if tmp == 0:
-            sm = 0.0
-            ym = 0.0
-        else:
-            sm = los[tmp - 1]
-            ym = prj.data[prv][:, tmp - 1].values
-    else:
-        sm = los[tmp]
-        ym = prj.data[prv][:, tmp].values
-        imx = len(los) - 1
-        if tmp == imx:
-            sp = 0.0
-            yp = 0.0
-        else:
-            sp = los[tmp + 1]
-            yp = prj.data[prv][:, tmp + 1].values
-
-    yb = (yp - ym) / (sp - sm) * (sb - sm) + ym
-
-    # add catenary
-    if add_cat:
-        yb -= cb.altitude_1s(sb) - cb.h * sb
-
-    # compress
-    i = _compress(yb)
-    yb = yb[i]
-
-    # count
-    count = _rainflow(yb)
-    dc = pd.DataFrame(
-        data=count[[0, 1, 3], :].T, columns=["load_range", "range_mean", "cycle_count"]
+    stored = np.asarray(res.los(), dtype=float)
+    # a stored position up to round-off is that position, as in Results.drop
+    match = np.flatnonzero(
+        np.isclose(stored, fraction, rtol=0.0, atol=simulation._POSITION_ATOL)
     )
+    if match.size > 0:
+        fraction = stored[match[0]]
+    if stored.size == 0 or not stored[0] <= fraction <= stored[-1]:
+        raise ValueError(
+            f"fatigue position {fraction} (span fraction) is outside the stored "
+            f"positions {stored.tolist()}"
+        )
 
-    return dc
+    values = res[variable].values
+    if stored.size == 1:
+        signal = values[:, 0]
+    else:
+        # linear interpolation between the two stored positions around it,
+        # the same as np.interp at every time
+        upper = min(max(int(np.searchsorted(stored, fraction)), 1), stored.size - 1)
+        lower = upper - 1
+        weight = (fraction - stored[lower]) / (stored[upper] - stored[lower])
+        signal = (1.0 - weight) * values[:, lower] + weight * values[:, upper]
+
+    if np.isnan(signal).any():
+        raise ValueError(
+            f"the {variable!r} signal holds nan (a run stopped early?): crop it "
+            "first with Results.drop(tmax=...)"
+        )
+
+    rows = _rainflow(signal[_compress(signal)])
+    return pd.DataFrame(rows, columns=_COLUMNS)

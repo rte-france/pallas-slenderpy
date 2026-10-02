@@ -50,9 +50,9 @@ with and without self-damping.
 
 ```python
 import numpy as np
-from slenderpy import cable
-from slenderpy import simtools
-from slenderpy import force
+from slenderpy.legacy import cable
+from slenderpy.legacy import simtools
+from slenderpy.legacy import force
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 

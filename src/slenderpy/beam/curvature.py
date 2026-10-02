@@ -1,0 +1,199 @@
+"""Curvature of a beam deflection field, as an operator with its jacobian.
+
+Two models share the same interface: the approximate (small-slope) curvature
+``D2 @ y``, and the exact geometric curvature
+``(D2 @ y) / (1 + (D1 @ y)**2)**(3/2)``. Both expose :meth:`Curvature.value`,
+:meth:`Curvature.jacobian` -- the sparse ``d(curvature)/dy`` used by the Newton
+iterations of the static and dynamic solvers -- and :meth:`Curvature.rate`, the
+same derivative applied to a deflection rate but kept valid at the end nodes.
+Use :func:`create` to pick one from the ``approx_curvature`` flag the solvers
+carry.
+"""
+
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+
+import numpy as np
+import scipy as sp
+
+import slenderpy.fd_utils as fdu
+
+
+class Curvature(ABC):
+    """Curvature operator on a uniform grid, and its jacobian.
+
+    Subclasses implement :meth:`value` and :meth:`jacobian` for one curvature
+    model. The finite-difference matrices are built once, at construction.
+
+    Parameters
+    ----------
+    n : int
+        Number of nodes.
+    ds : float
+        Space step.
+
+    Attributes
+    ----------
+    d2_with_borders : sp.sparse.csr_matrix
+        Second-derivative matrix. Its first and last rows are completed, so the
+        curvature is computed the end nodes.
+    d2_no_borders : sp.sparse.dia_matrix
+        Second-derivative matrix. Its first and last rows are empty, so the
+        jacobian vanishes at the end nodes.
+    """
+
+    def __init__(self, n: int, ds: float) -> None:
+        self.n = n
+        self.ds = ds
+        self.d2_with_borders = fdu.second_derivative_with_borders(n, ds)
+        self.d2_no_borders = fdu.second_derivative(n, ds)
+
+    @abstractmethod
+    def value(self, y: np.ndarray) -> np.ndarray:
+        """Curvature of the deflection field ``y``.
+
+        Parameters
+        ----------
+        y : np.ndarray
+            Deflection at the ``n`` nodes.
+
+        Returns
+        -------
+        np.ndarray
+            Curvature at the ``n`` nodes.
+        """
+
+    @abstractmethod
+    def jacobian(self, y: np.ndarray) -> sp.sparse.spmatrix:
+        """Derivative of :meth:`value` with respect to ``y``.
+
+        Parameters
+        ----------
+        y : np.ndarray
+            Deflection at the ``n`` nodes.
+
+        Returns
+        -------
+        sp.sparse.spmatrix
+            The ``n`` by ``n`` matrix ``d(curvature)/dy`` at ``y``.
+        """
+
+    @abstractmethod
+    def rate(self, y: np.ndarray, v: np.ndarray) -> np.ndarray:
+        """Time derivative of :meth:`value` for a deflection rate ``v``.
+
+        This is ``d(curvature)/dy @ v`` built on the derivative matrices with
+        their border rows, so it holds at every node, the two ends included.
+        :meth:`jacobian` cannot be used for that: its border rows are empty, so
+        it would report a zero curvature rate at the end nodes.
+
+        Parameters
+        ----------
+        y : np.ndarray
+            Deflection at the ``n`` nodes.
+        v : np.ndarray
+            Deflection rate at the ``n`` nodes.
+
+        Returns
+        -------
+        np.ndarray
+            Curvature rate at the ``n`` nodes.
+        """
+
+
+class ApproximateCurvature(Curvature):
+    """Small-slope curvature ``D2 @ y``, linear in ``y``."""
+
+    def value(self, y: np.ndarray) -> np.ndarray:
+        """Curvature of the deflection field ``y``."""
+        return self.d2_with_borders @ y
+
+    def jacobian(self, y: np.ndarray) -> sp.sparse.spmatrix:
+        """Derivative of :meth:`value` with respect to ``y``, constant here."""
+        return self.d2_no_borders
+
+    def rate(self, y: np.ndarray, v: np.ndarray) -> np.ndarray:
+        """Curvature rate, independent of ``y`` for this linear model."""
+        return self.d2_with_borders @ v
+
+
+class ExactCurvature(Curvature):
+    """Exact geometric curvature ``(D2 @ y) / (1 + (D1 @ y)**2)**(3/2)``.
+
+    Parameters
+    ----------
+    n : int
+        Number of nodes.
+    ds : float
+        Space step.
+
+    Attributes
+    ----------
+    d1_with_borders : sp.sparse.csr_matrix
+        First-derivative matrix, used for the slope of the curvature.
+    d1_no_borders : sp.sparse.dia_matrix
+        First-derivative matrix, used for the slope of the jacobian.
+    """
+
+    def __init__(self, n: int, ds: float) -> None:
+        super().__init__(n, ds)
+        self.d1_with_borders = fdu.first_derivative_with_borders(n, ds)
+        self.d1_no_borders = fdu.first_derivative(n, ds)
+
+    def value(self, y: np.ndarray) -> np.ndarray:
+        """Curvature of the deflection field ``y``."""
+        metric = 1.0 + (self.d1_with_borders @ y) ** 2
+        # metric * sqrt(metric) rather than metric**1.5: a float exponent goes
+        # through pow(), several times slower than a square root
+        return self.d2_with_borders @ y / (metric * np.sqrt(metric))
+
+    def jacobian(self, y: np.ndarray) -> sp.sparse.spmatrix:
+        """Derivative of :meth:`value` with respect to ``y``."""
+        slope = self.d1_no_borders @ y
+        metric = 1.0 + slope**2
+        # see value() on the square root; the second factor reuses the first
+        inv_metric_15 = 1.0 / (metric * np.sqrt(metric))
+        inv_metric_25 = inv_metric_15 / metric
+        return (
+            sp.sparse.diags(inv_metric_15) @ self.d2_no_borders
+            - 3.0
+            * sp.sparse.diags(slope * (self.d2_no_borders @ y) * inv_metric_25)
+            @ self.d1_no_borders
+        )
+
+    def rate(self, y: np.ndarray, v: np.ndarray) -> np.ndarray:
+        """Curvature rate at the deflection ``y``."""
+        slope = self.d1_with_borders @ y
+        metric = 1.0 + slope**2
+        # the derivative of jacobian(), with borders and applied to v: staying
+        # in vector form spares the assembly of a sparse product
+        return (
+            self.d2_with_borders @ v
+            - 3.0
+            * slope
+            * (self.d2_with_borders @ y)
+            * (self.d1_with_borders @ v)
+            / metric
+        ) / (metric * np.sqrt(metric))
+
+
+def create(n: int, ds: float, approx_curvature: bool) -> Curvature:
+    """Build the curvature operator selected by ``approx_curvature``.
+
+    Parameters
+    ----------
+    n : int
+        Number of nodes.
+    ds : float
+        Space step.
+    approx_curvature : bool
+        ``True`` for :class:`ApproximateCurvature`, ``False`` for
+        :class:`ExactCurvature`.
+
+    Returns
+    -------
+    Curvature
+        The selected operator.
+    """
+    return ApproximateCurvature(n, ds) if approx_curvature else ExactCurvature(n, ds)

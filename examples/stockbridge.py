@@ -2,18 +2,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
 
-import slenderpy.future.beam.dynamic as dynamic
-from slenderpy.future import simulation
-from slenderpy.future.beam.static import shape
-from slenderpy.future.beam.static.frequency import (
+import slenderpy.beam.dynamic as dynamic
+from slenderpy import simulation
+from slenderpy.beam.static import shape
+from slenderpy.beam.static.frequency import (
     natural_frequencies_hinged,
     natural_frequency,
 )
-from slenderpy.future.boundary_condition import hinged
-from slenderpy.future.components import Conductor, Span
-from slenderpy.future.force.air import Air
-from slenderpy.future.force.core import Gravity, PointExcitation
-from slenderpy.future.stockbridge import (
+from slenderpy.boundary_condition import hinged
+from slenderpy.components import Conductor, Span
+from slenderpy.force.air import Air
+from slenderpy.force.core import Gravity, PointExcitation
+from slenderpy.stockbridge import (
     ClampParameters,
     MassParameters,
     MessengerCableParameters,

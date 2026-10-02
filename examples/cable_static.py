@@ -7,7 +7,7 @@ grow as the tension drops and the sag increases.
 import matplotlib.pyplot as plt
 import numpy as np
 
-from slenderpy.future.cable.static import catenary, nleq, parabolic
+from slenderpy.cable.static import catenary, nleq, parabolic
 
 # ASTER 570 conductor on a 400 m span with a 20 m support level difference
 linm, axs, rts = 1.571, 3.653e07, 1.853e05

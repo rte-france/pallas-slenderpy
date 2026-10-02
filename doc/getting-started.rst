@@ -14,9 +14,9 @@ Cable Example
 
 .. code-block:: python
 
-   from slenderpy import cable
-   from slenderpy import simtools
-   from slenderpy import wind
+   from slenderpy.legacy import cable
+   from slenderpy.legacy import simtools
+   from slenderpy.legacy import wind
 
    # cable parameters
    cp = dict(mass=1.57, diameter=0.031, EA=3.76E+07, length=400., tension=3.7E+04, h=0.)
@@ -44,10 +44,10 @@ Beam Example
 
 .. code-block:: python
 
-   from slenderpy import beam
-   from slenderpy import fdm_utils as fdu
-   from slenderpy import force
-   from slenderpy import simtools
+   from slenderpy.legacy import beam
+   from slenderpy.legacy import fdm_utils as fdu
+   from slenderpy.legacy import force
+   from slenderpy.legacy import simtools
 
    # beam parameters
    bp = dict(mass=1.57, ei=[2155., 28.], kp=[0.018], length=50., tension=2.8E+04)

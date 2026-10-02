@@ -28,27 +28,27 @@ By making a taylor expansion at order 1 of this formula, under the assumption of
     \chi_{approx}(y) = \frac{\partial^2 y}{\partial x ^2 }
 
 
-The beam solvers are functions of a :class:`~slenderpy.future.components.Conductor`
-and a :class:`~slenderpy.future.components.Span`, whose ``boundary_conditions``
+The beam solvers are functions of a :class:`~slenderpy.components.Conductor`
+and a :class:`~slenderpy.components.Span`, whose ``boundary_conditions``
 must be set. Two choices are made independently, by arguments:
 
-* the bending law (:mod:`slenderpy.future.beam.bending`): ``model="constant"``
+* the bending law (:mod:`slenderpy.beam.bending`): ``model="constant"``
   for a constant bending stiffness :math:`EI` (``conductor.ei_max`` by default,
   or the ``ei`` argument), or ``model="varying"`` for a stiffness that falls
   from :math:`EI_{max}` to :math:`EI_{min}` with hysteresis, after the Bouc-Wen
   model, with :math:`\chi_0` = ``conductor.beta_flexion * span.tension``;
-* the curvature (:mod:`slenderpy.future.beam.curvature`):
+* the curvature (:mod:`slenderpy.beam.curvature`):
   ``approx_curvature=True`` for :math:`\chi_{approx}`, ``False`` for
   :math:`\chi_{exact}`.
 
 The displacement :math:`y` is the vertical position of the beam, stored as
 ``z`` in the results (see the output contract of
-:mod:`slenderpy.future.simulation`).
+:mod:`slenderpy.simulation`).
 
 Static
 ======
 
-:func:`slenderpy.future.beam.static.shape.solve` returns the displacement at the
+:func:`slenderpy.beam.static.shape.solve` returns the displacement at the
 nodes under a nodal load :math:`F(x)`.
 
 Constant model
@@ -85,9 +85,9 @@ returns ``nan``.
 Dynamic
 =======
 
-:func:`slenderpy.future.beam.dynamic.solve_dynamic` returns the time history of
+:func:`slenderpy.beam.dynamic.solve_dynamic` returns the time history of
 the beam under a force ``force(x, t, y, z, vy, vz) -> (fy, fz)`` (see
-:mod:`slenderpy.future.force.core`; the beam is planar and uses ``fz``). By
+:mod:`slenderpy.force.core`; the beam is planar and uses ``fz``). By
 default it starts at rest from the static shape under the force at the initial
 time.
 
@@ -205,5 +205,5 @@ The matrix and vector :eq:`eq:matrix_bc` are used for the static resolution. For
 we thus derivate with respect to time :eq:`eq:bc` obtaining the same matrix :math:`A` than :eq:`eq:matrix_bc`, since :math:`\frac{\partial y}{\partial t} = v`,  and the vector :math:`b` contains the time derivative of 
 :math:`d_i(t) \forall i \in \left\{1,2,3,4\right\}`. 
 
-Thus when using :func:`~slenderpy.future.beam.dynamic.solve_dynamic` the user should set :code:`dynamic_values` with :math:`\frac{\partial d_i}{\partial t} \forall i \in \left\{1,2,3,4\right\}` 
-in the :class:`~slenderpy.future.boundary_condition.BoundaryCondition` constructor.
+Thus when using :func:`~slenderpy.beam.dynamic.solve_dynamic` the user should set :code:`dynamic_values` with :math:`\frac{\partial d_i}{\partial t} \forall i \in \left\{1,2,3,4\right\}` 
+in the :class:`~slenderpy.boundary_condition.BoundaryCondition` constructor.

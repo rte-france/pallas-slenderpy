@@ -76,12 +76,12 @@ fitted from experiments or CFD simulation.
 Simulation
 ==========
 
-The ``future`` solvers share :mod:`slenderpy.future.simulation`.
+The ``future`` solvers share :mod:`slenderpy.simulation`.
 
 Parameters
 ----------
 
-:class:`~slenderpy.future.simulation.Parameters` holds the time stepping and
+:class:`~slenderpy.simulation.Parameters` holds the time stepping and
 the output configuration. The run has ``nt = round((tf - t0) / dt)`` steps of
 ``dt = (tf - t0) / nt`` and a snapshot is stored every ``rr`` steps, so the
 effective output step is ``rr * dt``. A warning is raised when either
@@ -96,7 +96,7 @@ included.
 Results
 -------
 
-:class:`~slenderpy.future.simulation.Results` stores each variable on a
+:class:`~slenderpy.simulation.Results` stores each variable on a
 ``time`` x ``span_frac`` grid (scalars on ``time`` only), in a global frame:
 origin at support 1, ``x`` along the span, ``z`` upwards, ``y`` completing a
 right-handed triad, SI units.
@@ -126,18 +126,18 @@ the horizontal position ``x`` of the nodes, the time and the global position
 and velocity of the structure. The beam uses ``fz`` only; the cable projects
 both components on its local normal and binormal.
 
-:mod:`slenderpy.future.force` provides:
+:mod:`slenderpy.force` provides:
 
-- :class:`~slenderpy.future.force.core.Gravity`, the weight, for the beam
+- :class:`~slenderpy.force.core.Gravity`, the weight, for the beam
   only: the cable equilibrium already holds it and the cable solver refuses
   it;
-- :class:`~slenderpy.future.force.core.PointExcitation`, a sinusoidal
+- :class:`~slenderpy.force.core.PointExcitation`, a sinusoidal
   vertical force applied at one node;
-- :class:`~slenderpy.future.force.wind.WindDrag`, the drag of a
-  :class:`~slenderpy.future.force.wind.ConstantWind`,
-  :class:`~slenderpy.future.force.wind.UniformTurbulentWind` or
-  :class:`~slenderpy.future.force.wind.TurbulentWindField`, with a constant
-  drag coefficient or :func:`~slenderpy.future.force.air.cylinder_drag` of
+- :class:`~slenderpy.force.wind.WindDrag`, the drag of a
+  :class:`~slenderpy.force.wind.ConstantWind`,
+  :class:`~slenderpy.force.wind.UniformTurbulentWind` or
+  :class:`~slenderpy.force.wind.TurbulentWindField`, with a constant
+  drag coefficient or :func:`~slenderpy.force.air.cylinder_drag` of
   the local Reynolds number.
 
 Provided forces add up: ``PointExcitation(...) + Gravity(mass) + WindDrag(...)``.
@@ -145,7 +145,7 @@ Provided forces add up: ``PointExcitation(...) + Gravity(mass) + WindDrag(...)``
 Fatigue
 -------
 
-:func:`~slenderpy.future.fatigue.count_cycles` counts the rainflow cycles
+:func:`~slenderpy.fatigue.count_cycles` counts the rainflow cycles
 (ASTM E1049-85, no mean correction) of a position-dependent result, e.g.
 ``z`` or ``moment``, at a distance from a support, such as the
 Poffenberger-Swart point 89 mm from a clamp. The result is read by linear
@@ -157,11 +157,11 @@ dedicated package.
 Static shapes
 -------------
 
-:func:`slenderpy.future.beam.static.shape.solve` and
-:func:`slenderpy.future.cable.static.shape.solve` give the static shape of
+:func:`slenderpy.beam.static.shape.solve` and
+:func:`slenderpy.cable.static.shape.solve` give the static shape of
 the structure under a load, from the same equations as the dynamic solvers
 without the time derivatives; the dynamic solvers start from it by default.
 The cable is written around the catenary of
-:mod:`slenderpy.future.cable.static.catenary`, which already holds the
+:mod:`slenderpy.cable.static.catenary`, which already holds the
 weight: the static load and the dynamic ``force`` both come on top of it, so
 no load returns the catenary and passing the weight again would double it.
