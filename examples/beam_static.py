@@ -1,71 +1,41 @@
-"""Static beam shape for both bending models and both curvature options.
+"""Static shape of a clamped span under its weight, and its bending boundary layer.
 
-Builds a single Conductor and Span, computes the static deflection under the
-conductor's own weight for every (bending model, curvature) combination, and
-overlays the four shapes on one plot.
+Away from the clamps the three bending laws give the same sag; within a few
+``sqrt(EI / tension)`` of a clamp the curvature, and with it the stiffness of
+the Bouc-Wen law, changes by orders of magnitude.
 """
 
 import matplotlib.pyplot as plt
 import numpy as np
 
-from slenderpy.future._constant import _GRAVITY
-from slenderpy.future.beam.static.shape import BendingModel, solve
-from slenderpy.future.boundary_condition import clamped, hinged
+from slenderpy.future.beam.static import shape
+from slenderpy.future.boundary_condition import clamped
 from slenderpy.future.components import Conductor, Span
 
+conductor = Conductor(mass=1.57, ei_min=28.28, ei_max=2155.07, beta_flexion=6.438e-07)
+span = Span(length=50.0, tension=2.0e04, boundary_conditions=clamped())
+n = 3001
+x = np.linspace(0.0, span.length, n)
+weight = np.full(n, -9.81 * conductor.mass)  # N/m
+laws = [
+    ("constant", conductor.ei_max, "constant $EI_{max}$"),
+    ("constant", conductor.ei_min, "constant $EI_{min}$"),
+    ("varying", None, "Bouc-Wen"),
+]
 
-def compare_models(span):
-    # setup conductor parameters
-    conductor = Conductor(
-        mass=1.57,
-        ei_min=28.28,
-        ei_max=2155.07,
-        beta_flexion=6.438e-07,
-    )
-
-    # cases variations
-    cases = [
-        (BendingModel.CONSTANT, conductor.ei_max, True),
-        (BendingModel.CONSTANT, conductor.ei_max, False),
-        (BendingModel.CONSTANT, conductor.ei_min, True),
-        (BendingModel.CONSTANT, conductor.ei_min, False),
-        (BendingModel.VARYING, None, True),
-        (BendingModel.VARYING, None, False),
-    ]
-
-    # Distributed self-weight (N/m), constant along the span
-    n = 201
-    x = np.linspace(0.0, span.length, n)
-    rhs = -_GRAVITY * conductor.mass * np.ones(n)
-
-    plt.figure()
-    for model, ei, approx_curvature in cases:
-        y = solve(
-            conductor,
-            span,
-            rhs=rhs,
-            n=n,
-            model=model,
-            ei=ei,
-            approx_curvature=approx_curvature,
-        )
-        curvature = "approx" if approx_curvature else "exact"
-        plt.plot(x, y, label=f"{model.value} (ei={ei}), {curvature} curvature")
-
-    plt.xlabel("Position along span [m]")
-    plt.ylabel("Deflection [m]")
-    plt.title("Static beam shape under self-weight")
-    plt.grid(True)
-    plt.legend()
-
-
-if __name__ == "__main__":
-    # two configurations, realistic span and bretelle
-    span = Span(length=440.0, tension=2.8e04, boundary_conditions=hinged())
-    bretelle = Span(length=5.0, tension=10.0, boundary_conditions=clamped())
-
-    # plot shape under gravity
-    compare_models(span)
-    compare_models(bretelle)
-
-    plt.show()
+fig, (left, right) = plt.subplots(1, 2, figsize=(11, 4))
+near = x[1:-1] <= 1.5
+for model, ei, label in laws:
+    z = shape.solve(conductor, span, weight, n, model=model, ei=ei)
+    curvature = np.diff(z, 2) / (x[1] - x[0]) ** 2  # at the interior nodes
+    left.plot(x, z, label=label)
+    right.semilogy(x[1:-1][near], np.abs(curvature[near]), label=label)
+right.axhline(conductor.beta_flexion * span.tension, c="k", ls=":", label=r"$\chi_0$")
+left.set(title="sag over the span", xlabel="x (m)", ylabel="z (m)")
+right.set(title="curvature near the clamp", xlabel="x (m)", ylabel="|curvature| (1/m)")
+for ax in (left, right):
+    ax.grid(True)
+right.legend()
+fig.suptitle("50 m clamped span under its weight, tension 20 kN")
+fig.tight_layout()
+plt.show()
