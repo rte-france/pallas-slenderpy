@@ -4,7 +4,7 @@ import numpy as np
 
 import slenderpy.future.beam.bending as BD
 import slenderpy.future.beam.curvature as CV
-from slenderpy import simtools
+from slenderpy.future import simulation
 from slenderpy.future._constant import _GRAVITY
 from slenderpy.future.beam.dynamic import solve_dynamic
 from slenderpy.future.beam.static.shape import solve
@@ -58,10 +58,10 @@ def static_gravity():
     dt = 1e-2
     dr = 1e-1
 
-    def force(x, t, y, v):
-        return -_GRAVITY * np.ones(nb_space) * conductor.mass
+    def force(x, t, y, z, vy, vz):
+        return 0.0, -_GRAVITY * np.ones(nb_space) * conductor.mass
 
-    rhs = force(None, None, None, None)
+    rhs = force(None, None, None, None, None, None)[1]
 
     sol_static = solve(
         conductor,
@@ -72,7 +72,7 @@ def static_gravity():
         approx_curvature=True,
     )
 
-    parameters = simtools.Parameters(
+    parameters = simulation.Parameters(
         ns=nb_space, tf=final_time, dt=dt, dr=dr, los=nb_space, pp=True
     )
 
@@ -87,7 +87,7 @@ def static_gravity():
         approx_curvature=False,
     )
 
-    y = sol_dynamic["y"]
+    y = sol_dynamic["z"]
 
     _plot_animation(x, sol_static, y, -10, 2, parameters.nr, dr)
 
@@ -99,12 +99,12 @@ def hyteresis():
     dt = 1e-3
     dr = 1e-3
 
-    parameters = simtools.Parameters(
+    parameters = simulation.Parameters(
         ns=nb_space, tf=final_time, dt=dt, dr=dr, los=nb_space, pp=True
     )
 
-    def force(x, t, y, v):
-        return np.zeros(nb_space)
+    def force(x, t, y, z, vy, vz):
+        return 0.0, np.zeros(nb_space)
 
     ds = span.length / (nb_space - 1)
 
@@ -133,9 +133,9 @@ def hyteresis():
         approx_curvature=False,
     )
 
-    y = res["y"]
-    c = res["c"]
-    M = res["M"]
+    y = res["z"]
+    c = res["curvature"]
+    M = res["moment"]
 
     c1 = np.linspace(0, c0, 50)
     M1 = bending.moment(c1)
@@ -247,10 +247,10 @@ def bretelle():
     dt = 1e-6
     dr = 1e-3
 
-    def force(x, t, y, v):
-        return -_GRAVITY * np.ones(nb_space) * conductor.mass
+    def force(x, t, y, z, vy, vz):
+        return 0.0, -_GRAVITY * np.ones(nb_space) * conductor.mass
 
-    rhs = force(None, None, None, None)
+    rhs = force(None, None, None, None, None, None)[1]
 
     sol_static = solve(
         conductor,
@@ -261,7 +261,7 @@ def bretelle():
         approx_curvature=False,
     )
 
-    parameters = simtools.Parameters(
+    parameters = simulation.Parameters(
         ns=nb_space, tf=final_time, dt=dt, dr=dr, los=nb_space, pp=True
     )
 
@@ -276,8 +276,8 @@ def bretelle():
         approx_curvature=False,
     )
 
-    y = res["y"]
-    c = res["c"]
+    y = res["z"]
+    c = res["curvature"]
     # e_kin = res["e_kin"]
     # e_bend = res["e_bend"]
     # e_dissip = res["e_dissip"]
@@ -340,8 +340,8 @@ def damping():
     dt = 1e-2
     dr = 1e-1
 
-    def force(x, t, y, v):
-        return -_GRAVITY * np.ones(nb_space) * conductor.mass
+    def force(x, t, y, z, vy, vz):
+        return 0.0, -_GRAVITY * np.ones(nb_space) * conductor.mass
 
     rhs = -10 * np.ones(nb_space) * conductor.mass
 
@@ -357,13 +357,13 @@ def damping():
     sol_static_proper_gravity = solve(
         conductor,
         span,
-        rhs=force(None, None, None, None),
+        rhs=force(None, None, None, None, None, None)[1],
         n=nb_space,
         model="constant",
         approx_curvature=False,
     )
 
-    parameters = simtools.Parameters(
+    parameters = simulation.Parameters(
         ns=nb_space, tf=final_time, dt=dt, dr=dr, los=nb_space, pp=True
     )
 
@@ -388,7 +388,7 @@ def damping():
             zeta=zeta,
         )
 
-        plt.plot(time, sol_dynamic["y"][:, pos], label=f"zeta={zeta}")
+        plt.plot(time, sol_dynamic["z"][:, pos], label=f"zeta={zeta}")
 
     plt.legend()
     plt.title("Damping effect on the beam mid-point displacement")

@@ -14,6 +14,7 @@ from slenderpy.future.beam.static.frequency import (
 )
 from slenderpy.future.boundary_condition import clamped, hinged
 from slenderpy.future.components import Conductor, Span
+from slenderpy.future.force.air import Air
 from slenderpy.future.force.core import Gravity, PointExcitation
 from slenderpy.future.stockbridge import (
     Clamp,
@@ -28,7 +29,6 @@ from slenderpy.future.stockbridge import (
     solve_imposed_force,
     solve_linearized_imposed_force,
 )
-from slenderpy.wind import air_volumic_mass
 
 # Cable used by the manufactured-solution suite (kept at the original size
 # so the analytic tolerances still hold).
@@ -507,12 +507,7 @@ def test_reduced_amplitude_stokcbridge(sb):
         / strouhal
     )
     estimated_amplitude = (
-        SPAN.length
-        * 0.5
-        * air_volumic_mass()
-        * CONDUCTOR.diameter
-        * cl0
-        * wind_speed**2
+        SPAN.length * 0.5 * Air().density * CONDUCTOR.diameter * cl0 * wind_speed**2
     )
 
     # the legacy Excitation(gravity=True) as future forces: same nearest node,

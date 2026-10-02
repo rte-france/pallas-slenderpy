@@ -3,8 +3,7 @@ import numpy as np
 import scipy as sp
 
 import slenderpy.future.beam.dynamic as dynamic
-from slenderpy import simtools
-from slenderpy.force import Excitation
+from slenderpy.future import simulation
 from slenderpy.future.beam.static import shape
 from slenderpy.future.beam.static.frequency import (
     natural_frequencies_hinged,
@@ -12,6 +11,8 @@ from slenderpy.future.beam.static.frequency import (
 )
 from slenderpy.future.boundary_condition import hinged
 from slenderpy.future.components import Conductor, Span
+from slenderpy.future.force.air import Air
+from slenderpy.future.force.core import Gravity, PointExcitation
 from slenderpy.future.stockbridge import (
     ClampParameters,
     MassParameters,
@@ -26,7 +27,6 @@ from slenderpy.future.stockbridge import (
     solve_imposed_force,
     solve_linearized_imposed_force,
 )
-from slenderpy.wind import air_volumic_mass
 
 MASS = MassParameters(
     length_to_clamp=0.1875,
@@ -277,7 +277,7 @@ def coupling_two_stockbridges():
     nb_space = 20 * MODE
     dt = min(0.01 / freq, 1e-3)
     dr = 5 * dt
-    parameters = simtools.Parameters(
+    parameters = simulation.Parameters(
         ns=nb_space, tf=TF, dt=dt, dr=dr, los=nb_space, pp=True
     )
     x = np.linspace(0, LSPAN, nb_space)
@@ -285,9 +285,7 @@ def coupling_two_stockbridges():
     wind_speed = (
         DIAMETER * MODE * natural_frequency(LSPAN, TENSION, CABLE_MASS) / STROUHAL
     )
-    estimated_amplitude = (
-        LSPAN * 0.5 * air_volumic_mass() * DIAMETER * CL0 * wind_speed**2
-    )
+    estimated_amplitude = LSPAN * 0.5 * Air().density * DIAMETER * CL0 * wind_speed**2
 
     approx_curvature = True
     model = "varying"
@@ -296,21 +294,17 @@ def coupling_two_stockbridges():
         1, min(nb_space - 2, int(np.round(pos_stockbridge / LSPAN * (nb_space - 1))))
     )
 
-    def force(x, t, y, v):
-        return Excitation(
-            f=freq,
-            a=4 * estimated_amplitude,
-            s=(2 * MODE - 1) * (LSPAN + 0.5) / (2 * MODE),
-            L=LSPAN,
-            tf=TF,
-            gravity=True,
-            m=CABLE_MASS,
-        )(x, t)[0]
+    force = Gravity(CABLE_MASS) + PointExcitation(
+        frequency=freq,
+        amplitude=4 * estimated_amplitude,
+        position=(2 * MODE - 1) * (LSPAN + 0.5) / (2 * MODE),
+        t_end=TF,
+    )
 
     y0 = shape.solve(
         conductor,
         span,
-        force(x, 0.0, None, None),
+        np.zeros_like(x) + force(x, 0.0, 0.0, 0.0, 0.0, 0.0)[1],
         nb_space,
         model=model,
         approx_curvature=approx_curvature,
@@ -361,15 +355,15 @@ def coupling_two_stockbridges():
     plt.title("max-min over the time")
     plt.plot(
         x,
-        np.max(res_newton["y"] - res_newton["y"][0, :], axis=0)
-        - np.min(res_newton["y"] - res_newton["y"][0, :], axis=0),
+        np.max(res_newton["z"] - res_newton["z"][0, :], axis=0)
+        - np.min(res_newton["z"] - res_newton["z"][0, :], axis=0),
         label="without stockbridge",
         color="blue",
     )
     plt.plot(
         x,
-        np.max(res_cable2["y"] - res_cable2["y"][0, :], axis=0)
-        - np.min(res_cable2["y"] - res_cable2["y"][0, :], axis=0),
+        np.max(res_cable2["z"] - res_cable2["z"][0, :], axis=0)
+        - np.min(res_cable2["z"] - res_cable2["z"][0, :], axis=0),
         label="with 2 stockbridge",
         color="orange",
     )
@@ -381,13 +375,13 @@ def coupling_two_stockbridges():
     plt.title("At first stockbridge location")
     plt.plot(
         t,
-        res_newton["y"][:, id_pos_stockbridge] - res_newton["y"][0, id_pos_stockbridge],
+        res_newton["z"][:, id_pos_stockbridge] - res_newton["z"][0, id_pos_stockbridge],
         label="without stockbridge",
         color="blue",
     )
     plt.plot(
         t,
-        res_cable2["y"][:, id_pos_stockbridge] - res_cable2["y"][0, id_pos_stockbridge],
+        res_cable2["z"][:, id_pos_stockbridge] - res_cable2["z"][0, id_pos_stockbridge],
         label="with 2 stockbridge",
         color="orange",
     )
