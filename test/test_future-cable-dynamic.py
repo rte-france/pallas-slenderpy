@@ -577,12 +577,21 @@ def test_default_start_with_a_scalar_force():
 
 
 def test_default_start_without_static_shape_raises():
-    # an upward load as large as the weight leaves the cable slack
-    weight = MASS * _GRAVITY
+    # a non-finite load at t0 has no static shape
     with pytest.raises(ValueError, match="static shape"):
         dynamic.solve(
             _conductor(),
             _span(),
             _parameters(tf=0.1),
-            force=lambda x, t, y, z, vy, vz: (0.0, weight),
+            force=lambda x, t, y, z, vy, vz: (0.0, np.nan),
         )
+
+
+def test_default_start_on_a_short_slack_span():
+    """The reviewer's case: 100 m at 5% sag, ns = 401, under wind drag."""
+    weight = MASS * _GRAVITY
+    span = Span(length=100.0, tension=weight * 100.0**2 / (8.0 * 5.0))
+    drag = WindDrag(diameter=DIAMETER, wind=ConstantWind(20.0))
+    pm = Parameters(ns=401, t0=0.0, tf=0.1, dt=1.0e-03, dr=1.0e-02, los=[0.5])
+    res = dynamic.solve(_conductor(), span, pm, force=drag)
+    assert np.all(np.isfinite(res["y"].values))
