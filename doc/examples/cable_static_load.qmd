@@ -1,0 +1,15 @@
+---
+title: "Cable under wind and ice"
+---
+
+Static shape of a cable under a steady wind and under an ice load.
+
+The load comes on top of the weight, already in the catenary: the wind blows
+the cable out of plane, the ice adds sag. ``shape.solve`` returns the global
+position of the nodes.
+
+Source: `examples/cable_static_load.py`.
+
+```{python}
+{{< include ../../examples/cable_static_load.py >}}
+```

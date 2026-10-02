@@ -1,0 +1,12 @@
+{
+  "hash": "42238e07e430ab5d5ce85a79b5e3c461",
+  "result": {
+    "engine": "jupyter",
+    "markdown": "---\ntitle: \"Cable under wind and ice\"\n---\n\nStatic shape of a cable under a steady wind and under an ice load.\n\nThe load comes on top of the weight, already in the catenary: the wind blows\nthe cable out of plane, the ice adds sag. ``shape.solve`` returns the global\nposition of the nodes.\n\nSource: `examples/cable_static_load.py`.\n\n::: {#d63eb4ae .cell execution_count=1}\n``` {.python .cell-code}\n\"\"\"Static shape of a cable under a steady wind and under an ice load.\n\nThe load comes on top of the weight, already in the catenary: the wind blows\nthe cable out of plane, the ice adds sag. ``shape.solve`` returns the global\nposition of the nodes.\n\"\"\"\n\nimport matplotlib.pyplot as plt\nimport numpy as np\n\nfrom slenderpy.cable import dynamic\nfrom slenderpy.cable.static import shape\nfrom slenderpy.components import Conductor, Span\nfrom slenderpy.force.wind import ConstantWind, WindDrag\n\nconductor = Conductor(mass=1.571, diameter=0.0313, axial_stiffness=3.76e07)\nspan = Span(length=400.0, tension=3.7e04)\nns = 201\n\n# steady 25 m/s wind, drag evaluated on the structure at rest\nx, y, z = dynamic.equilibrium(conductor, span, ns)\nzeros = np.zeros(ns)\ndrag = WindDrag(diameter=conductor.diameter, wind=ConstantWind(25.0))\nwind_y, wind_z = drag(x, 0.0, y, z, zeros, zeros)\nwindy = shape.solve(conductor, span, wind_y, wind_z, ns)\n\n# 10 mm of radial ice (density 900 kg/m3)\nradius = 0.5 * conductor.diameter\nice = -900.0 * 9.81 * np.pi * ((radius + 0.01) ** 2 - radius**2)\niced = shape.solve(conductor, span, 0.0, ice, ns)\n\nfig, (side, top) = plt.subplots(1, 2, figsize=(11, 4))\nside.plot(x, z, \"k\", label=\"weight only (catenary)\")\nside.plot(windy[0], windy[2], label=\"25 m/s wind\")\nside.plot(iced[0], iced[2], label=f\"10 mm ice ({-ice:.1f} N/m)\")\ntop.plot(x, y, \"k\")\ntop.plot(windy[0], windy[1], label=\"25 m/s wind\")\nside.set(title=\"side view\", xlabel=\"x (m)\", ylabel=\"z (m)\")\ntop.set(title=\"plan view: blowout\", xlabel=\"x (m)\", ylabel=\"y (m)\")\nfor ax in (side, top):\n    ax.grid(True)\nside.legend()\nfig.suptitle(\"400 m span, tension 37 kN\")\nfig.tight_layout()\nplt.show()\n```\n\n::: {.cell-output .cell-output-display}\n![](cable_static_load_files/figure-html/cell-2-output-1.png){width=1047 height=381}\n:::\n:::\n\n\n",
+    "supporting": [
+      "cable_static_load_files"
+    ],
+    "filters": [],
+    "includes": {}
+  }
+}

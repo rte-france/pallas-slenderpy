@@ -1,0 +1,12 @@
+{
+  "hash": "c6acad60a1bfad3a03205015213d3ccd",
+  "result": {
+    "engine": "jupyter",
+    "markdown": "---\ntitle: \"Cable under its weight\"\n---\n\nCable under its weight: catenary, parabolic and elastic (nleq) closed forms.\n\nAt a given tension the three shapes are visually the same; their differences\ngrow as the tension drops and the sag increases.\n\nSource: `examples/cable_static.py`.\n\n::: {#2c6bf587 .cell execution_count=1}\n``` {.python .cell-code}\n\"\"\"Cable under its weight: catenary, parabolic and elastic (nleq) closed forms.\n\nAt a given tension the three shapes are visually the same; their differences\ngrow as the tension drops and the sag increases.\n\"\"\"\n\nimport matplotlib.pyplot as plt\nimport numpy as np\n\nfrom slenderpy.cable.static import catenary, nleq, parabolic\n\n# ASTER 570 conductor on a 400 m span with a 20 m support level difference\nlinm, axs, rts = 1.571, 3.653e07, 1.853e05\nlspan, sld = 400.0, 20.0\nx = np.linspace(0.0, lspan, 401)\n\nfig, (left, right) = plt.subplots(1, 2, figsize=(11, 4))\nfor k, ratio in enumerate([0.05, 0.1, 0.2]):\n    tension = ratio * rts\n    z_cat = catenary.shape(x, lspan, tension, sld, linm)\n    z_par = parabolic.shape(x, lspan, tension, sld, linm)\n    x_nl, z_nl = nleq.shape(2001, lspan, tension, sld, linm, axs)\n    z_nl = np.interp(x, x_nl, z_nl)\n    left.plot(x, z_cat, c=f\"C{k}\", label=f\"T = {ratio:.0%} RTS\")\n    right.plot(x, 1e2 * (z_par - z_cat), c=f\"C{k}\", ls=\"--\")\n    right.plot(x, 1e2 * (z_nl - z_cat), c=f\"C{k}\", ls=\"-\")\nright.plot([], [], \"k--\", label=\"parabolic - catenary\")\nright.plot([], [], \"k-\", label=\"nleq - catenary\")\nleft.set(title=\"catenary shape\", xlabel=\"x (m)\", ylabel=\"z (m)\")\nright.set(title=\"difference to the catenary\", xlabel=\"x (m)\", ylabel=\"dz (cm)\")\nfor ax in (left, right):\n    ax.grid(True)\n    ax.legend()\nfig.suptitle(\"400 m span, 20 m level difference, ASTER 570\")\nfig.tight_layout()\nplt.show()\n```\n\n::: {.cell-output .cell-output-display}\n![](cable_static_files/figure-html/cell-2-output-1.png){width=1047 height=381}\n:::\n:::\n\n\n",
+    "supporting": [
+      "cable_static_files"
+    ],
+    "filters": [],
+    "includes": {}
+  }
+}
