@@ -112,10 +112,29 @@ def test_parameters_warns_when_dr_is_adjusted():
 
 
 def test_parameters_dr_longer_than_run_warns():
+    # the output step cannot exceed the run: only the start and the end are kept
     with pytest.warns(UserWarning, match="dr adjusted"):
         p = Parameters(tf=1.0, dt=0.01, dr=5.0)
-    assert p.nr == p.nt
-    assert p.rr == 1
+    assert p.rr == p.nt
+    assert p.nr == 1
+    assert p.time_vector_output() == pytest.approx([0.0, 1.0])
+
+
+@pytest.mark.parametrize(
+    "tf, dt, dr, rr",
+    [
+        (1.0, 0.03, 0.06, 2),  # nt = 33: the old nt // round(T / dr) gave 1
+        (1.0, 0.01, 0.07, 7),
+        (1.0, 0.01, 0.03, 3),
+        (10.0, 0.002, 0.01, 5),
+    ],
+)
+def test_parameters_output_rate_is_the_nearest_step_multiple(tf, dt, dr, rr):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        p = Parameters(tf=tf, dt=dt, dr=dr)
+    assert p.rr == rr
+    assert p.nr == p.nt // rr
 
 
 def test_parameters_exact_steps_do_not_warn():
@@ -451,3 +470,10 @@ def test_multiplot_results_must_be_consistent():
     other = Results(lot=[0.0, 1.0], lov=["scalar"], lov_dims=[1], los=[0.25, 0.5, 0.75])
     with pytest.raises(ValueError):
         multiplot([_filled_results(), other])
+
+
+def test_multiplot_keeps_negative_times_by_default():
+    res = Results(lot=[-2.0, -1.0, 0.0, 1.0], lov=["a"], lov_dims=[1], los=[0.5])
+    res.data["a"][:] = [1.0, 2.0, 3.0, 4.0]
+    _, ax = multiplot(res)
+    assert ax[0, 0].get_lines()[0].get_xdata() == pytest.approx([-2.0, -1.0, 0.0, 1.0])

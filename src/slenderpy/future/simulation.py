@@ -122,9 +122,10 @@ class Parameters:
         -----
         The number of steps is ``nt = round((tf - t0) / dt)`` and the step
         actually used is stored as ``dt = (tf - t0) / nt``. Snapshots are taken
-        every ``rr`` steps, so the effective output step is ``rr * dt``. A
-        ``UserWarning`` is raised when either effective step differs from the
-        requested one.
+        every ``rr = round(dr / dt)`` steps, clamped to ``[1, nt]``, so the
+        effective output step is ``rr * dt``, the multiple of ``dt`` nearest to
+        ``dr`` within the run. A ``UserWarning`` is raised when either
+        effective step differs from the requested one.
         """
         if isinstance(los, int):
             if los >= 2:
@@ -136,21 +137,17 @@ class Parameters:
         requested_dt, requested_dr = float(dt), float(dr)
         t0, tf = float(t0), float(tf)
         nt = int(round((tf - t0) / requested_dt))
-        nr = int(round((tf - t0) / requested_dr))
+        dt = (tf - t0) / nt
 
-        # Reconcile the number of outputs with an integer output rate.
-        if nr > nt or nr < 1:
-            nr = nt
-            rr = 1
-        else:
-            rr = nt // nr
-            nr = nt // rr
+        # Output every rr steps: the step multiple nearest to dr, within the run.
+        rr = min(max(1, int(round(requested_dr / dt))), nt)
+        nr = nt // rr
 
         self.ns = ns  # number of elements in discretization
         self.t0 = t0  # start time (s)
         self.tf = tf  # final time (s)
         self.nt = nt  # number of time steps
-        self.dt = (tf - t0) / nt  # time step actually used (s)
+        self.dt = dt  # time step actually used (s)
         self.nr = nr  # number of (time) outputs
         self.rr = rr  # output rate (one output every rr steps)
         self.pp = pp  # print progress (or progress-bar args)
@@ -418,7 +415,7 @@ def multiplot(
     Lref: float = 1.0,
     stl: str = "-",
     log: bool = False,
-    t0: float = 0.0,
+    t0: float = -np.inf,
     tf: float = np.inf,
     fst: int = _TITLE_SIZE,
     fsl: int = _LABEL_SIZE,
@@ -445,7 +442,8 @@ def multiplot(
         Use log-log axes and label the x axis as a frequency, ie plot the
         output of :func:`spectrum`. The default is False.
     t0 : float, optional
-        Lower bound of the plotted time (or frequency) window. The default is 0.
+        Lower bound of the plotted time (or frequency) window. The default is
+        -inf.
     tf : float, optional
         Upper bound of the plotted time (or frequency) window. The default is inf.
     fst : int, optional
