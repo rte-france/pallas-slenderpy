@@ -914,3 +914,24 @@ def test_converging_in_time():
                 field,
                 coarse / fine,
             )
+
+
+@pytest.mark.parametrize("model", [BendingModel.CONSTANT, BendingModel.VARYING])
+def test_fine_grid_converges(model):
+    """1 cm steps on a 10 m span: the step residual sits at its round-off floor.
+
+    ``dt * K @ y`` carries a round-off of about ``eps * dt * ||K|| * |y|``, with
+    ``||K||`` growing like ``EI / ds**4``; the Newton threshold must not ask
+    for less, or the very first step fails.
+    """
+    span = Span(length=10.0, tension=500.0, boundary_conditions=clamped())
+    parameters = simulation.Parameters(ns=1001, t0=0.0, tf=0.02, dt=2e-3, dr=2e-3)
+    res = solve_dynamic(
+        CONDUCTOR,
+        span,
+        parameters,
+        model=model,
+        force=_gravity(CONDUCTOR),
+        approx_curvature=False,
+    )
+    assert np.all(np.isfinite(res["z"].values))

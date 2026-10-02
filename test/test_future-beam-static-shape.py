@@ -4,7 +4,7 @@ import pytest
 from slenderpy.future.beam import bending
 from slenderpy.future.beam.static import shape
 from slenderpy.future.beam.static.shape import BendingModel, solve
-from slenderpy.future.boundary_condition import BoundaryCondition
+from slenderpy.future.boundary_condition import BoundaryCondition, clamped
 from slenderpy.future.components import Conductor, Span
 
 
@@ -263,3 +263,34 @@ def test_bending_model_is_reexported():
     and test_future-beam-curvature.py; here only the wiring is checked.
     """
     assert shape.BendingModel is bending.BendingModel
+
+
+@pytest.mark.parametrize(
+    "model, ei",
+    [
+        (BendingModel.CONSTANT, 2155.07),
+        (BendingModel.CONSTANT, 28.28),
+        ("varying", None),
+    ],
+)
+def test_fine_grid_converges(model, ei):
+    """1 cm steps on a 50 m span: the residual sits at its round-off floor.
+
+    ``EI * D4`` scales like ``EI / ds**4``, so the round-off of the residual of
+    even the exact linear solution, about ``eps * ||K|| * |y|``, exceeds
+    ``tol * max|load|``; the threshold must not ask for less than that floor.
+    """
+    conductor = Conductor(
+        mass=1.57, ei_min=28.28, ei_max=2155.07, beta_flexion=6.438e-07
+    )
+    span = Span(length=50.0, tension=2.0e04, boundary_conditions=clamped())
+    n = 5001
+    y = solve(
+        conductor, span, np.full(n, -9.81 * conductor.mass), n, model=model, ei=ei
+    )
+    coarse = solve(
+        conductor, span, np.full(501, -9.81 * conductor.mass), 501, model=model, ei=ei
+    )
+    assert np.all(np.isfinite(y))
+    # same sag as a coarse grid that converges without the floor
+    assert y.min() == pytest.approx(coarse.min(), rel=1e-2)

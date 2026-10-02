@@ -193,6 +193,14 @@ def solve_dynamic(
     B = 2.0 * conductor.mass * identity - damped_mass - dt2**2 * stiffness
     lu = sp.sparse.linalg.splu(sp.sparse.csc_matrix(A))
 
+    # round-off floor of the step residual: A @ v and dt * K @ y cannot be
+    # evaluated better than eps * ||operator|| * |state|, which grows like
+    # EI / ds**4 on fine grids; the stiffest tangent of the law bounds K
+    stiffest = max(law.ei_linear, float(np.max(law.tangent(np.zeros(1)))))
+    stiff = stiffest * D4 - span.tension * D2
+    step_norm = fdu.inf_norm(damped_mass + dt2**2 * stiff + BC)
+    elastic_norm = dt * fdu.inf_norm(stiff)
+
     # newton tangent, assembled and solved in banded storage. Its constant part
     # and the left factor of its bending term never change; for the approximate
     # curvature the right factor is the constant D2 as well, so only the tangent
@@ -289,7 +297,10 @@ def solve_dynamic(
         elastic = dt * stiffness @ y_old
         external = dt2 * fdu.clean_rhs(order, load)
         rhs = inertia - elastic + external + rhs_bc
-        threshold = tol * fdu.residual_scale((inertia, elastic, external, rhs_bc))
+        threshold = max(
+            tol * fdu.residual_scale((inertia, elastic, external, rhs_bc)),
+            fdu.round_off_floor([(step_norm, v_old), (elastic_norm, y_old)]),
+        )
 
         if linear:
             v_new = lu.solve(rhs)

@@ -55,6 +55,9 @@ def _solve(
 
     Returns the displacement, or an array of ``nan`` when ``max|residual|`` does
     not reach ``tol`` relative to the load level within ``max_iter`` iterations.
+    The threshold is floored at the round-off level of the residual, about
+    ``eps * ||operator|| * max|y|``: the ``D4`` term scales like ``EI / ds**4``, so
+    on a fine grid even the exact solution cannot reach ``tol`` times the load.
     """
     ds = length / (n - 1)
     order = bc.order
@@ -72,11 +75,18 @@ def _solve(
     def residual(y):
         return D2 @ law.moment(chi.value(y)) + linear @ y - rhs_tot
 
-    threshold = tol * np.abs(rhs_tot).max()
+    # the stiffest tangent of the law bounds the operator norm
+    stiffest = max(law.ei_linear, float(np.max(law.tangent(np.zeros(1)))))
+    operator_norm = fdu.inf_norm(stiffest * D4 + linear)
+
+    def threshold(y):
+        floor = fdu.round_off_floor([(operator_norm, y)])
+        return max(tol * np.abs(rhs_tot).max(), floor)
+
     res = residual(y)
 
     for _ in range(max_iter):
-        if np.abs(res).max() <= threshold:
+        if np.abs(res).max() <= threshold(y):
             return y
 
         tangent = sp.sparse.diags(law.tangent(chi.value(y)))
@@ -101,7 +111,7 @@ def _solve(
 
     print(
         f"static solve did not converge: max|residual| = {np.abs(res).max():.3e} "
-        f"for a target of {threshold:.3e}"
+        f"for a target of {threshold(y):.3e}"
     )
     return np.full(n, np.nan)
 
@@ -141,8 +151,8 @@ def solve(
         ``True`` (default) uses the approximate curvature ``D2 @ y``; ``False``
         uses the exact geometric curvature.
     tol : float, optional
-        Convergence threshold on ``max|residual|``, relative to the load level.
-        Default 1e-06.
+        Convergence threshold on ``max|residual|``, relative to the load level,
+        and never below the round-off level of the residual. Default 1e-06.
     max_iter : int, optional
         Maximum number of Newton iterations. Default 64.
 

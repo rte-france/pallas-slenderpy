@@ -397,3 +397,34 @@ def residual_scale(terms) -> float:
         divided by.
     """
     return max(max(np.abs(term).max() for term in terms), 1.0e-30)
+
+
+# multiple of the estimate below which a residual is taken as round-off
+ROUND_OFF_FACTOR = 16.0
+
+
+def inf_norm(a: sp.sparse.spmatrix) -> float:
+    """Infinity norm of a sparse matrix, the largest absolute row sum."""
+    return float(abs(a).sum(axis=1).max())
+
+
+def round_off_floor(pairs) -> float:
+    """Round-off level of a residual built from operator-vector products.
+
+    A product ``A @ x`` cannot be evaluated better than about
+    ``eps * ||A|| * max|x|``. On a fine grid the ``D4`` operator grows like
+    ``EI / ds**4``, so this level can exceed a tolerance taken relative to the
+    load, and a solver must not ask for less than it.
+
+    Parameters
+    ----------
+    pairs : iterable of (float, np.ndarray)
+        ``(||A||, x)`` for each product of the residual, see :func:`inf_norm`.
+
+    Returns
+    -------
+    float
+        ``ROUND_OFF_FACTOR * eps * sum(||A|| * max|x|)``.
+    """
+    eps = np.finfo(float).eps
+    return ROUND_OFF_FACTOR * eps * sum(norm * np.abs(x).max() for norm, x in pairs)
