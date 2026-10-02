@@ -40,40 +40,53 @@ def solve_dynamic_with_sb(
     Parameters
     ----------
     stockbridges_dict : dict
-        Dictionary of stockbridge dampers, with keys being the name of the damper and values being dictionaries with keys "stockbridge" (the Stockbridge object),
-        "position" (the position of the damper on the beam) and "initial_conditions" (the initial conditions for the damper).
-    beam : Any
-        Beam object.
-    parameters : Any
-        Parameters object containing the simulation parameters.
-    initial_position : np.ndarray
-        Initial position of the beam.
-    initial_velocity : np.ndarray
-        Initial velocity of the beam.
+        One entry per damper, keyed by its name. Each value is a dictionary
+        with the keys ``"stockbridge"`` (the
+        [](`~slenderpy.stockbridge.core.stockbridge.Stockbridge`)),
+        ``"position"`` (its distance from support 1, m), ``"initial condition
+        right"`` and ``"initial condition left"`` (the initial states of its two
+        masses).
+    conductor : Conductor
+        Conductor properties, as for
+        [](`~slenderpy.beam.dynamic.solve_dynamic`).
+    span : Span
+        Span geometry and loading; ``boundary_conditions`` must be set.
+    parameters : simulation.Parameters
+        Simulation parameters (space discretisation, time stepping, outputs).
+    model : BendingModel, optional
+        ``CONSTANT`` or ``VARYING``. Default ``CONSTANT``.
+    ei : float or None, optional
+        Constant model only: overrides ``conductor.ei_max``.
     force : callable, optional
         ``force(x, t, y, z, vy, vz) -> (fy, fz)``, the interface of
-        :mod:`slenderpy.force.core`, as for
-        :func:`slenderpy.beam.dynamic.solve_dynamic`: the beam is
+        [](`slenderpy.force.core`), as for
+        [](`~slenderpy.beam.dynamic.solve_dynamic`): the beam is
         planar, it is called with ``y = vy = 0`` and only ``fz`` (N/m, may be
         a scalar) is used. Default a null force.
-    approx_curvature : bool
-        Whether to use an approximation for the curvature.
-    initial_bending_moment : Optional[np.ndarray], optional
-        Initial bending moment of the beam, by default None
+    approx_curvature : bool, optional
+        ``True`` (default) for the approximate curvature, ``False`` for the
+        exact one.
+    initial_position : numpy.ndarray, optional
+        Initial vertical position of the beam nodes. Default the static shape
+        under ``force`` at ``t0``.
+    initial_velocity : numpy.ndarray, optional
+        Initial vertical velocity of the beam nodes. Default at rest.
+    initial_bending_moment : numpy.ndarray, optional
+        Initial bending moment, for the varying model. Default the static law
+        at the initial curvature.
     zeta : float, optional
-        Damping ratio, by default 0.0
-    f0 : Optional[float], optional
-        Natural frequency, by default None
-    it_picard : int, optional
-        Number of Picard iterations, by default 1
-    tol_picard : float, optional
-        Tolerance for Picard iterations, by default 1e-3
+        Damping ratio. Default 0.
+    tol : float, optional
+        Newton convergence threshold, relative to the largest term of the step
+        residual. Default 1e-06.
+    max_iter : int, optional
+        Maximum number of Newton iterations per step. Default 64.
 
     Returns
     -------
     tuple[simulation.Results, dict[str, Result]]
         The beam results, with the variables of
-        :func:`slenderpy.beam.dynamic.solve_dynamic` (``z``, ``vz``,
+        [](`~slenderpy.beam.dynamic.solve_dynamic`) (``z``, ``vz``,
         ``curvature``, ``moment``, ``eta``, ``n_iter``), and a dictionary of
         Result objects for each stockbridge damper.
     """

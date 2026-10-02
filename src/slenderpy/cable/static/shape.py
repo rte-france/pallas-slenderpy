@@ -1,7 +1,7 @@
 """Static shape of a suspended cable under a load.
 
-Solves the equations of :mod:`slenderpy.cable.dynamic` ([Lee1992]: the
-displacement from the catenary of :mod:`slenderpy.cable.static.catenary`
+Solves the equations of [](`slenderpy.cable.dynamic`) ([Lee1992]: the
+displacement from the catenary of [](`slenderpy.cable.static.catenary`)
 in its local triad) without the time derivatives, on the interior nodes of the
 same grid, uniform in arc length::
 
@@ -19,7 +19,7 @@ The small-displacement model cannot detect a slack cable: a load lifting the
 whole weight still gives a tensioned, nearly slack shape.
 
 The load comes on top of the weight, which is part of the model, as for the
-``force`` of :func:`slenderpy.cable.dynamic.solve`: no load gives the
+``force`` of [](`~slenderpy.cable.dynamic.solve`): no load gives the
 catenary.
 """
 
@@ -71,7 +71,7 @@ def solve(
     numpy.ndarray
         Global position of the nodes, shape ``(3, ns)``, rows ``x``, ``y``,
         ``z``, ready to pass as ``initial_position`` to
-        :func:`slenderpy.cable.dynamic.solve`. All nan when the solve
+        [](`~slenderpy.cable.dynamic.solve`). All nan when the solve
         fails: a non-finite load or state, or no convergence. The model cannot
         detect a slack cable (see the module docstring).
 

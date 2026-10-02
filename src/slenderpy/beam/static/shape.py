@@ -1,13 +1,13 @@
 """Static shape (deflection) of a beam under a custom right-hand-side force.
 
 The solver is a free function taking the ``Conductor`` and ``Span`` dataclasses
-from :mod:`slenderpy.components`. The two constitutive ingredients come
+from [](`slenderpy.components`). The two constitutive ingredients come
 from their own modules and are chosen independently:
 
     - the bending law, constant or Bouc-Wen, from
-      :mod:`slenderpy.beam.bending`;
+      [](`slenderpy.beam.bending`);
     - the curvature model, approximate or exact, from
-      :mod:`slenderpy.beam.curvature`.
+      [](`slenderpy.beam.curvature`).
 
 The nonlinear system is solved with a damped Newton iteration on the analytic
 Jacobian assembled from ``law.tangent`` and ``chi.jacobian``. A

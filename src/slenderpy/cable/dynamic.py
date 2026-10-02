@@ -6,11 +6,11 @@ non-dimensionalised by the cable length, on a grid uniform in arc length. The
 tangential displacement is not a degree of freedom; it follows from the
 quasi-static stretching condition.
 
-Ported from :func:`slenderpy.legacy.cable.solve`, with the interface moved to global
+Ported from ``slenderpy.legacy.cable.solve``, with the interface moved to global
 coordinates: the initial conditions and the results are absolute positions in a
 fixed frame, and positions of interest are normalised span positions, as in
-:mod:`slenderpy.beam.dynamic`. The frame is the one described at
-:func:`slenderpy.legacy.cable.tnb2xyz`: ``ex`` horizontal and ``ez`` vertical in the
+[](`slenderpy.beam.dynamic`). The frame is the one described at
+``slenderpy.legacy.cable.tnb2xyz``: ``ex`` horizontal and ``ez`` vertical in the
 plane of the two supports and the cable at rest, ``ey`` completing a
 right-handed set.
 
@@ -137,18 +137,18 @@ def solve(
         the span coordinate.
     force : callable, optional
         ``force(x, t, y, z, vy, vz) -> (fy, fz)``, the interface of
-        :mod:`slenderpy.force.core`: ``x`` the horizontal position of
+        [](`slenderpy.force.core`): ``x`` the horizontal position of
         each node (m), ``y``, ``z``, ``vy``, ``vz`` its global position (m)
         and velocity (m/s), and ``(fy, fz)`` the force per unit length (N/m)
         along global ``y`` and ``z`` (scalars allowed). The force is projected
         on the local normal and binormal; its tangential part is dropped.
         The weight must not be included: it is already in the catenary
-        equilibrium, so a :class:`~slenderpy.force.core.Gravity`, or
+        equilibrium, so a [](`~slenderpy.force.core.Gravity`), or
         a sum holding one, raises ``ValueError`` (a plain function cannot be
         checked). Default a null force. It is evaluated at ``t`` and
         ``t+dt`` but both at the state of the previous step, so a
         state-dependent force lags one step. The static solver
-        :func:`slenderpy.cable.static.shape.solve` takes its load with
+        [](`~slenderpy.cable.static.shape.solve`) takes its load with
         the same convention.
     zeta : float, optional
         Damping ratio, by default 0. The damping coefficient is ``2 w0 zeta``
@@ -156,8 +156,8 @@ def solve(
     initial_position : numpy.ndarray, optional
         Global ``(3, ns)`` position of the nodes at ``t0``. Default the
         static shape under ``force`` at ``t0``, evaluated at rest, from
-        :func:`slenderpy.cable.static.shape.solve`; without force it is
-        the catenary equilibrium of :func:`equilibrium`. Both ends must sit on their
+        [](`~slenderpy.cable.static.shape.solve`); without force it is
+        the catenary equilibrium of [](`~slenderpy.cable.dynamic.equilibrium`). Both ends must sit on their
         support. The tangential component of the displacement is discarded: the
         model derives it from the stretching condition.
     initial_velocity : numpy.ndarray, optional
@@ -171,15 +171,14 @@ def solve(
         ``dtension`` is zero at equilibrium; the total axial force, under the
         model's assumption of a uniform static tension, is
         ``span.tension + dtension``. The final state, recorded with
-        :meth:`simulation.Results.set_state`, holds the global ``position`` and
+        [](`~slenderpy.simulation.Results.set_state`), holds the global ``position`` and
         ``velocity`` at full ``ns`` resolution, so a restart is
         ``initial_position=state["position"]``.
 
-    Warns
+    Notes
     -----
-    UserWarning
-        If the CFL number exceeds 1, which makes the explicit part of the scheme
-        unreliable.
+    A ``UserWarning`` is raised if the CFL number exceeds 1, which makes the
+    explicit part of the scheme unreliable.
     """
     if conductor.axial_stiffness is None:
         raise ValueError("conductor.axial_stiffness is required for a cable solve")

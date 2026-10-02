@@ -9,7 +9,7 @@ A force is any callable ``force(x, t, y, z, vy, vz) -> (fy, fz)``:
 - ``fy``, ``fz``: force per unit length (N/m) along global ``y`` and ``z``,
   as arrays of the nodes' shape or anything broadcastable to it.
 
-The frame is the one of :mod:`slenderpy.simulation`: origin at support
+The frame is the one of [](`slenderpy.simulation`): origin at support
 1, ``x`` along the span, ``z`` upwards, ``y`` completing a right-handed triad.
 The beam solver uses ``fz`` only; the cable solver projects both components on
 its local normal and binormal.
@@ -56,8 +56,10 @@ class Force(ABC):
 class ForceSum(Force):
     """Sum of forces, built with ``+``.
 
-    Attributes:
-        terms: The summed forces, flattened: ``a + b + c`` holds three terms.
+    Attributes
+    ----------
+    terms
+        The summed forces, flattened: ``a + b + c`` holds three terms.
     """
 
     terms: tuple[Force, ...]
@@ -78,8 +80,10 @@ class Gravity(Force):
     For the beam only: the cable equilibrium already holds the weight, so the
     cable solver refuses this force.
 
-    Attributes:
-        mass: Mass per unit length (kg/m).
+    Attributes
+    ----------
+    mass
+        Mass per unit length (kg/m).
     """
 
     mass: float
@@ -106,12 +110,18 @@ class PointExcitation(Force):
     cable the applied force is larger by that factor (about 1% at typical
     slopes).
 
-    Attributes:
-        frequency: Frequency (Hz).
-        amplitude: Amplitude (N); positive goes up first.
-        position: Horizontal distance from support 1 (m).
-        t_start: Start of the excitation (s).
-        t_end: End of the excitation (s).
+    Attributes
+    ----------
+    frequency
+        Frequency (Hz).
+    amplitude
+        Amplitude (N); positive goes up first.
+    position
+        Horizontal distance from support 1 (m).
+    t_start
+        Start of the excitation (s).
+    t_end
+        End of the excitation (s).
     """
 
     frequency: float

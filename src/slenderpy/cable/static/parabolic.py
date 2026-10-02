@@ -279,11 +279,8 @@ def thermal_expansion_tension(
     temperature_i : initial temperature of cable (K)
     temperature_f : final temperature of cable (K)
     linm_i : initial linear mass (kg.m**-1)
-    axs : axial stiffness (N)
     alpha : thermal expansion coefficient (K**-1)
     g : gravitational acceleration (m.s**-2)
-    rtol : relative tolerance for quasi-newton algorithm
-    maxiter : maximum number of iterations in quasi-newton algorithm
 
     Returns
     -------
@@ -319,7 +316,7 @@ def thermal_expansion_temperature(
     alpha: floatArrayLike,
     g: floatArrayLike = _GRAVITY,
 ):
-    """Inverse of thermexp_tension, ie compute new temperature with tension change.
+    """Inverse of thermal_expansion_tension: new temperature from a tension change.
 
     If more than one arg is an array, they must have the same size (no check).
 
@@ -331,11 +328,8 @@ def thermal_expansion_temperature(
     sld : support level difference (m)
     temperature_i : initial temperature of cable (K)
     linm_i : initial linear mass (kg.m**-1)
-    axs : axial stiffness (N)
     alpha : thermal expansion coefficient (K**-1)
     g : gravitational acceleration (m.s**-2)
-    rtol : relative tolerance for quasi-newton algorithm
-    maxiter : maximum number of iterations in quasi-newton algorithm
 
     Returns
     -------

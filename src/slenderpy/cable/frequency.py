@@ -91,7 +91,7 @@ def natural(
 ):
     """Get natural frequency using taut string formula with different lengths according to arg method.
 
-    The ``method`` argument accepts a :class:`FrequencyMethod` member or its
+    The ``method`` argument accepts a [](`~slenderpy.cable.frequency.FrequencyMethod`) member or its
     string value ("taut", "parabolic", "catenary" or "nleq"); an invalid value
     raises ``ValueError``.
     """
@@ -121,7 +121,7 @@ def irvine_number(
     The Irvine number lambda is the dimensionless elasticity-to-sag ratio of
     the linear theory of a suspended cable, lambda^2 = 64 r^2/(1 + 8 r^2) *
     axs/tension with r the sag-to-span ratio. It governs the in-plane
-    frequencies through :func:`_irvine_frequencies`.
+    frequencies through ``_irvine_frequencies``.
 
     The sag ratio comes from the parabolic model, whose sag is
     linm*g*lspan^2/(8*tension), so that 8*r is exactly lspan/a with a the

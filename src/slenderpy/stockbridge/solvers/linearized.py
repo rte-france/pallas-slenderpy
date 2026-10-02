@@ -8,7 +8,7 @@ solved at each time step. The five unknowns are:
 - ``4``: clamp vertical acceleration.
 
 The state is symmetric (right and left masses share the same trajectory),
-so only one mass is integrated; the other entries of the :class:`Result`
+so only one mass is integrated; the other entries of the [](`~slenderpy.stockbridge.solvers.linearized.Result`)
 container are filled with NaNs.
 """
 

@@ -1,12 +1,12 @@
 """General boundary conditions for finite-difference beam/cable schemes.
 
-A :class:`BoundaryCondition` describes, at each end of the domain, one or two
+A [](`~slenderpy.boundary_condition.BoundaryCondition`) describes, at each end of the domain, one or two
 linear relations of the form::
 
     a * y(x) + b * (dy/dx)(x) + c * (d2y/dx2)(x) = d(t)
 
 and builds the matrix and right-hand side contributions that enforce them in a
-finite-difference scheme. The :func:`hinged` and :func:`clamped` helpers
+finite-difference scheme. The [](`~slenderpy.boundary_condition.hinged`) and [](`~slenderpy.boundary_condition.clamped`) helpers
 build the two most common cases (pinned and clamped ends).
 """
 

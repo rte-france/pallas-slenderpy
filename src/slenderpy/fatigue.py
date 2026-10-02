@@ -6,7 +6,7 @@ e.g. the Poffenberger-Swart point 89 mm from a clamp. Stress models, S-N
 curves and damage are out of scope: the counted cycles feed a separate
 package.
 
-The counting is ported from :mod:`slenderpy.legacy.fatigue`, without its Goodman
+The counting is ported from ``slenderpy.legacy.fatigue``, without its Goodman
 correction.
 """
 
@@ -49,14 +49,14 @@ def _rainflow(turning_points):
     Four-point stack algorithm of the legacy counter (ASTM E1049-85): a range
     that holds the first point of the stack is a half cycle, any other closed
     range a full cycle, and the ranges left on the stack at the end are half
-    cycles. On the output of :func:`_compress`, which collapses repeated
+    cycles. On the output of ``_compress``, which collapses repeated
     samples, a zero range cannot occur; zero ranges are still skipped, as a
     guard for direct calls.
 
     Parameters
     ----------
     turning_points : numpy.ndarray
-        Turning points of the signal, see :func:`_compress`.
+        Turning points of the signal, see ``_compress``.
 
     Returns
     -------

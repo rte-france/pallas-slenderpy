@@ -8,7 +8,7 @@ from .core.stockbridge import Result
 
 
 def _side_value(side: Side | str) -> str:
-    """Return the string value of a :class:`Side` (or pass-through a string)."""
+    """Return the string value of a [](`~slenderpy.stockbridge.plotting.Side`) (or pass-through a string)."""
     if isinstance(side, Side):
         return side.value
     return side

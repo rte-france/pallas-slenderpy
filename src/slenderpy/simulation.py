@@ -1,30 +1,26 @@
-"""Simulation configuration (:class:`Parameters`), time-series results
-(:class:`Results`) and the helpers to plot (:func:`multiplot`) and transform
-(:func:`spectrum`) them.
+"""Simulation configuration ([](`~slenderpy.simulation.Parameters`)), time-series results
+([](`~slenderpy.simulation.Results`)) and the helpers to plot ([](`~slenderpy.simulation.multiplot`)) and transform
+([](`~slenderpy.simulation.spectrum`)) them.
 
-Ported from :mod:`slenderpy.legacy.simtools` with bug fixes and modernization.
-``Results`` is backed by an :class:`xarray.Dataset` with a ``time`` x
+Ported from ``slenderpy.legacy.simtools`` with bug fixes and modernization.
+``Results`` is backed by an ``xarray.Dataset`` with a ``time`` x
 ``span_frac`` layout, ``span_frac`` being the horizontal distance from support 1
 over the span length, in [0, 1].
 
-Output contract
----------------
 Every solver returns its results in one global frame: origin at
 support 1, ``x`` along the span, ``z`` upwards, ``y`` completing a right-handed
-triad; SI units. Shared variable names:
+triad; SI units. Shared variable names (the output contract):
 
-=============  =========================================  =====  ====
-name           meaning                                    cable  beam
-=============  =========================================  =====  ====
-``x``, ``y``   along-span and out-of-plane position (m)   yes    no
-``z``          vertical position (m)                      yes    yes
-``vz``         vertical velocity (m/s)                    no     yes
-``curvature``  bending curvature (1/m)                    no     yes
-``moment``     bending moment (N.m)                       no     yes
-``eta``        Bouc-Wen internal variable                 no     yes
-``n_iter``     Newton iterations of the step (scalar)     no     yes
-``dtension``   dynamic increment of axial force (N)       yes    no
-=============  =========================================  =====  ====
+| name | meaning | cable | beam |
+|------|---------|-------|------|
+| ``x``, ``y`` | along-span and out-of-plane position (m) | yes | no |
+| ``z`` | vertical position (m) | yes | yes |
+| ``vz`` | vertical velocity (m/s) | no | yes |
+| ``curvature`` | bending curvature (1/m) | no | yes |
+| ``moment`` | bending moment (N.m) | no | yes |
+| ``eta`` | Bouc-Wen internal variable | no | yes |
+| ``n_iter`` | Newton iterations of the step (scalar) | no | yes |
+| ``dtension`` | dynamic increment of axial force (N) | yes | no |
 """
 
 from __future__ import annotations
@@ -440,7 +436,7 @@ def multiplot(
         Line plot style. The default is '-'.
     log : bool, optional
         Use log-log axes and label the x axis as a frequency, ie plot the
-        output of :func:`spectrum`. The default is False.
+        output of [](`~slenderpy.simulation.spectrum`). The default is False.
     t0 : float, optional
         Lower bound of the plotted time (or frequency) window. The default is
         -inf.
@@ -545,7 +541,7 @@ def spectrum(res: Results) -> Results:
     The returned Results stores frequencies (Hz) in place of times, keeping the
     same variables, dimensions and positions. Values are the one-sided modulus
     ``abs(fft(x) / n)`` over the first ``n // 2`` bins, the DC bin included;
-    this 1/n normalization is the same convention as :mod:`slenderpy.legacy.simtools`,
+    this 1/n normalization is the same convention as ``slenderpy.legacy.simtools``,
     so a unit-amplitude sine peaks at 0.5.
 
     Parameters
@@ -563,11 +559,10 @@ def spectrum(res: Results) -> Results:
     ValueError
         If the input holds fewer than two time samples.
 
-    Warns
+    Notes
     -----
-    UserWarning
-        If the time sampling is not uniform, or if a variable holds NaN (which
-        propagates to its whole spectrum).
+    A ``UserWarning`` is raised if the time sampling is not uniform, or if a
+    variable holds NaN (which propagates to its whole spectrum).
     """
     lot = np.asarray(res.lot(), dtype=float)
     n = len(lot)

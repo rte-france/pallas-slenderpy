@@ -2,14 +2,14 @@
 
 The package is organised in four sub-packages:
 
-- :mod:`stockbridge.core` - the domain model: :class:`Mass`, :class:`Clamp`,
-  :class:`Stockbridge`, the :class:`Side` enum and the
+- [](`slenderpy.stockbridge.core`) - the domain model: [](`~slenderpy.stockbridge.__init__.Mass`), [](`~slenderpy.stockbridge.__init__.Clamp`),
+  [](`~slenderpy.stockbridge.__init__.Stockbridge`), the [](`~slenderpy.stockbridge.__init__.Side`) enum and the
   parameter dataclasses.
-- :mod:`stockbridge.solvers` - free-function solvers
-  (:func:`solve_imposed_force`, :func:`solve_imposed_acceleration`,
-  :func:`solve_linearized_imposed_force`).
-- :mod:`stockbridge.plotting` - matplotlib plotting helpers.
-- :mod:`stockbridge.coupling` - coupling with the beam model.
+- [](`slenderpy.stockbridge.solvers`) - free-function solvers
+  ([](`~slenderpy.stockbridge.__init__.solve_imposed_force`), [](`~slenderpy.stockbridge.__init__.solve_imposed_acceleration`),
+  [](`~slenderpy.stockbridge.__init__.solve_linearized_imposed_force`)).
+- [](`slenderpy.stockbridge.plotting`) - matplotlib plotting helpers.
+- [](`slenderpy.stockbridge.coupling`) - coupling with the beam model.
 
 The most common symbols are re-exported here for convenience.
 """

@@ -1,7 +1,7 @@
 """Frozen dataclasses describing a conductor and a span.
 
 These value objects group the physical parameters shared by the cable and beam
-models of :mod:`slenderpy`. Most parameters are common to both models; a
+models of ``slenderpy``. Most parameters are common to both models; a
 few are model-specific and default to ``None``:
 
     - ``axial_stiffness`` is used by the cable model only.
@@ -35,16 +35,24 @@ def _check_optional_positive(name: str, value: float | None) -> None:
 class Conductor:
     """Physical properties of a conductor, expressed per unit length.
 
-    Attributes:
-        mass: Linear mass, i.e. mass per unit length (kg/m).
-        diameter: Conductor diameter (m). Used by dynamic-force computations.
-        axial_stiffness: Axial stiffness EA (N). Cable model only.
-        ei_min: Minimum bending stiffness (N.m^2). Beam model.
-        ei_max: Maximum bending stiffness (N.m^2). Beam model.
-        beta_flexion: Flexion compliance (J^-1). Beam model (Bouc-Wen); the
-            critical curvature is derived as chi0 = beta_flexion * tension.
-        thermal_expansion: Linear thermal-expansion coefficient alpha (1/K).
-            Cable thermal computations only.
+    Attributes
+    ----------
+    mass
+        Linear mass, i.e. mass per unit length (kg/m).
+    diameter
+        Conductor diameter (m). Used by dynamic-force computations.
+    axial_stiffness
+        Axial stiffness EA (N). Cable model only.
+    ei_min
+        Minimum bending stiffness (N.m^2). Beam model.
+    ei_max
+        Maximum bending stiffness (N.m^2). Beam model.
+    beta_flexion
+        Flexion compliance (J^-1). Beam model (Bouc-Wen); the
+        critical curvature is derived as chi0 = beta_flexion * tension.
+    thermal_expansion
+        Linear thermal-expansion coefficient alpha (1/K).
+        Cable thermal computations only.
     """
 
     mass: float
@@ -76,13 +84,18 @@ class Conductor:
 class Span:
     """Geometry and loading of a span.
 
-    Attributes:
-        length: Span length (m).
-        tension: Mechanical tension (N).
-        sld: Support level difference between the two supports (m). May be
-            negative; the sign encodes which support is higher.
-        boundary_conditions: Boundary conditions for the beam model. ``None``
-            for the cable model.
+    Attributes
+    ----------
+    length
+        Span length (m).
+    tension
+        Mechanical tension (N).
+    sld
+        Support level difference between the two supports (m). May be
+        negative; the sign encodes which support is higher.
+    boundary_conditions
+        Boundary conditions for the beam model. ``None``
+        for the cable model.
     """
 
     length: float

@@ -1,6 +1,6 @@
 """Pieces of the [Lee1992] cable model shared by the static and dynamic solvers.
 
-The catenary equilibrium of :mod:`slenderpy.cable.static.catenary`
+The catenary equilibrium of [](`slenderpy.cable.static.catenary`)
 sampled on a grid uniform in arc length, its local triad, the conversions
 between the local state and global positions, the finite-difference operators,
 the quasi-static stretching condition and the projection of a global force on

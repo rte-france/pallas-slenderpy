@@ -1,11 +1,11 @@
 """Dynamic (time-domain) response of a beam under a custom force.
 
-Companion of :mod:`slenderpy.beam.static.shape`: same ``Conductor`` and
+Companion of [](`slenderpy.beam.static.shape`): same ``Conductor`` and
 ``Span`` inputs, the same bending law from
-:mod:`slenderpy.beam.bending` and the same curvature model from
-:mod:`slenderpy.beam.curvature`, with one solver covering the four
+[](`slenderpy.beam.bending`) and the same curvature model from
+[](`slenderpy.beam.curvature`), with one solver covering the four
 (model, curvature) combinations. The banded-storage helpers the Newton tangent
-is assembled with live in :mod:`slenderpy.fd_utils`.
+is assembled with live in [](`slenderpy.fd_utils`).
 """
 
 from __future__ import annotations
@@ -127,7 +127,7 @@ def solve_dynamic(
         ``None`` (default), ``conductor.ei_max`` is used.
     force : callable, optional
         ``force(x, t, y, z, vy, vz) -> (fy, fz)``, the interface of
-        :mod:`slenderpy.force.core`, e.g.
+        [](`slenderpy.force.core`), e.g.
         ``Gravity(conductor.mass) + PointExcitation(...)``. The beam is
         planar: it is called with ``y = vy = 0`` and only ``fz`` (N/m, may be
         a scalar) is used. Default a null force. It is evaluated at the state
@@ -138,7 +138,7 @@ def solve_dynamic(
         uses the exact geometric curvature.
     initial_position : np.ndarray, optional
         Initial position. Default the static shape under ``force`` at ``t0``,
-        from :func:`shape.solve` with the same model and curvature option.
+        from [](`~slenderpy.beam.dynamic.shape.solve`) with the same model and curvature option.
     initial_velocity : np.ndarray, optional
         Initial velocity. Default at rest.
     initial_bending_moment : np.ndarray, optional
@@ -161,9 +161,9 @@ def solve_dynamic(
         bending ``moment`` and hysteresis variable ``eta`` (zero for the
         constant model) at the positions of ``parameters.los``, and the
         per-step iteration count ``n_iter``; names follow the output contract
-        of :mod:`slenderpy.simulation`. Snapshots after a failed step are
+        of [](`slenderpy.simulation`). Snapshots after a failed step are
         left at nan. The final state, recorded with
-        :meth:`simulation.Results.set_state`, keeps the same five fields, under
+        [](`~slenderpy.simulation.Results.set_state`), keeps the same five fields, under
         the same names, at full ``ns`` resolution.
     """
     model = BendingModel(model)

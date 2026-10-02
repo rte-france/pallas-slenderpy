@@ -120,7 +120,7 @@ def build_matrix_force_imposed(
     sb : Stockbridge
         Stockbridge model containing the system parameters.
     A_base : np.ndarray
-        Base matrix produced by :func:`_build_A_base`. Mutated in place and returned.
+        Base matrix produced by ``_build_A_base``. Mutated in place and returned.
     old_curvature_derivative : np.ndarray
         Concatenation of the curvature increments of the right and left masses, shape ``(n1 + n2,)``.
 

@@ -3,16 +3,16 @@
 Two models share the same interface: a constant bending stiffness, and the
 Bouc-Wen envelope whose tangent stiffness falls from ``ei_max`` at rest to
 ``ei_min`` once the curvature exceeds a critical value. Both expose
-:meth:`Bending.moment` and :meth:`Bending.tangent`, the latter being the
+[](`~slenderpy.beam.bending.Bending.moment`) and [](`~slenderpy.beam.bending.Bending.tangent`), the latter being the
 ``dM/dcurvature`` the Newton iterations of the static solver need, plus the
-:attr:`Bending.ei_linear` the linear part of the scheme is assembled with. Use
-:func:`create` to resolve one from a ``(conductor, span, model)`` triplet.
+``Bending.ei_linear`` the linear part of the scheme is assembled with. Use
+[](`~slenderpy.beam.bending.create`) to resolve one from a ``(conductor, span, model)`` triplet.
 
-:meth:`Bending.moment` and :meth:`Bending.tangent` are envelopes in the
+[](`~slenderpy.beam.bending.Bending.moment`) and [](`~slenderpy.beam.bending.Bending.tangent`) are envelopes in the
 curvature alone, which is what a static solve needs. A time-domain solve uses
-the second group -- :meth:`Bending.dynamic_moment`,
-:meth:`Bending.update_eta`, :meth:`Bending.dynamic_tangent` and
-:meth:`Bending.initial_eta` -- where the Bouc-Wen hysteresis is carried by a
+the second group -- [](`~slenderpy.beam.bending.Bending.dynamic_moment`),
+[](`~slenderpy.beam.bending.Bending.update_eta`), [](`~slenderpy.beam.bending.Bending.dynamic_tangent`) and
+[](`~slenderpy.beam.bending.Bending.initial_eta`) -- where the Bouc-Wen hysteresis is carried by a
 state variable ``eta`` bounded by 1 rather than by the curvature history. The
 constant law implements that group trivially, with no state, so a solver can
 drive either model through the same calls.
@@ -38,7 +38,7 @@ class BendingModel(str, Enum):
 class Bending(ABC):
     """Bending-moment law, as a function of the curvature.
 
-    Subclasses implement :meth:`moment` and :meth:`tangent` for one model, and
+    Subclasses implement [](`~slenderpy.beam.bending.Bending.moment`) and [](`~slenderpy.beam.bending.Bending.tangent`) for one model, and
     pass the stiffness of the linear part of the law to this constructor.
 
     Parameters
@@ -100,7 +100,7 @@ class Bending(ABC):
         curvature : np.ndarray
             Curvature at the end of the step.
         eta : np.ndarray
-            Hysteresis variable at the end of the step, from :meth:`update_eta`.
+            Hysteresis variable at the end of the step, from [](`~slenderpy.beam.bending.Bending.update_eta`).
 
         Returns
         -------
@@ -126,8 +126,8 @@ class Bending(ABC):
         Returns
         -------
         np.ndarray
-            Branch index of each node, for :meth:`update_eta` and
-            :meth:`dynamic_tangent`.
+            Branch index of each node, for [](`~slenderpy.beam.bending.Bending.update_eta`) and
+            [](`~slenderpy.beam.bending.Bending.dynamic_tangent`).
         """
 
     @abstractmethod
@@ -143,7 +143,7 @@ class Bending(ABC):
         dchi : np.ndarray
             Curvature increment over the step.
         branch : np.ndarray or None, optional
-            Branch to evaluate the law on, from :meth:`branch`. Default the
+            Branch to evaluate the law on, from [](`~slenderpy.beam.bending.Bending.branch`). Default the
             branch of ``(eta_old, dchi)`` itself.
 
         Returns
@@ -156,7 +156,7 @@ class Bending(ABC):
     def dynamic_tangent(
         self, eta: np.ndarray, dchi: np.ndarray, branch: np.ndarray | None = None
     ) -> np.ndarray:
-        """Tangent stiffness of :meth:`dynamic_moment` over the step.
+        """Tangent stiffness of [](`~slenderpy.beam.bending.Bending.dynamic_moment`) over the step.
 
         Parameters
         ----------
@@ -165,7 +165,7 @@ class Bending(ABC):
         dchi : np.ndarray
             Curvature increment over the step.
         branch : np.ndarray or None, optional
-            Branch the step was evaluated on, from :meth:`branch`. Default the
+            Branch the step was evaluated on, from [](`~slenderpy.beam.bending.Bending.branch`). Default the
             branch of ``(eta, dchi)``.
 
         Returns
@@ -178,7 +178,7 @@ class Bending(ABC):
     def initial_eta(self, moment: np.ndarray, curvature: np.ndarray) -> np.ndarray:
         """Hysteresis variable matching an initial moment and curvature.
 
-        Inverse of :meth:`dynamic_moment` in ``eta``, used to start a run from a
+        Inverse of [](`~slenderpy.beam.bending.Bending.dynamic_moment`) in ``eta``, used to start a run from a
         known bending moment.
 
         Parameters
@@ -272,7 +272,7 @@ class VaryingBending(Bending):
         Critical curvature separating the two stiffness regimes.
     plateau : float
         ``(ei_max - ei_min) * chi0``, the saturated hysteretic moment, i.e. the
-        largest value the ``eta`` term of :meth:`dynamic_moment` can reach.
+        largest value the ``eta`` term of [](`~slenderpy.beam.bending.VaryingBending.dynamic_moment`) can reach.
 
     Raises
     ------
@@ -319,7 +319,7 @@ class VaryingBending(Bending):
     def dynamic_moment(self, curvature: np.ndarray, eta: np.ndarray) -> np.ndarray:
         """Bending moment of the time-domain law.
 
-        Unlike :meth:`moment`, which is an envelope in the curvature alone, this
+        Unlike [](`~slenderpy.beam.bending.VaryingBending.moment`), which is an envelope in the curvature alone, this
         is linear in the curvature and carries the whole hysteresis in ``eta``.
         """
         return self.ei_min * curvature + self.plateau * eta
@@ -329,7 +329,7 @@ class VaryingBending(Bending):
 
         The sign of the new ``eta`` is the sign of ``chi0*eta_old + dchi``. A
         change of branch, at a reversal of ``dchi`` or a zero of ``eta``, is a
-        kink of :meth:`update_eta`, where its tangent jumps by up to
+        kink of [](`~slenderpy.beam.bending.VaryingBending.update_eta`), where its tangent jumps by up to
         ``ei_max / ei_min``.
         """
         return np.sign(dchi) + np.sign(self.chi0 * eta_old + dchi)
@@ -352,7 +352,7 @@ class VaryingBending(Bending):
         whatever the step size, and a reversal of ``dchi`` correctly leaves the
         hysteresis on the stiff branch. With a given ``branch`` (frozen by a
         solver) the same expression is evaluated on that branch; it equals the
-        law wherever the branch is the one of :meth:`branch`.
+        law wherever the branch is the one of [](`~slenderpy.beam.bending.VaryingBending.branch`).
         """
         if branch is None:
             branch = self.branch(eta_old, dchi)
@@ -361,9 +361,9 @@ class VaryingBending(Bending):
     def dynamic_tangent(
         self, eta: np.ndarray, dchi: np.ndarray, branch: np.ndarray | None = None
     ) -> np.ndarray:
-        """Tangent stiffness of :meth:`dynamic_moment` over the step.
+        """Tangent stiffness of [](`~slenderpy.beam.bending.VaryingBending.dynamic_moment`) over the step.
 
-        Built from the derivative of :meth:`update_eta` with respect to ``dchi``,
+        Built from the derivative of [](`~slenderpy.beam.bending.VaryingBending.update_eta`) with respect to ``dchi``,
         which equals ``1/chi0`` at rest -- making the tangent stiffness
         ``ei_max`` -- and decays as the hysteresis saturates, down to ``ei_min``.
         """

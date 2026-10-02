@@ -4,16 +4,16 @@ Each builder returns the centered-difference matrix of a given derivative on a
 uniform grid of ``n`` nodes spaced by ``ds``. The rows carrying the boundary
 conditions are left empty: two rows (first and last) for an order-2 scheme,
 four rows (two first and two last) for an order-4 scheme. Those rows are meant
-to be filled by a :class:`~slenderpy.boundary_condition.BoundaryCondition`
+to be filled by a [](`~slenderpy.boundary_condition.BoundaryCondition`)
 contribution added to the matrix.
 
-:func:`clean_matrix` and :func:`clean_rhs` empty those same rows in any other
+[](`~slenderpy.fd_utils.clean_matrix`) and [](`~slenderpy.fd_utils.clean_rhs`) empty those same rows in any other
 matrix or right-hand side taking part in the scheme, so that the boundary
 conditions are the only relations enforced there.
 
 The rest of the module holds the numerical helpers the solvers share:
-:func:`banded`, :func:`tridiagonal` and :func:`product_band` move a narrow
-sparse matrix in and out of the LAPACK banded layout, and :func:`residual_scale`
+[](`~slenderpy.fd_utils.banded`), [](`~slenderpy.fd_utils.tridiagonal`) and [](`~slenderpy.fd_utils.product_band`) move a narrow
+sparse matrix in and out of the LAPACK banded layout, and [](`~slenderpy.fd_utils.residual_scale`)
 gives a Newton iteration something to measure its residual against.
 """
 
@@ -343,7 +343,7 @@ def product_band(
     Parameters
     ----------
     left : tuple of np.ndarray
-        The ``(lower, diag, upper)`` triple of ``L``, as :func:`tridiagonal`
+        The ``(lower, diag, upper)`` triple of ``L``, as [](`~slenderpy.fd_utils.tridiagonal`)
         returns.
     right : tuple of np.ndarray
         The same triple for ``R``.
@@ -353,7 +353,7 @@ def product_band(
     Returns
     -------
     np.ndarray
-        The product in the layout of :func:`banded`.
+        The product in the layout of [](`~slenderpy.fd_utils.banded`).
     """
     lower, diag, upper = left
     r_low, r_dia, r_up = right
@@ -419,7 +419,7 @@ def round_off_floor(pairs) -> float:
     Parameters
     ----------
     pairs : iterable of (float, np.ndarray)
-        ``(||A||, x)`` for each product of the residual, see :func:`inf_norm`.
+        ``(||A||, x)`` for each product of the residual, see [](`~slenderpy.fd_utils.inf_norm`).
 
     Returns
     -------

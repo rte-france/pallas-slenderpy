@@ -1,6 +1,6 @@
 """Air properties and the drag coefficient of a circular cylinder.
 
-Formulas ported from :mod:`slenderpy.legacy.wind`.
+Formulas ported from ``slenderpy.legacy.wind``.
 """
 
 from __future__ import annotations
@@ -16,10 +16,14 @@ from slenderpy.components import _check_positive
 class Air:
     """Air state.
 
-    Attributes:
-        temperature: Temperature (K).
-        pressure: Pressure (Pa).
-        humidity: Relative humidity, in [0, 1].
+    Attributes
+    ----------
+    temperature
+        Temperature (K).
+    pressure
+        Pressure (Pa).
+    humidity
+        Relative humidity, in [0, 1].
     """
 
     temperature: float = 293.15

@@ -2,11 +2,11 @@
 
 Two models share the same interface: the approximate (small-slope) curvature
 ``D2 @ y``, and the exact geometric curvature
-``(D2 @ y) / (1 + (D1 @ y)**2)**(3/2)``. Both expose :meth:`Curvature.value`,
-:meth:`Curvature.jacobian` -- the sparse ``d(curvature)/dy`` used by the Newton
-iterations of the static and dynamic solvers -- and :meth:`Curvature.rate`, the
+``(D2 @ y) / (1 + (D1 @ y)**2)**(3/2)``. Both expose [](`~slenderpy.beam.curvature.Curvature.value`),
+[](`~slenderpy.beam.curvature.Curvature.jacobian`) -- the sparse ``d(curvature)/dy`` used by the Newton
+iterations of the static and dynamic solvers -- and [](`~slenderpy.beam.curvature.Curvature.rate`), the
 same derivative applied to a deflection rate but kept valid at the end nodes.
-Use :func:`create` to pick one from the ``approx_curvature`` flag the solvers
+Use [](`~slenderpy.beam.curvature.create`) to pick one from the ``approx_curvature`` flag the solvers
 carry.
 """
 
@@ -23,7 +23,7 @@ import slenderpy.fd_utils as fdu
 class Curvature(ABC):
     """Curvature operator on a uniform grid, and its jacobian.
 
-    Subclasses implement :meth:`value` and :meth:`jacobian` for one curvature
+    Subclasses implement [](`~slenderpy.beam.curvature.Curvature.value`) and [](`~slenderpy.beam.curvature.Curvature.jacobian`) for one curvature
     model. The finite-difference matrices are built once, at construction.
 
     Parameters
@@ -66,7 +66,7 @@ class Curvature(ABC):
 
     @abstractmethod
     def jacobian(self, y: np.ndarray) -> sp.sparse.spmatrix:
-        """Derivative of :meth:`value` with respect to ``y``.
+        """Derivative of [](`~slenderpy.beam.curvature.Curvature.value`) with respect to ``y``.
 
         Parameters
         ----------
@@ -81,11 +81,11 @@ class Curvature(ABC):
 
     @abstractmethod
     def rate(self, y: np.ndarray, v: np.ndarray) -> np.ndarray:
-        """Time derivative of :meth:`value` for a deflection rate ``v``.
+        """Time derivative of [](`~slenderpy.beam.curvature.Curvature.value`) for a deflection rate ``v``.
 
         This is ``d(curvature)/dy @ v`` built on the derivative matrices with
         their border rows, so it holds at every node, the two ends included.
-        :meth:`jacobian` cannot be used for that: its border rows are empty, so
+        [](`~slenderpy.beam.curvature.Curvature.jacobian`) cannot be used for that: its border rows are empty, so
         it would report a zero curvature rate at the end nodes.
 
         Parameters
@@ -110,7 +110,7 @@ class ApproximateCurvature(Curvature):
         return self.d2_with_borders @ y
 
     def jacobian(self, y: np.ndarray) -> sp.sparse.spmatrix:
-        """Derivative of :meth:`value` with respect to ``y``, constant here."""
+        """Derivative of [](`~slenderpy.beam.curvature.ApproximateCurvature.value`) with respect to ``y``, constant here."""
         return self.d2_no_borders
 
     def rate(self, y: np.ndarray, v: np.ndarray) -> np.ndarray:
@@ -149,7 +149,7 @@ class ExactCurvature(Curvature):
         return self.d2_with_borders @ y / (metric * np.sqrt(metric))
 
     def jacobian(self, y: np.ndarray) -> sp.sparse.spmatrix:
-        """Derivative of :meth:`value` with respect to ``y``."""
+        """Derivative of [](`~slenderpy.beam.curvature.ExactCurvature.value`) with respect to ``y``."""
         slope = self.d1_no_borders @ y
         metric = 1.0 + slope**2
         # see value() on the square root; the second factor reuses the first
@@ -188,8 +188,8 @@ def create(n: int, ds: float, approx_curvature: bool) -> Curvature:
     ds : float
         Space step.
     approx_curvature : bool
-        ``True`` for :class:`ApproximateCurvature`, ``False`` for
-        :class:`ExactCurvature`.
+        ``True`` for [](`~slenderpy.beam.curvature.ApproximateCurvature`), ``False`` for
+        [](`~slenderpy.beam.curvature.ExactCurvature`).
 
     Returns
     -------

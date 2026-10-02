@@ -90,7 +90,7 @@ class Stockbridge:
 
 
 class Result:
-    """Results of a stockbridge simulation, stored in :class:`slenderpy.simulation.Results` objects for the right mass, left mass and clamp."""
+    """Results of a stockbridge simulation, stored in [](`~slenderpy.simulation.Results`) objects for the right mass, left mass and clamp."""
 
     def __init__(self, stockbridge: Stockbridge, time_vector: np.ndarray) -> None:
         """Init with args.

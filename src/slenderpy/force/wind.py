@@ -2,9 +2,9 @@
 
 A wind model provides ``velocity(x, t) -> (wy, wz)``, the wind velocity (m/s)
 at the horizontal positions ``x`` (m) and time ``t`` (s), in the global frame
-of :mod:`slenderpy.force.core`. The mean wind blows along ``+y``.
+of [](`slenderpy.force.core`). The mean wind blows along ``+y``.
 
-The turbulent models are ported from :mod:`slenderpy.legacy.turbwind`.
+The turbulent models are ported from ``slenderpy.legacy.turbwind``.
 """
 
 from __future__ import annotations
@@ -59,8 +59,10 @@ def _time_vector(t_start: float, t_end: float, dt: float) -> np.ndarray:
 class ConstantWind:
     """Steady, uniform wind along ``y``.
 
-    Attributes:
-        speed: Wind speed (m/s); a negative speed blows along ``-y``.
+    Attributes
+    ----------
+    speed
+        Wind speed (m/s); a negative speed blows along ``-y``.
     """
 
     speed: float
@@ -80,18 +82,26 @@ class UniformTurbulentWind:
 
     A Von Karman along-wind signal generated at init on the time window, then
     normalised to exactly ``mean`` and ``std``. Ported from
-    :class:`slenderpy.legacy.turbwind.RandomWind1D`; with ``t_start = 0`` both give
+    ``slenderpy.legacy.turbwind.RandomWind1D``; with ``t_start = 0`` both give
     the same signal for the same seed. Between samples the speed is linearly
     interpolated; outside the window it is held at its end values.
 
-    Attributes:
-        mean: Mean wind speed (m/s), positive.
-        std: Standard deviation of the wind speed (m/s).
-        length_scale: Turbulence length scale (m).
-        t_start: Start of the window (s).
-        t_end: End of the window (s).
-        dt: Sampling step (s).
-        seed: Seed of the random generator; None for a random seed.
+    Attributes
+    ----------
+    mean
+        Mean wind speed (m/s), positive.
+    std
+        Standard deviation of the wind speed (m/s).
+    length_scale
+        Turbulence length scale (m).
+    t_start
+        Start of the window (s).
+    t_end
+        End of the window (s).
+    dt
+        Sampling step (s).
+    seed
+        Seed of the random generator; None for a random seed.
     """
 
     mean: float
@@ -140,7 +150,7 @@ class UniformTurbulentWind:
 class TurbulentWindField:
     """Turbulent wind field along the span, along-wind and vertical components.
 
-    Ported from :class:`slenderpy.legacy.turbwind.TurbWind3D`, restricted to the
+    Ported from ``slenderpy.legacy.turbwind.TurbWind3D``, restricted to the
     along-wind ``u`` (giving ``wy``) and vertical ``w`` (giving ``wz``)
     components; the along-span component is tangential and, the legacy cross
     spectral matrix being block diagonal, dropping it leaves ``u`` and ``w``
@@ -154,20 +164,34 @@ class TurbulentWindField:
     the time window; ``velocity`` interpolates linearly in time then in
     ``x``, and holds the edge values outside.
 
-    Attributes:
-        mean: Mean wind speed (m/s), positive.
-        length: Length of the sampled line (m).
-        n_points: Number of points of the line, at least 2.
-        t_start: Start of the window (s).
-        t_end: End of the window (s).
-        dt: Sampling step (s).
-        std_u: Standard deviation of the along-wind component (m/s).
-        std_w: Standard deviation of the vertical component (m/s).
-        length_scale_u: Turbulence length scale of ``u`` (m).
-        length_scale_w: Turbulence length scale of ``w`` (m).
-        coherence_u: Coherence decay coefficient of ``u`` along the line.
-        coherence_w: Coherence decay coefficient of ``w`` along the line.
-        seed: Seed of the random generator; None for a random seed.
+    Attributes
+    ----------
+    mean
+        Mean wind speed (m/s), positive.
+    length
+        Length of the sampled line (m).
+    n_points
+        Number of points of the line, at least 2.
+    t_start
+        Start of the window (s).
+    t_end
+        End of the window (s).
+    dt
+        Sampling step (s).
+    std_u
+        Standard deviation of the along-wind component (m/s).
+    std_w
+        Standard deviation of the vertical component (m/s).
+    length_scale_u
+        Turbulence length scale of ``u`` (m).
+    length_scale_w
+        Turbulence length scale of ``w`` (m).
+    coherence_u
+        Coherence decay coefficient of ``u`` along the line.
+    coherence_w
+        Coherence decay coefficient of ``w`` along the line.
+    seed
+        Seed of the random generator; None for a random seed.
     """
 
     mean: float
@@ -269,12 +293,17 @@ class WindDrag(Force):
     ``drag_coefficient(Re)`` at the local Reynolds number
     ``Re = |r| * diameter / nu``. The force is zero where ``|r|`` is zero.
 
-    Attributes:
-        diameter: Cylinder diameter (m).
-        wind: Any object with ``velocity(x, t) -> (wy, wz)``.
-        drag_coefficient: Constant drag coefficient, or a function of the
-            Reynolds number. Default :func:`cylinder_drag`.
-        air: Air state, for the density and the viscosity.
+    Attributes
+    ----------
+    diameter
+        Cylinder diameter (m).
+    wind
+        Any object with ``velocity(x, t) -> (wy, wz)``.
+    drag_coefficient
+        Constant drag coefficient, or a function of the
+        Reynolds number. Default [](`~slenderpy.force.wind.cylinder_drag`).
+    air
+        Air state, for the density and the viscosity.
     """
 
     diameter: float
