@@ -1,0 +1,91 @@
+---
+title: "Getting started"
+---
+
+## Install
+
+```bash
+python -m pip install "slenderpy @ git+https://github.com/rte-france/pallas-slenderpy"
+```
+
+The examples and the documentation also use matplotlib
+(`pip install "slenderpy[examples] @ git+..."`).
+
+## The building blocks
+
+Every solver takes the same two descriptions of the structure, both frozen
+dataclasses of [](`slenderpy.components`):
+
+- a [](`~slenderpy.components.Conductor`): mass per unit length, diameter,
+  axial and bending stiffnesses;
+- a [](`~slenderpy.components.Span`): length, tension, support level
+  difference and, for a beam, its boundary conditions.
+
+Time-domain solvers take a [](`~slenderpy.simulation.Parameters`) (number of
+nodes, time window, time and output steps, stored positions) and return a
+[](`~slenderpy.simulation.Results`) indexed by time and span fraction. Loads
+are forces from [](`slenderpy.force.core`), or any function with the same
+signature.
+
+## A first cable run
+
+A 400 m span released from a perturbed catenary, mid-span position over 20 s:
+
+```{python}
+import matplotlib.pyplot as plt
+import numpy as np
+
+from slenderpy import simulation
+from slenderpy.cable import dynamic
+from slenderpy.components import Conductor, Span
+
+conductor = Conductor(mass=1.571, diameter=0.0313, axial_stiffness=3.76e07)
+span = Span(length=400.0, tension=3.7e04)
+parameters = simulation.Parameters(ns=101, tf=20.0, dt=2.0e-03, dr=2.0e-02, los=[0.5])
+
+x, y, z = dynamic.equilibrium(conductor, span, parameters.ns)
+bump = 0.5 * np.sin(np.pi * x / span.length)
+res = dynamic.solve(
+    conductor, span, parameters, initial_position=np.stack([x, y + bump, z + bump])
+)
+
+plt.plot(res.lot(), res["y"].values[:, 0], label="y (out of plane)")
+plt.plot(res.lot(), res["z"].values[:, 0] - z[parameters.ns // 2], label="z - static")
+plt.xlabel("time (s)")
+plt.ylabel("mid-span (m)")
+plt.legend()
+plt.show()
+```
+
+## A first beam run
+
+A 20 m clamped span under its weight: static shape, then released from 1.5
+times that shape with the Bouc-Wen law, whose hysteresis damps the vibration:
+
+```{python}
+from slenderpy.beam.dynamic import solve_dynamic
+from slenderpy.beam.static import shape
+from slenderpy.boundary_condition import clamped
+from slenderpy.force.core import Gravity
+
+conductor = Conductor(mass=1.57, ei_min=28.28, ei_max=2155.07, beta_flexion=6.438e-07)
+span = Span(length=20.0, tension=2.0e03, boundary_conditions=clamped())
+parameters = simulation.Parameters(ns=501, tf=10.0, dt=2.0e-03, dr=1.0e-02, los=[0.5])
+
+rest = shape.solve(conductor, span, np.full(501, -9.81 * conductor.mass), 501, model="varying")
+res = solve_dynamic(
+    conductor, span, parameters, model="varying",
+    force=Gravity(conductor.mass), initial_position=1.5 * rest,
+)
+
+plt.plot(res.lot(), 1e3 * (res["z"].values[:, 0] - rest[250]))
+plt.xlabel("time (s)")
+plt.ylabel("mid-span z - static (mm)")
+plt.show()
+```
+
+## Next
+
+The [user guide](simulation.qmd) explains the models and conventions, the
+[examples](examples/index.qmd) cover beam and cable, static and dynamic, and
+the [API reference](reference/index.qmd) documents every module.

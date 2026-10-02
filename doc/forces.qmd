@@ -1,0 +1,65 @@
+---
+title: "Forces"
+---
+
+## The interface
+
+A force is any callable
+
+```python
+force(x, t, y, z, vy, vz) -> (fy, fz)
+```
+
+returning the force per unit length (N/m) along the global `y` and `z` axes,
+from the horizontal position `x` of the nodes (m), the time `t` (s), and the
+global position (`y`, `z`, m) and velocity (`vy`, `vz`, m/s) of the
+structure. The components may be scalars or arrays broadcastable to the
+nodes. The frame is the one of the [output
+contract](simulation.qmd#the-output-contract).
+
+- The beam is planar: it is called with `y = vy = 0` and only `fz` is used.
+- The cable projects both components on its local normal and binormal; the
+  along-span part is dropped. **The weight is already in the catenary
+  equilibrium**: a cable force must not include it, and a
+  [](`~slenderpy.force.core.Gravity`) passed to the cable solver is refused.
+  The cable static solver takes its load with the same convention.
+
+## Provided forces
+
+[](`slenderpy.force.core`):
+
+- [](`~slenderpy.force.core.Gravity`): the weight, `(0, -g m)`, for the beam;
+- [](`~slenderpy.force.core.PointExcitation`): a sinusoidal vertical force
+  applied at the node nearest a position, over a time window.
+
+[](`slenderpy.force.wind`):
+
+- wind models with `velocity(x, t) -> (wy, wz)`:
+  [](`~slenderpy.force.wind.ConstantWind`),
+  [](`~slenderpy.force.wind.UniformTurbulentWind`) (a Von Karman signal, the
+  same along the span) and [](`~slenderpy.force.wind.TurbulentWindField`) (a
+  correlated field along the span);
+- [](`~slenderpy.force.wind.WindDrag`): the drag on a circular cylinder with
+  the relative velocity, with a constant drag coefficient or
+  [](`~slenderpy.force.air.cylinder_drag`) of the local Reynolds number.
+
+[](`slenderpy.force.air`): the air density and viscosity
+([](`~slenderpy.force.air.Air`)) and the cylinder drag coefficient.
+
+## Composition
+
+Provided forces add up with `+`:
+
+```python
+from slenderpy.force.core import Gravity, PointExcitation
+from slenderpy.force.wind import ConstantWind, WindDrag
+
+force = (
+    Gravity(conductor.mass)
+    + PointExcitation(frequency=5.0, amplitude=10.0, position=2.5)
+    + WindDrag(diameter=conductor.diameter, wind=ConstantWind(10.0))
+)
+```
+
+A plain function cannot take part in `+`; pass it alone, or wrap it in a
+subclass of [](`~slenderpy.force.core.Force`).

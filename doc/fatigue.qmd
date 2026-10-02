@@ -1,0 +1,30 @@
+---
+title: "Fatigue"
+---
+
+[](`~slenderpy.fatigue.count_cycles`) counts the rainflow cycles (ASTM
+E1049-85, without mean correction) of a position-dependent result at a
+distance from a support:
+
+```python
+from slenderpy import fatigue
+
+cycles = fatigue.count_cycles(res, "z", span, distance=0.089, support="right")
+cycles.groupby("range")["count"].sum()
+```
+
+- The variable, for example `z`, `y`, `curvature` or `moment`, is read at the
+  span fraction of the fatigue position by linear interpolation between the
+  two stored positions around it: store the fatigue position itself in
+  `Parameters.los` when possible.
+- The result is a `pandas.DataFrame` with columns `range`, `mean` and `count`,
+  one row per cycle (`count` 1) or half cycle (`count` 0.5), in extraction
+  order.
+- Both supports sit at a constant height, so counting `z` near a clamp gives
+  the Poffenberger-Swart $Y_b$ ranges (89 mm from the clamp by convention);
+  the means carry the static offset.
+- Repeated equal samples are collapsed before counting, so a plateau, such
+  as a run at rest, cannot hide cycles.
+
+Stress models, S-N curves and damage are left to a dedicated package. See
+the [wind fatigue example](examples/cable_wind_fatigue.qmd).

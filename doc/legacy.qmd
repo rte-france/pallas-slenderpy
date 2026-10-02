@@ -1,0 +1,26 @@
+---
+title: "Legacy modules"
+---
+
+The former slenderpy API is kept in `slenderpy.legacy` until its last
+features are ported or dropped:
+
+```python
+from slenderpy.legacy import cable, simtools
+```
+
+It is not covered by the API reference. Its docstrings use the former
+conventions (local triad for the cable, `simtools` results).
+
+| Module | Purpose | Replacement |
+|--------|---------|-------------|
+| `beam` | beam solvers on the legacy `simtools` | [](`slenderpy.beam.dynamic`), [](`slenderpy.beam.static.shape`) |
+| `cable` | `SCable` and its dynamic solver, in the local triad | [](`slenderpy.cable.dynamic`), [](`slenderpy.cable.static.catenary`); the added-mass solver and `export_vtk` are not ported |
+| `cable_wakeosc` | cable coupled with a wake oscillator | not ported |
+| `fatigue` | rainflow counting of legacy cable results | [](`slenderpy.fatigue`) |
+| `fdm_utils` | finite-difference operators | [](`slenderpy.fd_utils`) |
+| `force` | sinusoidal excitation, wake oscillator parameters | [](`slenderpy.force.core`); the wake oscillator is not ported |
+| `simtools` | simulation parameters and results | [](`slenderpy.simulation`) |
+| `turbwind` | turbulent wind signals and fields, drag forces | [](`slenderpy.force.wind`) |
+| `wind` | air properties, Bishop and Hassan models, drag | [](`slenderpy.force.air`), [](`slenderpy.force.wind`); Bishop and Hassan are not ported |
+| `_cable_utils` | internal helpers of the legacy cable | internal |
