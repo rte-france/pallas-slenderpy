@@ -709,6 +709,38 @@ def test_hysteresis_loop_stays_within_the_static_envelope():
     assert np.all(np.abs(mom) <= np.abs(law.moment(curv)) + law.plateau)
 
 
+@pytest.mark.parametrize("perturbation", [1e-13, 3e-13])
+def test_hysteresis_reversals_converge_whatever_the_round_off(perturbation):
+    """A reversal of the curvature rate is a kink of the Bouc-Wen law.
+
+    Newton straddling it used to stall, and round-off decided whether it got
+    through: these two perturbations of the forcing, at the 1e-13 level, used
+    to fail even with max_iter = 2000 (the CI failure of
+    test_hysteresis_loop_stays_within_the_static_envelope).
+    """
+    ns = 101
+    f0 = 0.5 / BRETELLE.length * np.sqrt(BRETELLE.tension / CONDUCTOR.mass)
+    amplitude = (1.0 + perturbation) * 4.0 * _GRAVITY * CONDUCTOR.mass
+
+    def force(x, t, y, z, vy, vz):
+        return 0.0, amplitude * np.sin(2.0 * np.pi * f0 * t) * np.ones_like(x)
+
+    parameters = simulation.Parameters(
+        ns=ns, t0=0.0, tf=3.0 / f0, dt=1.0 / (f0 * 500), dr=1.0 / (f0 * 500)
+    )
+    res = solve_dynamic(
+        CONDUCTOR,
+        BRETELLE,
+        parameters,
+        model=BendingModel.VARYING,
+        force=force,
+        approx_curvature=True,
+        initial_position=np.zeros(ns),
+    )
+    assert np.all(np.isfinite(res["moment"].values))
+    assert np.abs(res["eta"].values).max() <= 1.0 + 1e-09
+
+
 @pytest.mark.parametrize("approx_curvature", [True, False])
 def test_hysteresis_lives_at_the_clamped_ends(approx_curvature):
     """Cyclic loading of the varying model: eta moves at the end nodes too.

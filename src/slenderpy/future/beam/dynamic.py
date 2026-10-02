@@ -90,10 +90,15 @@ def solve_dynamic(
       iteration, for the reason above;
     - ``d(chi)/dt`` in (4) is evaluated as ``d(chi)/dy @ v(n+1)`` in both
       curvature options, i.e. fully implicit like the ``eta`` update it feeds.
-    - a step that does not converge within ``max_iter`` stops the run: the
-      snapshots already computed are kept, the remaining ones are left at nan and
-      no final state is recorded. A non-finite state counts as a failure, so nan
-      never passes for a converged step.
+    - a step whose Newton iteration does not converge within ``max_iter`` is
+      re-solved once with the Bouc-Wen branch of every node lagged from the
+      previous step, a smooth problem, then ``eta`` is recomputed on the law's
+      own branch so it stays bounded by 1. This only happens at a few reversal
+      steps, where Newton straddling the kink of the law can stall depending on
+      round-off; the error there is first order. If the fallback fails too, the
+      run stops: the snapshots already computed are kept, the remaining ones are
+      left at nan and no final state is recorded. A non-finite state counts as a
+      failure, so nan never passes for a converged step.
 
     Parameters
     ----------
@@ -146,7 +151,8 @@ def solve_dynamic(
         Convergence threshold on ``max|step residual|``, relative to the largest
         term of that residual. Default 1e-06.
     max_iter : int, optional
-        Maximum number of Newton iterations per step. Default 64.
+        Maximum number of Newton iterations per step, and per fallback
+        solve. Default 64.
 
     Returns
     -------
@@ -286,6 +292,8 @@ def solve_dynamic(
     pb = spb.generate(parameters.pp, parameters.nt, desc=__name__)
     t_old = parameters.t0
     converged = True
+    # curvature increment of the previous step, for the lagged branch
+    dchi_old = np.zeros(ns)
 
     for step in range(parameters.nt):
         t_new = t_old + dt
@@ -311,63 +319,97 @@ def solve_dynamic(
         else:
             remainder_old = D2 @ law.dynamic_moment(chi_old, eta_old) - ei_D4 @ y_old
 
-            def step_state(v):
-                """State and step residual reached by a candidate velocity."""
+            def step_state(v, branch=None):
+                """State and step residual reached by a candidate velocity.
+
+                The law is evaluated on ``branch``, or on its own branch when
+                ``branch`` is None.
+                """
                 y = y_old + dt2 * (v_old + v)
                 chi = chi_operator.value(y)
                 # curvature increment driving the hysteresis, as the curvature
                 # rate at the end of the step times the step: the same fully
                 # implicit discretisation the eta update of the law is built on
                 dchi = dt * chi_operator.rate(y, v)
-                eta = law.update_eta(eta_old, dchi)
+                eta = law.update_eta(eta_old, dchi, branch)
                 remainder = D2 @ law.dynamic_moment(chi, eta) - ei_D4 @ y
                 residual = A @ v - rhs + dt2 * (remainder_old + remainder)
                 return y, chi, dchi, eta, residual
 
-            v_new = v_old
-            y_new, chi_new, dchi_new, eta_new, step_residual = step_state(v_new)
-            error = np.abs(step_residual).max()
-            n_iter = 0
-
-            while n_iter < max_iter and error > threshold:
-                # tangent bending stiffness of the law over the step. The
-                # moment reaches the velocity twice: once through the curvature,
-                # whose derivative carries dt2, and once through eta, whose
-                # increment carries dt, i.e. twice as much. Only the hysteretic
-                # part of dynamic_tangent takes the second path, so it is the
-                # only one weighted twice
-                tangent = 2.0 * law.dynamic_tangent(eta_new, dchi_new) - law.ei_linear
-
-                jacobian = jacobian_base + dt2**2 * fdu.product_band(
-                    left_rows, right_rows(y_new), tangent
-                )
-                try:
-                    increment = sp.linalg.solve_banded(
-                        (fdu.BANDWIDTH, fdu.BANDWIDTH), jacobian, -step_residual
+            def newton(branch=None):
+                """Newton on the step residual, on ``branch`` (default the law's own)."""
+                v = v_old
+                state = step_state(v, branch)
+                error = np.abs(state[-1]).max()
+                n_iter = 0
+                while n_iter < max_iter and error > threshold:
+                    y, _, dchi, eta, step_residual = state
+                    # tangent bending stiffness of the law over the step. The
+                    # moment reaches the velocity twice: once through the
+                    # curvature, whose derivative carries dt2, and once through
+                    # eta, whose increment carries dt, i.e. twice as much. Only
+                    # the hysteretic part of dynamic_tangent takes the second
+                    # path, so it is the only one weighted twice
+                    tangent = (
+                        2.0 * law.dynamic_tangent(eta, dchi, branch) - law.ei_linear
                     )
-                except np.linalg.LinAlgError:
-                    break
 
-                # backtrack while the increment increases the residual, because
-                # the full newton step can overshoot where the bouc-wen law is
-                # not differentiable, at a sign change of dchi or eta. Such a
-                # sign change also needs a step that momentarily increases the
-                # residual, so a failed backtrack takes the full step instead of
-                # giving up: only max_iter ends the iteration.
-                relaxation = 1.0
-                trial = step_state(v_new + increment)
-                while np.abs(trial[-1]).max() >= error and relaxation > _MIN_RELAXATION:
-                    relaxation *= 0.5
-                    trial = step_state(v_new + relaxation * increment)
+                    jacobian = jacobian_base + dt2**2 * fdu.product_band(
+                        left_rows, right_rows(y), tangent
+                    )
+                    try:
+                        increment = sp.linalg.solve_banded(
+                            (fdu.BANDWIDTH, fdu.BANDWIDTH), jacobian, -step_residual
+                        )
+                    except np.linalg.LinAlgError:
+                        break
 
-                if np.abs(trial[-1]).max() >= error:
+                    # backtrack while the increment increases the residual,
+                    # because the full newton step can overshoot where the
+                    # bouc-wen law is not differentiable, at a sign change of
+                    # dchi or eta. Such a sign change also needs a step that
+                    # momentarily increases the residual, so a failed backtrack
+                    # takes the full step instead of giving up: only max_iter
+                    # ends the iteration.
                     relaxation = 1.0
-                    trial = step_state(v_new + increment)
+                    trial = step_state(v + increment, branch)
+                    while (
+                        np.abs(trial[-1]).max() >= error
+                        and relaxation > _MIN_RELAXATION
+                    ):
+                        relaxation *= 0.5
+                        trial = step_state(v + relaxation * increment, branch)
 
-                v_new = v_new + relaxation * increment
-                y_new, chi_new, dchi_new, eta_new, step_residual = trial
-                error = np.abs(step_residual).max()
-                n_iter += 1
+                    if np.abs(trial[-1]).max() >= error:
+                        relaxation = 1.0
+                        trial = step_state(v + increment, branch)
+
+                    v = v + relaxation * increment
+                    state = trial
+                    error = np.abs(state[-1]).max()
+                    n_iter += 1
+                return v, state, error, n_iter
+
+            v_new, state, error, n_iter = newton()
+            if not (error <= threshold and np.all(np.isfinite(state[0]))):
+                # fallback. The law is kinked where a node changes branch (a
+                # reversal of dchi, a zero of eta), its tangent jumping by up
+                # to ei_max/ei_min, and newton straddling such a kink can
+                # stall: round-off decides whether it gets through. The step
+                # is then re-solved with the branch lagged from the previous
+                # step, a smooth problem, and eta is recomputed on the law's
+                # own branch from the converged curvature increment, which
+                # keeps it bounded by 1. The error is first order, on these
+                # steps only
+                v_lag, state_lag, error_lag, n_lag = newton(
+                    law.branch(eta_old, dchi_old)
+                )
+                n_iter += n_lag
+                if error_lag <= threshold and np.all(np.isfinite(state_lag[0])):
+                    y, chi, dchi, _, step_residual = state_lag
+                    state = (y, chi, dchi, law.update_eta(eta_old, dchi), step_residual)
+                    v_new, error = v_lag, error_lag
+            y_new, chi_new, dchi_new, eta_new, step_residual = state
 
             if not (error <= threshold and np.all(np.isfinite(y_new))):
                 print(
@@ -396,6 +438,8 @@ def solve_dynamic(
 
         t_old = t_new
         y_old, v_old, chi_old, eta_old = y_new, v_new, chi_new, eta_new
+        if not linear:
+            dchi_old = dchi_new
 
     pb.close()
     res.stop_timer()

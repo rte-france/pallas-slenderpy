@@ -109,8 +109,12 @@ class Bending(ABC):
         """
 
     @abstractmethod
-    def update_eta(self, eta_old: np.ndarray, dchi: np.ndarray) -> np.ndarray:
-        """Advance the hysteresis variable over one time step.
+    def branch(self, eta_old: np.ndarray, dchi: np.ndarray) -> np.ndarray:
+        """Branch of the law the step lies on, at each node.
+
+        The time-domain law is smooth on each branch and has a kink where the
+        branch changes; a solver can freeze the branch to iterate on a smooth
+        problem, then update it from the solution.
 
         Parameters
         ----------
@@ -122,11 +126,36 @@ class Bending(ABC):
         Returns
         -------
         np.ndarray
+            Branch index of each node, for :meth:`update_eta` and
+            :meth:`dynamic_tangent`.
+        """
+
+    @abstractmethod
+    def update_eta(
+        self, eta_old: np.ndarray, dchi: np.ndarray, branch: np.ndarray | None = None
+    ) -> np.ndarray:
+        """Advance the hysteresis variable over one time step.
+
+        Parameters
+        ----------
+        eta_old : np.ndarray
+            Hysteresis variable at the start of the step.
+        dchi : np.ndarray
+            Curvature increment over the step.
+        branch : np.ndarray or None, optional
+            Branch to evaluate the law on, from :meth:`branch`. Default the
+            branch of ``(eta_old, dchi)`` itself.
+
+        Returns
+        -------
+        np.ndarray
             Hysteresis variable at the end of the step.
         """
 
     @abstractmethod
-    def dynamic_tangent(self, eta: np.ndarray, dchi: np.ndarray) -> np.ndarray:
+    def dynamic_tangent(
+        self, eta: np.ndarray, dchi: np.ndarray, branch: np.ndarray | None = None
+    ) -> np.ndarray:
         """Tangent stiffness of :meth:`dynamic_moment` over the step.
 
         Parameters
@@ -135,6 +164,9 @@ class Bending(ABC):
             Hysteresis variable at the end of the step.
         dchi : np.ndarray
             Curvature increment over the step.
+        branch : np.ndarray or None, optional
+            Branch the step was evaluated on, from :meth:`branch`. Default the
+            branch of ``(eta, dchi)``.
 
         Returns
         -------
@@ -195,11 +227,19 @@ class ConstantBending(Bending):
         """Bending moment of the time-domain law, ignoring ``eta``."""
         return self.ei_linear * curvature
 
-    def update_eta(self, eta_old: np.ndarray, dchi: np.ndarray) -> np.ndarray:
+    def branch(self, eta_old: np.ndarray, dchi: np.ndarray) -> np.ndarray:
+        """A single branch: this law is linear."""
+        return np.zeros_like(dchi)
+
+    def update_eta(
+        self, eta_old: np.ndarray, dchi: np.ndarray, branch: np.ndarray | None = None
+    ) -> np.ndarray:
         """Hysteresis variable, left unchanged: this law has no internal state."""
         return eta_old
 
-    def dynamic_tangent(self, eta: np.ndarray, dchi: np.ndarray) -> np.ndarray:
+    def dynamic_tangent(
+        self, eta: np.ndarray, dchi: np.ndarray, branch: np.ndarray | None = None
+    ) -> np.ndarray:
         """Tangent stiffness over the step, ``ei`` everywhere."""
         return self.ei_linear * np.ones_like(dchi)
 
@@ -284,7 +324,19 @@ class VaryingBending(Bending):
         """
         return self.ei_min * curvature + self.plateau * eta
 
-    def update_eta(self, eta_old: np.ndarray, dchi: np.ndarray) -> np.ndarray:
+    def branch(self, eta_old: np.ndarray, dchi: np.ndarray) -> np.ndarray:
+        """``sign(dchi) + sign(eta)``, in {-2, 0, 2}, the signs that close the law.
+
+        The sign of the new ``eta`` is the sign of ``chi0*eta_old + dchi``. A
+        change of branch, at a reversal of ``dchi`` or a zero of ``eta``, is a
+        kink of :meth:`update_eta`, where its tangent jumps by up to
+        ``ei_max / ei_min``.
+        """
+        return np.sign(dchi) + np.sign(self.chi0 * eta_old + dchi)
+
+    def update_eta(
+        self, eta_old: np.ndarray, dchi: np.ndarray, branch: np.ndarray | None = None
+    ) -> np.ndarray:
         """Advance the Bouc-Wen hysteresis variable over one time step.
 
         Fully implicit discretisation of ``chi0 * d(eta)/dt = d(chi)/dt - 1/2 *
@@ -298,21 +350,25 @@ class VaryingBending(Bending):
         closed form -- no sub-iteration and no lagged ``abs(eta)``. The
         denominator is never below ``chi0``, so ``eta`` stays bounded by 1
         whatever the step size, and a reversal of ``dchi`` correctly leaves the
-        hysteresis on the stiff branch.
+        hysteresis on the stiff branch. With a given ``branch`` (frozen by a
+        solver) the same expression is evaluated on that branch; it equals the
+        law wherever the branch is the one of :meth:`branch`.
         """
-        numerator = self.chi0 * eta_old + dchi
-        return numerator / (
-            self.chi0 + 0.5 * dchi * (np.sign(dchi) + np.sign(numerator))
-        )
+        if branch is None:
+            branch = self.branch(eta_old, dchi)
+        return (self.chi0 * eta_old + dchi) / (self.chi0 + 0.5 * dchi * branch)
 
-    def dynamic_tangent(self, eta: np.ndarray, dchi: np.ndarray) -> np.ndarray:
+    def dynamic_tangent(
+        self, eta: np.ndarray, dchi: np.ndarray, branch: np.ndarray | None = None
+    ) -> np.ndarray:
         """Tangent stiffness of :meth:`dynamic_moment` over the step.
 
         Built from the derivative of :meth:`update_eta` with respect to ``dchi``,
         which equals ``1/chi0`` at rest -- making the tangent stiffness
         ``ei_max`` -- and decays as the hysteresis saturates, down to ``ei_min``.
         """
-        branch = np.sign(dchi) + np.sign(eta)
+        if branch is None:
+            branch = np.sign(dchi) + np.sign(eta)
         eta_tangent = (1.0 - 0.5 * branch * eta) / (self.chi0 + 0.5 * dchi * branch)
         return self.ei_min + self.plateau * eta_tangent
 

@@ -206,3 +206,23 @@ def test_varying_tangent_against_finite_differences():
 def test_ei_linear_is_the_stiffness_of_the_linear_part(law, expected):
     """Check the stiffness the ``D4`` term is assembled with."""
     assert law.ei_linear == expected
+
+
+def test_branch_given_explicitly_matches_the_default():
+    """update_eta and dynamic_tangent on the law's own branch are the law."""
+    law = _varying_law()
+    rng = np.random.default_rng(0)
+    eta_old = rng.uniform(-1.0, 1.0, 200)
+    dchi = rng.normal(scale=law.chi0, size=200)
+    branch = law.branch(eta_old, dchi)
+    eta = law.update_eta(eta_old, dchi)
+    assert set(np.unique(branch)) <= {-2.0, 0.0, 2.0}
+    assert law.update_eta(eta_old, dchi, branch) == pytest.approx(eta, rel=1e-15)
+    assert law.dynamic_tangent(eta, dchi, branch) == pytest.approx(
+        law.dynamic_tangent(eta, dchi), rel=1e-15
+    )
+
+
+def test_constant_law_has_a_single_branch():
+    law = BD.ConstantBending(10.0)
+    assert np.all(law.branch(np.zeros(5), np.linspace(-1.0, 1.0, 5)) == 0.0)
