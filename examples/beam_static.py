@@ -14,7 +14,7 @@ from slenderpy.future.components import Conductor, Span
 
 conductor = Conductor(mass=1.57, ei_min=28.28, ei_max=2155.07, beta_flexion=6.438e-07)
 span = Span(length=50.0, tension=2.0e04, boundary_conditions=clamped())
-n = 3001
+n = 5001  # 1 cm steps, to resolve the EI min boundary layer (4 cm)
 x = np.linspace(0.0, span.length, n)
 weight = np.full(n, -9.81 * conductor.mass)  # N/m
 laws = [
