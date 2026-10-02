@@ -4,6 +4,17 @@ import numpy as np
 import pytest
 import scipy as sp
 
+from slenderpy.future import simulation
+from slenderpy.future.beam.bending import BendingModel
+from slenderpy.future.beam.dynamic import solve_dynamic
+from slenderpy.future.beam.static import shape
+from slenderpy.future.beam.static.frequency import (
+    natural_frequencies_hinged,
+    natural_frequency,
+)
+from slenderpy.future.boundary_condition import clamped, hinged
+from slenderpy.future.components import Conductor, Span
+from slenderpy.future.force.core import Gravity, PointExcitation
 from slenderpy.future.stockbridge import (
     Clamp,
     ClampParameters,
@@ -12,10 +23,12 @@ from slenderpy.future.stockbridge import (
     MessengerCableParameters,
     Side,
     Stockbridge,
+    solve_dynamic_with_sb,
     solve_imposed_acceleration,
     solve_imposed_force,
     solve_linearized_imposed_force,
 )
+from slenderpy.wind import air_volumic_mass
 
 # Cable used by the manufactured-solution suite (kept at the original size
 # so the analytic tolerances still hold).
@@ -54,6 +67,24 @@ def _build_sb(mass_params, K, C):
     )
     return sb, mass_right, mass_left, clamp
 
+
+CONDUCTOR = Conductor(
+    mass=1.57,
+    diameter=31.1e-3,
+    ei_min=28.28,
+    ei_max=2155.07,
+    beta_flexion=6.437693e-07,
+)
+
+SPAN = Span(length=440.0, tension=39e3, boundary_conditions=hinged())
+
+# the four (model, curvature) combinations the solver has to cover
+CASES = [
+    (BendingModel.CONSTANT, True),
+    (BendingModel.CONSTANT, False),
+    (BendingModel.VARYING, True),
+    (BendingModel.VARYING, False),
+]
 
 # --- linearised solver: manufactured-solution suite -----------------------
 
@@ -311,6 +342,42 @@ def test_solve_imposed_acceleration_left_right_symmetry(sb):
     )
 
 
+def test_same_force_symmetry(clamp_params, cable_params):
+    mass_right = MassParameters(
+        length_to_clamp=0.1875,
+        length_to_centroid=0.0325,
+        mass=0.856,
+        moment_of_inertia=0.001814,
+    )
+    mass_left = MassParameters(
+        length_to_clamp=0.1475,
+        length_to_centroid=0.0275,
+        mass=0.712,
+        moment_of_inertia=0.001541,
+    )
+    sb = Stockbridge(clamp_params, mass_right, cable_params, mass_left, cable_params)
+    sb_miror = Stockbridge(
+        clamp_params, mass_left, cable_params, mass_right, cable_params
+    )
+
+    nb = 50
+    tf = 0.5
+    dt = tf / nb
+    t = np.linspace(0, tf, nb)
+    acc = -0.1 * (2 * np.pi * 20) * np.sin(2 * np.pi * 20 * t)
+    ang = np.zeros(nb)
+    ic1 = np.zeros(sb.mass_right.nb_unknowns)
+    ic2 = np.zeros(sb.mass_left.nb_unknowns)
+    res = solve_imposed_acceleration(sb, tf, ic1, ic2, acc, ang, dt)
+    res_miror = solve_imposed_acceleration(sb_miror, tf, ic1, ic2, acc, ang, dt)
+
+    assert np.allclose(
+        res.general["force_clamp"],
+        res_miror.general["force_clamp"],
+        atol=1e-12,
+    )
+
+
 # --- consistency: force <-> acceleration round trip -----------------------
 
 
@@ -415,3 +482,137 @@ def test_linearized_energy_balance():
     # Energy balance bounded — relax the tolerance because Crank-Nicolson + the
     # cumulative integrator drift slightly during the transient.
     assert np.max(np.abs(residual)) < 0.5 * np.max(np.abs(E_kin + E_pot))
+
+
+def test_reduced_amplitude_stokcbridge(sb):
+    mode = 25
+    strouhal = 0.2
+    cl0 = 0.6
+
+    freq = natural_frequencies_hinged(
+        SPAN.length, SPAN.tension, CONDUCTOR.mass, CONDUCTOR.ei_max, mode
+    )[-1]
+    nb_space = 20 * mode
+    dt = min(0.01 / freq, 1e-3)
+    dr = 5 * dt
+    tf = 3.0
+    parameters = simulation.Parameters(
+        ns=nb_space, tf=tf, dt=dt, dr=dr, los=nb_space, pp=True
+    )
+    x = np.linspace(0, SPAN.length, nb_space)
+    wind_speed = (
+        CONDUCTOR.diameter
+        * mode
+        * natural_frequency(SPAN.length, SPAN.tension, CONDUCTOR.mass)
+        / strouhal
+    )
+    estimated_amplitude = (
+        SPAN.length
+        * 0.5
+        * air_volumic_mass()
+        * CONDUCTOR.diameter
+        * cl0
+        * wind_speed**2
+    )
+
+    # the legacy Excitation(gravity=True) as future forces: same nearest node,
+    # same half-cell spreading
+    force = Gravity(CONDUCTOR.mass) + PointExcitation(
+        frequency=freq,
+        amplitude=4 * estimated_amplitude,
+        position=(2 * mode - 1) * (SPAN.length + 0.5) / (2 * mode),
+        t_end=tf,
+    )
+
+    pos_stockbridge = SPAN.length / (2 * mode)
+    ic1 = np.zeros(sb.mass_right.nb_unknowns)
+    ic2 = np.zeros(sb.mass_left.nb_unknowns)
+    sb_dict = {
+        "sb1": {
+            "stockbridge": sb,
+            "position": pos_stockbridge,
+            "initial condition right": ic1,
+            "initial condition left": ic2,
+        },
+        "sb2": {
+            "stockbridge": sb,
+            "position": 5 * pos_stockbridge,
+            "initial condition right": ic1,
+            "initial condition left": ic2,
+        },
+    }
+
+    for model, approx in CASES:
+        ei = CONDUCTOR.ei_min if model == BendingModel.CONSTANT else None
+        y0 = shape.solve(
+            CONDUCTOR,
+            SPAN,
+            np.zeros_like(x) + force(x, 0.0, 0.0, 0.0, 0.0, 0.0)[1],
+            nb_space,
+            model=model,
+            ei=ei,
+            approx_curvature=approx,
+        )
+
+        res = solve_dynamic(
+            CONDUCTOR,
+            SPAN,
+            parameters,
+            model=model,
+            ei=ei,
+            approx_curvature=approx,
+            initial_position=1.02 * y0,
+            force=force,
+        )
+
+        res_stockbridge, _ = solve_dynamic_with_sb(
+            sb_dict,
+            CONDUCTOR,
+            SPAN,
+            parameters,
+            model=model,
+            force=force,
+            approx_curvature=approx,
+            initial_position=y0,
+        )
+
+        assert np.max(np.max(res["z"], axis=0) - np.min(res["z"], axis=0)) > np.max(
+            np.max(res_stockbridge["z"], axis=0) - np.min(res_stockbridge["z"], axis=0)
+        ), (model, approx)
+
+
+@pytest.mark.parametrize("approx_curvature", [True, False])
+def test_coupling_without_damper_matches_solve_dynamic(approx_curvature):
+    """With no damper the coupled solver is solve_dynamic, Newton included.
+
+    The varying model started off its static shape needs Newton iterations
+    with backtracking on the step residual; the coupled solver must take the
+    same steps and reach the same state.
+    """
+    span = Span(length=4.9016908, tension=80.0, boundary_conditions=clamped())
+    ns = 101
+    x = np.linspace(0.0, span.length, ns)
+    force = Gravity(CONDUCTOR.mass)
+    y0 = shape.solve(
+        CONDUCTOR,
+        span,
+        np.zeros(ns) + force(x, 0.0, 0.0, 0.0, 0.0, 0.0)[1],
+        ns,
+        model=BendingModel.VARYING,
+        approx_curvature=approx_curvature,
+    )
+    parameters = simulation.Parameters(ns=ns, t0=0.0, tf=0.1, dt=0.002, dr=0.01)
+    common = dict(
+        model=BendingModel.VARYING,
+        force=force,
+        approx_curvature=approx_curvature,
+        initial_position=1.02 * y0,
+    )
+    plain = solve_dynamic(CONDUCTOR, span, parameters, **common)
+    coupled, _ = solve_dynamic_with_sb({}, CONDUCTOR, span, parameters, **common)
+
+    assert np.all(np.isfinite(plain["z"].values))
+    assert np.all(np.isfinite(coupled["z"].values))
+    assert np.array_equal(coupled["n_iter"].values, plain["n_iter"].values)
+    scale = np.abs(plain["z"].values).max()
+    assert np.abs(coupled["z"].values - plain["z"].values).max() <= 1e-12 * scale

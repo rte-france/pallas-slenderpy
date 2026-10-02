@@ -2,10 +2,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
 
+import slenderpy.future.beam.dynamic as dynamic
 from slenderpy import simtools
 from slenderpy.force import Excitation
-from slenderpy.future.beam.beam import BeamBW
+from slenderpy.future.beam.static import shape
+from slenderpy.future.beam.static.frequency import (
+    natural_frequencies_hinged,
+    natural_frequency,
+)
 from slenderpy.future.boundary_condition import hinged
+from slenderpy.future.components import Conductor, Span
 from slenderpy.future.stockbridge import (
     ClampParameters,
     MassParameters,
@@ -237,33 +243,37 @@ def energy_linearized():
     plt.show()
 
 
-def coupling():
+def coupling_two_stockbridges():
+    # Aeolian excitation parameters
+    MODE = 20
+    STROUHAL = 0.2
+    CL0 = 0.6
+    TF = 10.0
+
     # Cable (ASTER 570)
     LSPAN = 440.0
     TENSION = 39e3
     CABLE_MASS = 1.57
     EI_MAX = 2155.07
     EI_MIN = 28.28
-    CHI0 = 0.03
     DIAMETER = 31.1e-3
+    BETA_FLEXION = 6.437693e-07
 
-    # Aeolian excitation parameters
-    MODE = 25
-    STROUHAL = 0.2
-    CL0 = 0.6
-    TF = 10.0
-
-    beamBW = BeamBW(
-        length=LSPAN,
-        boundary_conditions=hinged(0, 0, 0, 0),
-        tension=TENSION,
+    conductor = Conductor(
         mass=CABLE_MASS,
-        ei_max=EI_MAX,
+        diameter=DIAMETER,
         ei_min=EI_MIN,
-        critical_curvature=CHI0,
+        ei_max=EI_MAX,
+        beta_flexion=BETA_FLEXION,
     )
 
-    freq = beamBW.natural_frequencies_hinged(MODE, EI_MAX)[-1]
+    span = Span(
+        length=LSPAN,
+        tension=TENSION,
+        boundary_conditions=hinged(),
+    )
+
+    freq = natural_frequencies_hinged(LSPAN, TENSION, CABLE_MASS, EI_MAX, MODE)[-1]
     nb_space = 20 * MODE
     dt = min(0.01 / freq, 1e-3)
     dr = 5 * dt
@@ -272,9 +282,18 @@ def coupling():
     )
     x = np.linspace(0, LSPAN, nb_space)
 
-    wind_speed = DIAMETER * MODE * beamBW.natural_frequency() / STROUHAL
+    wind_speed = (
+        DIAMETER * MODE * natural_frequency(LSPAN, TENSION, CABLE_MASS) / STROUHAL
+    )
     estimated_amplitude = (
         LSPAN * 0.5 * air_volumic_mass() * DIAMETER * CL0 * wind_speed**2
+    )
+
+    approx_curvature = True
+    model = "varying"
+    pos_stockbridge = LSPAN / (2 * MODE)
+    id_pos_stockbridge = max(
+        1, min(nb_space - 2, int(np.round(pos_stockbridge / LSPAN * (nb_space - 1))))
     )
 
     def force(x, t, y, v):
@@ -288,29 +307,24 @@ def coupling():
             m=CABLE_MASS,
         )(x, t)[0]
 
-    sol_static = beamBW.solve_static(
-        n=nb_space, rhs=force(x, 0.0, None, 0), approx_curvature=False
+    y0 = shape.solve(
+        conductor,
+        span,
+        force(x, 0.0, None, None),
+        nb_space,
+        model=model,
+        approx_curvature=approx_curvature,
     )
 
-    res_simple = beamBW.solve_dynamic(
-        parameters=parameters,
-        initial_position=sol_static,
-        initial_velocity=np.zeros(nb_space),
+    res_newton = dynamic.solve_dynamic(
+        conductor,
+        span,
+        parameters,
+        model=model,
         force=force,
-        approx_curvature=False,
-        it_picard=20,
-        tol_picard=1e-3,
-        zeta=0,
+        approx_curvature=approx_curvature,
+        initial_position=y0,
     )
-
-    pos_stockbridge = LSPAN / (2 * MODE)
-    id_pos_stockbridge = max(
-        1, min(nb_space - 2, int(np.round(pos_stockbridge / LSPAN * (nb_space - 1))))
-    )
-
-    force_array = np.zeros((nb_space, parameters.nt))
-    for it_t in range(parameters.nt):
-        force_array[:, it_t] = force(x, it_t * dt, None, None)
 
     sb = Stockbridge(CLAMP, MASS, CABLE, MASS, CABLE)
     ic1 = np.zeros(sb.mass_right.nb_unknowns)
@@ -330,57 +344,55 @@ def coupling():
         },
     }
 
-    res_cable, res_sb = solve_dynamic_with_sb(
+    res_cable2, _ = solve_dynamic_with_sb(
         sb_dict,
-        beamBW,
+        conductor,
+        span,
         parameters,
-        initial_position=sol_static,
-        initial_velocity=np.zeros(nb_space),
-        force=force_array,
-        approx_curvature=False,
-        it_picard=20,
-        tol_picard=1e-3,
-        zeta=0,
+        model=model,
+        force=force,
+        approx_curvature=approx_curvature,
+        initial_position=y0,
     )
 
-    t = res_cable["time"]
+    t = parameters.time_vector_output()
 
     plt.figure()
     plt.title("max-min over the time")
     plt.plot(
         x,
-        np.max(res_simple["y"] - res_simple["y"][0, :], axis=0)
-        - np.min(res_simple["y"] - res_simple["y"][0, :], axis=0),
-        label="No sb",
+        np.max(res_newton["y"] - res_newton["y"][0, :], axis=0)
+        - np.min(res_newton["y"] - res_newton["y"][0, :], axis=0),
+        label="without stockbridge",
         color="blue",
     )
     plt.plot(
         x,
-        np.max(res_cable["y"] - res_cable["y"][0, :], axis=0)
-        - np.min(res_cable["y"] - res_cable["y"][0, :], axis=0),
-        label="2 sb",
+        np.max(res_cable2["y"] - res_cable2["y"][0, :], axis=0)
+        - np.min(res_cable2["y"] - res_cable2["y"][0, :], axis=0),
+        label="with 2 stockbridge",
         color="orange",
     )
     plt.xlabel("position (m)")
-    plt.ylabel("deviation from the equilibrium position")
+    plt.ylabel("deviation from the equilibrium position (m)")
     plt.legend()
 
     plt.figure()
     plt.title("At first stockbridge location")
     plt.plot(
         t,
-        res_simple["y"][:, id_pos_stockbridge] - res_simple["y"][0, id_pos_stockbridge],
-        label="No sb",
+        res_newton["y"][:, id_pos_stockbridge] - res_newton["y"][0, id_pos_stockbridge],
+        label="without stockbridge",
         color="blue",
     )
     plt.plot(
         t,
-        res_cable["y"][:, id_pos_stockbridge] - res_cable["y"][0, id_pos_stockbridge],
-        label="2 sb",
+        res_cable2["y"][:, id_pos_stockbridge] - res_cable2["y"][0, id_pos_stockbridge],
+        label="with 2 stockbridge",
         color="orange",
     )
     plt.xlabel("time (s)")
-    plt.ylabel("deviation from the equilibrium position")
+    plt.ylabel("deviation from the equilibrium position (m)")
     plt.legend()
 
     plt.show()
@@ -390,4 +402,4 @@ if __name__ == "__main__":
     basic_example()
     test_equivalence()
     energy_linearized()
-    coupling()
+    coupling_two_stockbridges()

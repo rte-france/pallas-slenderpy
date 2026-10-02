@@ -1,28 +1,40 @@
-from typing import Any, Optional
+from __future__ import annotations
+
+from typing import Optional
 
 import numpy as np
 import scipy as sp
 
+import slenderpy.future.beam.bending as bending
+import slenderpy.future.beam.curvature as curvature
 import slenderpy.future.fd_utils as fdu
 from slenderpy import _progress_bar as spb
-from slenderpy import simtools
-from slenderpy.future.stockbridge import Result
+from slenderpy.future import simulation
+from slenderpy.future.beam.bending import BendingModel
+from slenderpy.future.beam.static import shape
+from slenderpy.future.components import Conductor, Span
+from slenderpy.future.stockbridge.core.stockbridge import Result
+
+# smallest newton relaxation factor tried before declaring the step useless
+_MIN_RELAXATION = 1.0e-06
 
 
 def solve_dynamic_with_sb(
     stockbridges_dict: dict,
-    beam: Any,
-    parameters: Any,
-    initial_position: np.ndarray,
-    initial_velocity: np.ndarray,
-    force: np.ndarray,
-    approx_curvature: bool,
-    initial_bending_moment: Optional[np.ndarray] = None,
-    zeta: float = 0.0,
-    f0: Optional[float] = None,
-    it_picard: int = 1,
-    tol_picard: float = 1e-3,
-) -> tuple[simtools.Results, dict[str, Result]]:
+    conductor: Conductor,
+    span: Span,
+    parameters: simulation.Parameters,
+    model: BendingModel = BendingModel.CONSTANT,
+    ei: float | None = None,
+    force: callable | None = None,
+    approx_curvature: bool = True,
+    initial_position: np.ndarray[float] | None = None,
+    initial_velocity: np.ndarray[float] | None = None,
+    initial_bending_moment: Optional[np.ndarray[float]] = None,
+    zeta: Optional[float] = 0,
+    tol: float = 1.0e-06,
+    max_iter: int = 64,
+) -> tuple[simulation.Results, dict[str, Result]]:
     """Solver for the dynamic coupling of a beam with stockbridge dampers.
 
     Parameters
@@ -58,80 +70,114 @@ def solve_dynamic_with_sb(
     tuple[simtools.Results, dict[str, Result]]
         The first element is a simtools.Results object containing the results for the beam, and the second element is a dictionary of Result objects for each stockbridge damper.
     """
-    # Beam setup: spatial grid, time step and derivative matrices.
-    lspan = beam.length
+    model = BendingModel(model)
+
+    if span.boundary_conditions is None:
+        raise ValueError("span.boundary_conditions is required for a beam solve")
+
+    law = bending.create(conductor, span, model, ei)
+
+    # discretisation
     ns = parameters.ns
-    ds = lspan / (ns - 1)
-    dt = parameters.tf / parameters.nt
-    x = np.linspace(0.0, lspan, ns)
-    current_time = parameters.t0 + dt
+    ds = span.length / (ns - 1)
+    dt = (parameters.tf - parameters.t0) / parameters.nt
+    dt2 = 0.5 * dt
+    x = np.linspace(0.0, span.length, ns)
+    bc = span.boundary_conditions
+    order = bc.order
 
-    order = beam.bc.order
-    D1 = fdu.first_derivative(ns, ds)
-    D2_border = fdu.second_derivative(ns, ds)
-    D2 = fdu.clean_matrix(order, D2_border)
+    # operators; fourth_derivative already zeroes its border rows
+    D2 = fdu.clean_matrix(order, fdu.second_derivative(ns, ds))
     D4 = fdu.fourth_derivative(ns, ds)
-    rhs_bc = np.zeros(ns)
+    BC, _ = bc.compute(ns, ds)
+    identity = fdu.clean_matrix(order, sp.sparse.identity(ns))
+    chi_operator = curvature.create(ns, ds, approx_curvature)
 
+    # crank-nicolson matrices; A is state-independent, factorise it once
+    f0 = 0.5 / span.length * np.sqrt(span.tension / conductor.mass)
+    damp = 2.0 * conductor.mass * 2.0 * np.pi * f0 * zeta
+    ei_D4 = law.ei_linear * D4
+    stiffness = ei_D4 - span.tension * D2
+    damped_mass = (conductor.mass + dt2 * damp) * identity
+    A = damped_mass + dt2**2 * stiffness + BC
+    B = 2.0 * conductor.mass * identity - damped_mass - dt2**2 * stiffness
+    lu = sp.sparse.linalg.splu(sp.sparse.csc_matrix(A))
+
+    # newton tangent, assembled and solved in banded storage. Its constant part
+    # and the left factor of its bending term never change; for the approximate
+    # curvature the right factor is the constant D2 as well, so only the tangent
+    # stiffness varies from one iteration to the next
+    jacobian_base = fdu.banded(A - dt2**2 * ei_D4)
+    left_rows = fdu.tridiagonal(D2)
     if approx_curvature:
-        # Linear curvature approximation simplifies the beam operator.
-        K = beam.get_ei() * D4 - beam.tension * D2
+        constant_rows = fdu.tridiagonal(chi_operator.jacobian(np.zeros(ns)))
 
-        def curvature(y):
-            return D2 @ y
+        def right_rows(y):
+            return constant_rows
+
     else:
-        # Nonlinear curvature uses the full geometric expression.
-        K = -beam.tension * D2
 
-        def curvature(y):
-            return D2_border @ y / np.sqrt((1 + (D1 @ y) ** 2) ** 3)
+        def right_rows(y):
+            return fdu.tridiagonal(chi_operator.jacobian(y))
 
-    y_old = initial_position
-    v_old = initial_velocity
-    curvature_old = curvature(y_old)
+    # the remainder G is identically zero for a law with no hysteresis
+    # taken with the approximate curvature: that case is linear
+    linear = not law.hysteretic and approx_curvature
+
+    if force is None:
+
+        def force(x, t, y, v):
+            return np.zeros_like(x)
+
+    # initial state
+    if initial_velocity is None:
+        initial_velocity = np.zeros(ns)
+    if initial_position is None:
+        initial_position = shape.solve(
+            conductor,
+            span,
+            force(x, parameters.t0, np.zeros(ns), np.zeros(ns)),
+            ns,
+            model=model,
+            ei=ei,
+            approx_curvature=approx_curvature,
+            tol=tol,
+            max_iter=max_iter,
+        )
+
+    y_old = np.asarray(initial_position, dtype=float)
+    v_old = np.asarray(initial_velocity, dtype=float)
+    if y_old.shape != (ns,) or v_old.shape != (ns,):
+        raise ValueError(f"initial position and velocity must have length {ns}")
+
+    chi_old = chi_operator.value(y_old)
     if initial_bending_moment is None:
-        initial_bending_moment = beam._bending_moment(curvature_old)
-    bending_moment_old = initial_bending_moment
-    eta_old = beam._init_eta(bending_moment_old, curvature_old)
+        initial_bending_moment = law.moment(chi_old)
+    eta_old = law.initial_eta(initial_bending_moment, chi_old)
 
-    if f0 is None:
-        f0 = beam.natural_frequency()
-    damp = 2 * beam.mass * 2 * np.pi * f0 * zeta
-
-    # beam result
-    toolbox = beam._build_dict(parameters, damp, K, D2)
-    powers_name = ["p_kin", "p_bend", "p_tens", "p_ext", "p_dissip"]
-    energies_name = ["e_kin", "e_bend", "e_tens", "e_ext", "e_dissip"]
-    picard = ["it_picard"]
-    lov = ["y", "v", "c", "M"]
-    all_lov = lov + powers_name + energies_name + picard
-    time_vector = parameters.time_vector_output().tolist()
-    res_cable = simtools.Results(
-        lot=time_vector,
-        lov=all_lov,
-        lov_dims=[
-            2,
-            2,
-            2,
-            2,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-        ],
-        los=np.linspace(0, 1, len(parameters.los)),
+    # output
+    lov = ["y", "v", "c", "M", "eta", "n_iter"]  # TODO ajouter energies
+    lot = parameters.time_vector_output().tolist()
+    res_cable = simulation.Results(
+        lot=lot,
+        lov=lov,
+        lov_dims=[2, 2, 2, 2, 2, 1],
+        los=parameters.los,
     )
+    res_cable.start_timer()
     res_cable.update(
-        0, x / lspan, lov, [y_old, v_old, curvature_old, bending_moment_old]
+        0,
+        x / span.length,
+        lov,
+        [
+            y_old,
+            v_old,
+            chi_old,
+            law.dynamic_moment(chi_old, eta_old),
+            eta_old,
+            0,
+        ],
     )
-    pb = spb.generate(parameters.pp, parameters.nt, desc=__name__)
 
     acc_clamp_old = [0 for _ in stockbridges_dict.values()]
     acc_ang_clamp_old = [0 for _ in stockbridges_dict.values()]
@@ -149,7 +195,7 @@ def solve_dynamic_with_sb(
     sb_results_dict = {}
     for idx, key in enumerate(stockbridges_dict.keys()):
         sb = stockbridges_dict[key]["stockbridge"]
-        sb_results_dict[key] = Result(sb, time_vector)
+        sb_results_dict[key] = Result(sb, lot)
         sb_results_dict[key].update(
             0, u1_old[idx], u2_old[idx], acc_clamp_old[idx], acc_ang_clamp_old[idx]
         )
@@ -164,47 +210,130 @@ def solve_dynamic_with_sb(
     ]
     all_pos = np.array([value.get("position") for value in stockbridges_dict.values()])
     id_pos_stockbridge = np.maximum(
-        1, np.minimum(ns - 2, np.round(all_pos / lspan * (ns - 1)))
+        1, np.minimum(ns - 2, np.round(all_pos / span.length * (ns - 1)))
     ).astype(int)
     d = x[id_pos_stockbridge + 1] - x[id_pos_stockbridge - 1]
 
+    # time loop
+    pb = spb.generate(parameters.pp, parameters.nt, desc=__name__)
+    t_old = parameters.t0
+    converged = True
+
+    force_sb_old = np.zeros(ns)
     # time iteration
-    for k in range(1, parameters.nt):
-        if beam.bc.dynamic_values is not None:
-            rhs_bc = beam.bc.update_rhs(ns, x, k)
+    for step in range(parameters.nt):
+        t_new = t_old + dt
 
         # Apply previous stockbridge forces to the beam as distributed loads.
         # The stencil weights approximate the clamp force on adjacent beam nodes.
-        force[id_pos_stockbridge, k] += -0.5 * 2 * force_clamp / d
-        force[id_pos_stockbridge + 1, k] += -0.25 * 2 * force_clamp / d
-        force[id_pos_stockbridge - 1, k] += -0.25 * 2 * force_clamp / d
+        force_sb_new = np.zeros(ns)
+        force_sb_new[id_pos_stockbridge] += (
+            -0.5 * 2 * force_clamp / d
+        )  # TODO tester sans distriuer sur 3 points
+        force_sb_new[id_pos_stockbridge + 1] += -0.25 * 2 * force_clamp / d
+        force_sb_new[id_pos_stockbridge - 1] += -0.25 * 2 * force_clamp / d
 
-        force_previous = fdu.clean_rhs(order, force[:, k - 1])
-        force_current = fdu.clean_rhs(order, force[:, k])
-
-        v_new, y_new, eta_new, curvature_new, bending_moment_new, it = (
-            beam.picard_process(
-                toolbox,
-                v_old,
-                y_old,
-                eta_old,
-                rhs_bc,
-                curvature,
-                approx_curvature,
-                force_current + force_previous,
-                it_picard,
-                tol_picard,
-            )
+        load = (
+            force(x, t_old, y_old, v_old)
+            + force_sb_old
+            + force(x, t_new, y_old, v_old)
+            + force_sb_new
         )
+        rhs_bc = (
+            np.zeros(ns) if bc.dynamic_values is None else bc.update_rhs(ns, x, t_new)
+        )
+        inertia = B @ v_old
+        elastic = dt * stiffness @ y_old
+        external = dt2 * fdu.clean_rhs(order, load)
+        rhs = inertia - elastic + external + rhs_bc
+        threshold = tol * fdu.residual_scale((inertia, elastic, external, rhs_bc))
+
+        if linear:
+            v_new = lu.solve(rhs)
+            y_new = y_old + dt2 * (v_old + v_new)
+            chi_new = chi_operator.value(y_new)
+            eta_new = eta_old
+            n_iter = 1
+        else:
+            remainder_old = D2 @ law.dynamic_moment(chi_old, eta_old) - ei_D4 @ y_old
+
+            def step_state(v):
+                """State and step residual reached by a candidate velocity."""
+                y = y_old + dt2 * (v_old + v)
+                chi = chi_operator.value(y)
+                # curvature increment driving the hysteresis, as the curvature
+                # rate at the end of the step times the step: the same fully
+                # implicit discretisation the eta update of the law is built on
+                dchi = dt * chi_operator.rate(y, v)
+                eta = law.update_eta(eta_old, dchi)
+                remainder = D2 @ law.dynamic_moment(chi, eta) - ei_D4 @ y
+                residual = A @ v - rhs + dt2 * (remainder_old + remainder)
+                return y, chi, dchi, eta, residual
+
+            v_new = v_old
+            y_new, chi_new, dchi_new, eta_new, step_residual = step_state(v_new)
+            error = np.abs(step_residual).max()
+            n_iter = 0
+
+            while n_iter < max_iter and error > threshold:
+                # tangent bending stiffness of the law over the step. The
+                # moment reaches the velocity twice: once through the curvature,
+                # whose derivative carries dt2, and once through eta, whose
+                # increment carries dt, i.e. twice as much. Only the hysteretic
+                # part of dynamic_tangent takes the second path, so it is the
+                # only one weighted twice
+                tangent = 2.0 * law.dynamic_tangent(eta_new, dchi_new) - law.ei_linear
+
+                jacobian = jacobian_base + dt2**2 * fdu.product_band(
+                    left_rows, right_rows(y_new), tangent
+                )
+                try:
+                    increment = sp.linalg.solve_banded(
+                        (fdu.BANDWIDTH, fdu.BANDWIDTH), jacobian, -step_residual
+                    )
+                except np.linalg.LinAlgError:
+                    break
+
+                # backtrack while the increment increases the residual, because
+                # the full newton step can overshoot where the bouc-wen law is
+                # not differentiable, at a sign change of dchi or eta. Such a
+                # sign change also needs a step that momentarily increases the
+                # residual, so a failed backtrack takes the full step instead of
+                # giving up: only max_iter ends the iteration.
+                relaxation = 1.0
+                trial = step_state(v_new + increment)
+                while np.abs(trial[3]).max() >= error and relaxation > _MIN_RELAXATION:
+                    relaxation *= 0.5
+                    trial = step_state(v_new + relaxation * increment)
+
+                if np.abs(trial[3]).max() >= error:
+                    relaxation = 1.0
+                    trial = step_state(v_new + increment)
+
+                v_new = v_new + relaxation * increment
+                y_new, chi_new, dchi_new, eta_new, step_residual = trial
+                error = np.abs(step_residual).max()
+                n_iter += 1
+
+            if not (error <= threshold and np.all(np.isfinite(y_new))):
+                print(
+                    f"dynamic solve did not converge at step {step + 1}"
+                    f"/{parameters.nt} (t = {t_new:.6g} s): max|residual| = "
+                    f"{error:.3e} for a target of {threshold:.3e}"
+                )
+                converged = False
+                break
 
         # Compute clamp acceleration from the updated cable state.
         # This acceleration is passed back to the stockbridge model.
+        bending_moment = law.dynamic_moment(chi_new, eta_new)
         acc_clamp_new = (
-            force[id_pos_stockbridge, k]
-            + beam.tension * (D2 @ y_new)[id_pos_stockbridge]
-            - (D2 @ bending_moment_new)[id_pos_stockbridge]
+            force(x, t_new, y_old, v_old)[id_pos_stockbridge]
+            + force_sb_new[id_pos_stockbridge]
+            + span.tension * (D2 @ y_new)[id_pos_stockbridge]
+            - (D2 @ bending_moment)[id_pos_stockbridge]
             - damp * v_new[id_pos_stockbridge]
-        ) / beam.mass
+        ) / conductor.mass
         acc_ang_clamp_new = 0 * acc_clamp_new
 
         # loop for all stockbridges
@@ -259,58 +388,49 @@ def solve_dynamic_with_sb(
             u2_old[idx] = np.array(u2_new[idx])
 
         acc_clamp_old = acc_clamp_new
+        force_sb_old = force_sb_new
 
-        if (k + 1) % parameters.rr == 0:
-            values = (
-                [y_new, v_new, curvature_new, bending_moment_new]
-                + list(
-                    beam.compute_power(
-                        D2,
-                        curvature_new,
-                        v_old,
-                        v_new,
-                        y_new,
-                        eta_new,
-                        force_current,
-                        dt,
-                        x,
-                    ).values()
-                )
-                + [it]
-            )
+        if (step + 1) % parameters.rr == 0:
             res_cable.update(
-                (k // parameters.rr) + 1,
-                x / lspan,
-                lov + powers_name + picard,
-                values,
+                (step + 1) // parameters.rr,
+                x / span.length,
+                lov,
+                [
+                    y_new,
+                    v_new,
+                    chi_new,
+                    law.dynamic_moment(chi_new, eta_new),
+                    eta_new,
+                    n_iter,
+                ],
             )
             pb.update(parameters.rr)
+
             for idx, key in enumerate(stockbridges_dict.keys()):
                 sb = stockbridges_dict[key]["stockbridge"]
                 sb_results_dict[key].update(
-                    (k // parameters.rr) + 1,
+                    (step // parameters.rr) + 1,
                     u1_old[idx],
                     u2_old[idx],
                     acc_clamp_new[idx],
                     acc_ang_clamp_new[idx],
                 )
 
-        current_time += dt
-        v_old = v_new
-        y_old = y_new
-        eta_old = eta_new
-        curvature_old = curvature_new
-        bending_moment_old = bending_moment_new
+        t_old = t_new
+        y_old, v_old, chi_old, eta_old = y_new, v_new, chi_new, eta_new
 
-    beam.update_energies(
-        res_cable,
-        powers_name,
-        energies_name,
-        parameters.tf / parameters.nr,
-        parameters.nr,
-    )
     pb.close()
-    res_cable.set_state(
-        {"y": y_new, "v": v_new, "c": curvature_new, "M": bending_moment_new}
-    )
+    res_cable.stop_timer()
+
+    if converged:
+        res_cable.set_state(
+            {
+                "y": y_old,
+                "v": v_old,
+                "c": chi_old,
+                "M": law.dynamic_moment(chi_old, eta_old),
+                "eta": eta_old,
+            }
+        )
+
     return res_cable, sb_results_dict
