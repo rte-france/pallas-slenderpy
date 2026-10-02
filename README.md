@@ -1,129 +1,81 @@
-# Slenderpy
+# slenderpy
 
-_**slenderpy**_ is a python package to simulate the vibrations of elongated structures like cables or beams.
+Static and dynamic simulation of slender structures, overhead line cables
+and beams, under their weight, wind and point excitations.
+
+[![Tests](https://github.com/rte-france/pallas-slenderpy/actions/workflows/pytest.yml/badge.svg)](https://github.com/rte-france/pallas-slenderpy/actions/workflows/pytest.yml)
+[![Lint](https://github.com/rte-france/pallas-slenderpy/actions/workflows/lint.yml/badge.svg)](https://github.com/rte-france/pallas-slenderpy/actions/workflows/lint.yml)
+[![Coverage](https://rte-france.github.io/pallas-slenderpy/coverage/badge.svg)](https://rte-france.github.io/pallas-slenderpy/coverage/)
+[![Docs](https://img.shields.io/badge/docs-online-blue)](https://rte-france.github.io/pallas-slenderpy/)
+![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)
+[![License: MPL-2.0](https://img.shields.io/badge/license-MPL--2.0-green)](LICENSE)
+
+![Free vibration of a 400 m span: mid-span displacement and spectrum](doc/images/hero.png)
+
+## Features
+
+- Cable: catenary, parabolic and elastic closed forms; static shape under any
+  load; time-domain solver (Lee and Perkins model); natural frequencies.
+- Beam: static shape and dynamics of a tensioned beam, with a constant
+  bending stiffness or a Bouc-Wen (hysteretic) bending law.
+- Forces: gravity, point excitation, wind drag with constant or turbulent
+  wind and a Reynolds-dependent drag coefficient, composed with `+`.
+- Fatigue: rainflow cycle counting at a distance from a support.
+- Stockbridge dampers (experimental).
+- The former API is kept in `slenderpy.legacy`.
 
 ## Installation
 
-### Using pip
-
-To install the package using pip, execute the following command:
-
-```shell script
-python -m pip install slenderpy@git+https://github.com/rte-france/pallas-slenderpy
+```shell
+python -m pip install "slenderpy @ git+https://github.com/rte-france/pallas-slenderpy"
 ```
 
-### Using conda
+or, with [uv](https://docs.astral.sh/uv/):
 
-(not available yet)
-
-## Building the documentation
-
-First, make sure you have sphinx and the Readthedocs theme installed.
-
-If you use pip, open a terminal and enter the following commands:
-
-```shell script
-pip install sphinx
-pip install sphinx_rtd_theme
+```shell
+uv add "slenderpy @ git+https://github.com/rte-france/pallas-slenderpy"
 ```
 
-If you use conda, open an Anaconda Powershell Prompt and enter the following commands:
+## Quick start
 
-```shell script
-conda install sphinx
-conda install sphinx_rtd_theme
-```
-
-Then, in the same terminal or anaconda prompt, go to directory `slenderpy/doc` and build the doc:
-
-```shell script
-cd doc
-make html
-```
-
-The documentation can then be accessed from `doc/_build/html/index.html`.
-
-## Simple usage
-
-This example defines a cable excited for a short time with a point sine force. The cable is simulated
-with and without self-damping.
+Static shape of a 400 m span blown by a 25 m/s wind:
 
 ```python
 import numpy as np
-from slenderpy.legacy import cable
-from slenderpy.legacy import simtools
-from slenderpy.legacy import force
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 
-# Cable definition (EA is the axial stiffness).
-cb = cable.SCable(mass=1.57, diameter=0.031, EA=3.76E+07,
-                  length=200., tension=3.7E+04, h=0.)
+from slenderpy.cable import dynamic
+from slenderpy.cable.static import shape
+from slenderpy.components import Conductor, Span
+from slenderpy.force.wind import ConstantWind, WindDrag
 
-# Number of space samples.
-ns = 101
+conductor = Conductor(mass=1.571, diameter=0.0313, axial_stiffness=3.76e07)
+span = Span(length=400.0, tension=3.7e04)
+x, y, z = dynamic.equilibrium(conductor, span, 201)
 
-# Vector of space samples. It defines the positions of the states exported by the simulation.
-# The positions are normalized (i.e., in interval ]0, 1[).
-s = np.linspace(0.0, 1.0, ns)
-los = s[1:-1].tolist()
-
-# Set the simulation parameters.
-# dt is the simulation time step and dr the time step to save the simulation results.
-pm = simtools.Parameters(ns=ns, t0=0., tf=8., dt=1.0E-03, dr=3.0E-02, los=los, pp=True)
-
-# Define a sine excitation (freq=2Hz) at position=5% of cable length, from time 0.2s to time 1.0s.
-fr = force.Excitation(f=2., a=0.1, s=(0.05 * cb.Lp), m=1., L=cb.Lp,
-                      t0=0.2, tf=1.0, gravity=False)
-
-# Run simulation without self-damping.
-res = cable.solve(cb, pm, force=fr)
-
-# Extract values of normal displacement and add zero values at cable's ends.
-# We get an array of dimension (nTimes x nPositions).
-un = res.data['un'].values
-un = np.insert(un, (0, un.shape[1]), values=0, axis=1)
-
-# Get vectors of time and of horizontal position.
-time = res.data['time'].values
-x = cb.Lp * s
-
-# Run simulation with a non-zero damping factor (zt).
-res_damp = cable.solve(cb, pm, force=fr, zt=0.2)
-
-# Extract results and add zero values at cable's ends.
-un_damp = res_damp.data['un'].values
-un_damp = np.insert(un_damp, (0, un_damp.shape[1]), values=0, axis=1)
+drag = WindDrag(diameter=conductor.diameter, wind=ConstantWind(25.0))
+zeros = np.zeros_like(x)
+windy = shape.solve(conductor, span, *drag(x, 0.0, y, z, zeros, zeros), 201)
+print(f"out-of-plane deflection at mid-span: {windy[1].max():.2f} m")
 ```
 
-Add the following code to show the evolution of the vertical displacement in an animation loop:
+## Documentation
 
-```python
-fig, ax = plt.subplots(figsize=[6, 4], tight_layout=True)
-ax.set_xlabel('horizontal position [m]')
-ax.set_ylabel('vertical displacement [m]')
-line1, = ax.plot(x, np.zeros_like(x), label="zero damping")
-line2, = ax.plot(x, np.zeros_like(x), label="non-zero damping")
-ax.legend()
-xlim = ax.get_xlim()
-d = np.max(np.abs(un))
-ax.set_ylim([-1.5 * d, 1.5 * d])
-ylim = ax.get_ylim()
-text = ax.text(0.95 * xlim[0] + 0.05 * xlim[1],
-               0.9 * ylim[0] + 0.1 * ylim[1], 't=0s')
+- [Documentation](https://rte-france.github.io/pallas-slenderpy/): user
+  guide, examples and API reference.
+- [Examples](examples/): short scripts, each ending with its figures.
+- [Coverage report](https://rte-france.github.io/pallas-slenderpy/coverage/).
 
+## Development
 
-def animate(i):
-    """The function to call at each frame."""
-    line1.set_ydata(un[i, :])
-    line2.set_ydata(un_damp[i, :])
-    text.set_text("t={:2.3f}s".format(time[i]))
-    return line1, line2, text
-
-
-ani = animation.FuncAnimation(
-    fig, animate, interval=20, blit=True,
-    frames=time.size, repeat=True)
-
-plt.show()
+```shell
+uv sync --all-extras
+uv run pytest test --cov=slenderpy --cov-report=term   # tests with coverage
+uv run ruff check . && uv run ruff format --check .    # lint
 ```
+
+Building the documentation is described in [CONTRIBUTING.md](CONTRIBUTING.md#documentation).
+
+## Contributing and license
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](code_of_conduct.md).
+slenderpy is distributed under the [Mozilla Public License 2.0](LICENSE).
