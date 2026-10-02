@@ -28,24 +28,41 @@ By making a taylor expansion at order 1 of this formula, under the assumption of
     \chi_{approx}(y) = \frac{\partial^2 y}{\partial x ^2 }
 
 
-A :class:`~slenderpy.future.beam.beam.Beam` object can either be a :class:`~slenderpy.future.beam.beam.BeamConst` or a :class:`~slenderpy.future.beam.beam.BeamBW`. 
-The first one solves the beam equation with a constant bending stiffness whereas the second one solves it with a variable bending stiffness with hysteresis effects based on Bouc-Wen model.
+The beam solvers are functions of a :class:`~slenderpy.future.components.Conductor`
+and a :class:`~slenderpy.future.components.Span`, whose ``boundary_conditions``
+must be set. Two choices are made independently, by arguments:
+
+* the bending law (:mod:`slenderpy.future.beam.bending`): ``model="constant"``
+  for a constant bending stiffness :math:`EI` (``conductor.ei_max`` by default,
+  or the ``ei`` argument), or ``model="varying"`` for a stiffness that falls
+  from :math:`EI_{max}` to :math:`EI_{min}` with hysteresis, after the Bouc-Wen
+  model, with :math:`\chi_0` = ``conductor.beta_flexion * span.tension``;
+* the curvature (:mod:`slenderpy.future.beam.curvature`):
+  ``approx_curvature=True`` for :math:`\chi_{approx}`, ``False`` for
+  :math:`\chi_{exact}`.
+
+The displacement :math:`y` is the vertical position of the beam, stored as
+``z`` in the results (see the output contract of
+:mod:`slenderpy.future.simulation`).
 
 Static
 ======
 
-:class:`~slenderpy.future.beam.beam.BeamConst` object
------------------------------------------------------
+:func:`slenderpy.future.beam.static.shape.solve` returns the displacement at the
+nodes under a nodal load :math:`F(x)`.
+
+Constant model
+--------------
 
 The equation solved in the static case is:
 
 .. math::
-    &\frac{\partial^2 M(y)}{\partial x ^2 } - H \frac{\partial^2 y}{\partial x ^2 } = F(x) \\ 
+    &\frac{\partial^2 M(y)}{\partial x ^2 } - H \frac{\partial^2 y}{\partial x ^2 } = F(x) \\
     &M(y) = EI \chi(y)
 
 
-:class:`~slenderpy.future.beam.beam.BeamBW` object
------------------------------------------------------
+Varying model
+-------------
 
 The equation solved in the static case is:
 
@@ -55,163 +72,88 @@ The equation solved in the static case is:
     &\bar{\chi} = (1 - \frac{EI_{min}}{EI_{max}}) \chi_0
 
 
-For the resolution, the space derivatives are discretized using finite differences centered schemes. 
-Because of the non-linearity of the problem, the function :code:`sp.optimize.root` is used to solve the equation.
+Resolution
+----------
+
+The space derivatives are discretized with centered finite differences. The
+nonlinear system is solved with a damped Newton iteration, starting from the
+constant-stiffness linear solution. The Jacobian is assembled analytically from
+the tangent of the bending law and the Jacobian of the curvature; each step is
+relaxed until it decreases the residual norm. A solve that does not converge
+returns ``nan``.
 
 Dynamic
 =======
 
-:class:`~slenderpy.future.beam.beam.BeamConst` object
------------------------------------------------------
+:func:`slenderpy.future.beam.dynamic.solve_dynamic` returns the time history of
+the beam under a force ``force(x, t, y, z, vy, vz) -> (fy, fz)`` (see
+:mod:`slenderpy.future.force.core`; the beam is planar and uses ``fz``). By
+default it starts at rest from the static shape under the force at the initial
+time.
+
+Constant model
+--------------
 
 The equation solved in the dynamic case is:
 
 .. math::
     &m\frac{\partial^2 y}{\partial t ^2 } + 2m\omega_0 \zeta \frac{\partial y}{\partial t  }  + \frac{\partial^2 M}{\partial x ^2 }   - H \frac{\partial^2 y}{\partial x ^2 } = F(x,t) \\
     &M(y) = EI \chi(y)
-    :label: eq:beam_dynamic_const
-
-For the temporal discretization, a Crank-Nicolson scheme is used. We also introduce the velocity :math:`v = \frac{\partial y}{\partial t }` as an additional variable.
-We rewrite :eq:`eq:beam_dynamic_const` as:
-
-.. math::
-    m\frac{\partial v}{\partial t } = F(x,t) - 2m\omega_0 \zeta v - D_2 M  + H D_2 y 
-
-with :math:`D_2` the second order space derivative operator.
-
-The two unknows at each time step :math:`n` are the velocity :math:`v^n` and the displacement :math:`y^n`,
-which are two vectors of size the number of nodes along the beam. 
-The external force :math:`F^n` is also a vector of the same size and the operator :math:`D_2` is a matrix.
-The bending moment :math:`M^n` is also a vector of the same size and it is computed from the displacement :math:`y^n` using the curvature formula.
-The Crank-Nicolson scheme applied to this equation reads:
-
-.. math::
-    &m \frac{v^{n+1} - v^n}{\Delta t} = \frac{1}{2}(F^{n+1} + F^n - 2m\omega_0 \zeta (v^{n+1} + v^n) - D_2 M^{n+1}  - D_2 M^n + H D_2 y^{n+1} + H D_2 y^n) \\
-    & \frac{y^{n+1} - y^n}{\Delta t} = \frac{1}{2} (v^{n+1} + v^n)
-
-We substitute :math:`y^{n+1}` in the first equation and we introduce :math:`K = - H D_2` to get:
-
-.. math::
-    &v^{n+1}(I_d (m + m\omega_0 \zeta \Delta t) + \frac{\Delta t^2}{4}K) = v^n(I_d (m - m\omega_0 \zeta \Delta t) - \frac{\Delta t^2}{4}K) \\
-    & \hspace{15em} + \frac{\Delta t}{2}(F^{n+1} + F^n) \\
-    & \hspace{15em} - \frac{\Delta t}{2} D_2 (M^{n+1} + M^n) \\
-    & \hspace{15em} -\Delta t K y^n \\
-    &y^{n+1} = y^n + \frac{\Delta t}{2} (v^{n+1} + v^n)
-    :label: eq:beam_dynamic_const_cn
-
-with :math:`I_d` the identity matrix.
-
-The problem in :eq:`eq:beam_dynamic_const_cn` is the term :math:`D_2 M^{n+1}` which is non-linear because of the curvature formula.
-In the case where the curvature is approximated, we have :math:`M^{n+1} = EI D_2 y^{n+1}` and the problem becomes linear. 
-We can thus rewrite :eq:`eq:beam_dynamic_const_cn` as:
-
-.. math::
-    &v^{n+1}(I_d (m + m\omega_0 \zeta \Delta t) + \frac{\Delta t^2}{4}K) = v^n(I_d (m - m\omega_0 \zeta \Delta t) - \frac{\Delta t^2}{4}K) \\
-    & \hspace{15em} + \frac{\Delta t}{2}(F^{n+1} + F^n) \\
-    & \hspace{15em} -\Delta t K y^n \\
-    &y^{n+1} = y^n + \frac{\Delta t}{2} (v^{n+1} + v^n)
-    :label: eq:beam_dynamic_const_cn_approx
-
-with :math:`K = EI D_4 - H D_2` where :math:`D_4` is the fourth order space derivative operator.
-
-In the case of the exact curvature formula, we could replace :math:`M^{n+1}` by its value at the previous time step :math:`M^n` to get an explicit scheme.
-But unfortunately this scheme was not always stable for the beam equation.
-Thus we use Picard iterations to solve the non-linear problem at each time step. Here is the process:
-
-* Initialize :math:`y^p = y^n`
-* Iterate until convergence:
-  
-  * Compute :math:`M^p = EI \chi_{exact}(y^p)`
-  * Compute :math:`v^{n+1}` and :math:`y^{n+1}`
-  
-  .. math::
-      &v^{n+1}(I_d (m + m\omega_0 \zeta \Delta t) + \frac{\Delta t^2}{4}K) = v^n(I_d (m - m\omega_0 \zeta \Delta t) - \frac{\Delta t^2}{4}K) \\
-      & \hspace{15em} + \frac{\Delta t}{2}(F^{n+1} + F^n) \\
-      & \hspace{15em} - \frac{\Delta t}{2} D_2 (M^p + M^n) \\
-      & \hspace{15em} -\Delta t K y^n \\
-      &y^{n+1} = y^n + \frac{\Delta t}{2} (v^{n+1} + v^n)
-  
-  * Update :math:`y^p = y^{n+1}`
 
 
-:class:`~slenderpy.future.beam.beam.BeamBW` object
------------------------------------------------------ 
+Varying model
+-------------
 
 The equations solved in the dynamic case are:
 
 .. math::
     &m\frac{\partial^2 y}{\partial t ^2 } + 2m\omega_0 \zeta \frac{\partial y}{\partial t  }  + \frac{\partial^2 M}{\partial x ^2 }   - H \frac{\partial^2 y}{\partial x ^2 } = F(x,t) \\
     &M(y) = EI_{min}\chi(y) + (EI_{max} - EI_{min})\chi_0 \eta \\
-    & \chi_0 \frac{\partial \eta}{\partial t} = \frac{\partial \chi}{\partial t} - \frac{1}{2} (\frac{\partial \chi}{\partial t} |\eta| + |\frac{\partial \chi}{\partial t}| \eta) 
+    & \chi_0 \frac{\partial \eta}{\partial t} = \frac{\partial \chi}{\partial t} - \frac{1}{2} (\frac{\partial \chi}{\partial t} |\eta| + |\frac{\partial \chi}{\partial t}| \eta)
 
 
-For the case of the approximated curvature, we choose a Crank-Nicolson scheme for the velocity and the displacement and an Euler implicit scheme for the hysteresis variable:
+Time discretization
+-------------------
 
-.. math::
-    &v^{n+1}(I_d (m + m\omega_0 \zeta \Delta t) + \frac{\Delta t^2}{4}K) = v^n(I_d (m - m\omega_0 \zeta \Delta t) - \frac{\Delta t^2}{4}K) \\
-    & \hspace{15em} + \frac{\Delta t}{2}(F^{n+1} + F^n) \\
-    & \hspace{15em} + \frac{\Delta t}{2}(EI_{max} - EI_{min}) \chi_0 D_2 (\eta^{n+1} + \eta^n)\\
-    & \hspace{15em} -\Delta t K y^n \\
-    &y^{n+1} = y^n + \frac{\Delta t}{2} (v^{n+1} + v^n) \\
-    &\eta^{n+1}( \chi_0 + \frac{\Delta t}{2} |D_2 v^{n+1}|) = \chi_0 \eta^n + \Delta t D_2 v^{n+1} - \frac{\Delta t}{2} D_2 v^{n+1} |\eta^{n+1}|
-
-with :math:`K = EI_{min} D_4 - H D_2`.
-
-It is quite similar to :eq:`eq:beam_dynamic_const_cn_approx` except that there is an additional term due to the hysteresis variable :math:`\eta`.
-The term :math:`|\eta^{n+1}|` makes the problem non linear thus we use Picard iterations to solve the problem at each time step. Here is the process:
-
-* Initialize :math:`\eta^p = \eta^n`
-* Iterate until convergence:
-  
-  * Compute :math:`v^{n+1}` and :math:`\eta^{n+1}`:
-  
-  .. math::
-    &v^{n+1}(I_d (m + m\omega_0 \zeta \Delta t) + \frac{\Delta t^2}{4}K) = v^n(I_d (m - m\omega_0 \zeta \Delta t) - \frac{\Delta t^2}{4}K) \\
-    & \hspace{15em} + \frac{\Delta t}{2}(F^{n+1} + F^n) \\
-    & \hspace{15em} + \frac{\Delta t}{2}(EI_{max} - EI_{min}) \chi_0 D_2 (\eta^p + \eta^n)\\
-    & \hspace{15em} -\Delta t K y^n \\  
-    &\eta^{n+1}( \chi_0 + \frac{\Delta t}{2} |D_2 v^{n+1}|) = (\chi_0 \eta^n + \Delta t D_2 v^{n+1} - \frac{\Delta t}{2} D_2 v^{n+1} |\eta^p|) 
-
-  * Update :math:`\eta^p = \eta^{n+1}`
-
-* Update :math:`y^{n+1} = y^n + \frac{\Delta t}{2} (v^{n+1} + v^n)`
-
-
-For the case of the exact curvature formula, we choose a Crank-Nicolson scheme for the velocity and the displacement and an Euler implicit scheme for the hysteresis variable:
+The velocity :math:`v = \frac{\partial y}{\partial t }` is introduced as an
+additional unknown and both models are integrated with the same Crank-Nicolson
+scheme on the first-order system, solved for the velocity:
 
 .. math::
-    &v^{n+1}(I_d (m + m\omega_0 \zeta \Delta t) + \frac{\Delta t^2}{4}K) = v^n(I_d (m - m\omega_0 \zeta \Delta t) - \frac{\Delta t^2}{4}K) \\
-    & \hspace{15em} + \frac{\Delta t}{2}(F^{n+1} + F^n) \\
-    & \hspace{15em} - \frac{\Delta t}{2} D_2 (M^{n+1} + M^n) \\
-    & \hspace{15em} -\Delta t K y^n \\
-    &y^{n+1} = y^n + \frac{\Delta t}{2} (v^{n+1} + v^n) \\
-    &\eta^{n+1}( \chi_0 + \frac{1}{2} |\chi^{n+1} - \chi^n|) = \chi_0 \eta^n + \chi^{n+1} - \chi^n - \frac{1}{2} (\chi^{n+1} - \chi^n) |\eta^{n+1}|
+    &A v^{n+1} = B v^n - \Delta t K y^n - \frac{\Delta t}{2} (G^n + G^{n+1}) + \frac{\Delta t}{2} (F^n + F^{n+1}) \\
+    &y^{n+1} = y^n + \frac{\Delta t}{2} (v^{n+1} + v^n)
 
-with :math:`K = - H D_2`.
+with :math:`K = EI_{lin} D_4 - H D_2` the linear part of the equation,
+:math:`A = m I_d + \frac{\Delta t}{2} c I_d + \frac{\Delta t^2}{4} K` plus the
+boundary rows, :math:`B` the same with the two last signs flipped,
+:math:`c = 2 m \omega_0 \zeta` the damping coefficient, and
+:math:`G = D_2 M - EI_{lin} D_4 y` the nonlinear remainder. :math:`EI_{lin}` is
+:math:`EI` for the constant model and :math:`EI_{min}` for the varying one; the
+split between :math:`K` and :math:`G` is purely algebraic.
 
-Again the term :math:`D_2 M^{n+1}` is non-linear. We thus use Picard iterations to solve the non-linear problem at each time step. Here is the process:
+For the constant model with the approximate curvature :math:`G` vanishes: the
+problem is linear, :math:`A` is factorised once and each step is one solve.
 
-* Initialize :math:`y^p = y^n, \eta^p = \eta^n`
-* Iterate until convergence:
-  
-  * Compute :math:`M^p = EI_{min} \chi(y^p) + (EI_{max} - EI_{min})\chi_0 \eta_p` 
-  * Compute :math:`v^{n+1}` and :math:`y^{n+1}`:
-  
-  .. math::
-      &v^{n+1}(I_d (m + m\omega_0 \zeta \Delta t) + \frac{\Delta t^2}{4}K) = v^n(I_d (m - m\omega_0 \zeta \Delta t) - \frac{\Delta t^2}{4}K) \\
-      & \hspace{15em} + \frac{\Delta t}{2}(F^{n+1} + F^n) \\
-      & \hspace{15em} - \frac{\Delta t}{2} D_2 (M^p + M^n) \\
-      & \hspace{15em} -\Delta t K y^n \\
-      &y^{n+1} = y^n + \frac{\Delta t}{2} (v^{n+1} + v^n)
-  
-  * Update :math:`y^p = y^{n+1}`
+In the three other cases the step is solved with a Newton iteration on its
+residual, with the tangent
 
-  * Compute :math:`\chi^p` from :math:`y^p`
-  * Compute :math:`\eta^{n+1}`
-  .. math::
-      \eta^{n+1}( \chi_0 + \frac{1}{2} |\chi^p - \chi^n|) = \chi_0 \eta^n + \chi^p - \chi^n - \frac{1}{2} (\chi^p - \chi^n) |\eta^p|
+.. math::
+    A + \frac{\Delta t^2}{4} \left( D_2 \, \mathrm{diag}\left(\frac{dM}{d\chi}\right) \frac{d\chi}{dy} - EI_{lin} D_4 \right)
 
-  * Update :math:`\eta^p = \eta^{n+1}`
+and a backtracking that relaxes a step increasing the residual. The hysteresis
+variable is advanced fully implicitly, with
+:math:`\Delta \chi = \Delta t \frac{d\chi}{dy} v^{n+1}`:
+
+.. math::
+    \chi_0 (\eta^{n+1} - \eta^n) = \Delta \chi - \frac{1}{2} (\Delta \chi |\eta^{n+1}| + |\Delta \chi| \eta^{n+1})
+
+Since the sign of :math:`\eta^{n+1}` is the sign of
+:math:`\chi_0 \eta^n + \Delta \chi`, this equation has a closed-form solution,
+bounded by 1 whatever the step. A fixed-point (Picard) iteration on a frozen
+:math:`A` does not converge here: with :math:`EI_{lin} = EI_{min}` and a true
+tangent of :math:`EI_{max}` its gain is :math:`EI_{max}/EI_{min}`. A step that
+does not converge stops the run; the snapshots already computed are kept and
+the remaining ones are left at ``nan``.
 
 
 Boundary Conditions
@@ -263,5 +205,5 @@ The matrix and vector :eq:`eq:matrix_bc` are used for the static resolution. For
 we thus derivate with respect to time :eq:`eq:bc` obtaining the same matrix :math:`A` than :eq:`eq:matrix_bc`, since :math:`\frac{\partial y}{\partial t} = v`,  and the vector :math:`b` contains the time derivative of 
 :math:`d_i(t) \forall i \in \left\{1,2,3,4\right\}`. 
 
-Thus when using the method :code:`solve_dynamic` the user should set the attribute :code:`dynamic_values` with :math:`\frac{\partial d_i}{\partial t} \forall i \in \left\{1,2,3,4\right\}` 
+Thus when using :func:`~slenderpy.future.beam.dynamic.solve_dynamic` the user should set :code:`dynamic_values` with :math:`\frac{\partial d_i}{\partial t} \forall i \in \left\{1,2,3,4\right\}` 
 in the :class:`~slenderpy.future.boundary_condition.BoundaryCondition` constructor.

@@ -49,7 +49,9 @@ def _rainflow(turning_points):
     Four-point stack algorithm of the legacy counter (ASTM E1049-85): a range
     that holds the first point of the stack is a half cycle, any other closed
     range a full cycle, and the ranges left on the stack at the end are half
-    cycles. Zero ranges are skipped.
+    cycles. On the output of :func:`_compress`, which collapses repeated
+    samples, a zero range cannot occur; zero ranges are still skipped, as a
+    guard for direct calls.
 
     Parameters
     ----------
