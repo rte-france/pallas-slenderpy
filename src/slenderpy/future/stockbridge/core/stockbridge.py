@@ -1,6 +1,6 @@
 import numpy as np
 
-from slenderpy import simtools
+from slenderpy.future import simulation
 
 from .clamp import Clamp
 from .mass import Mass
@@ -90,7 +90,7 @@ class Stockbridge:
 
 
 class Result:
-    """Results of a stockbridge simulation, stored in :class:`simtools.Results` objects for the right mass, left mass and clamp."""
+    """Results of a stockbridge simulation, stored in :class:`slenderpy.future.simulation.Results` objects for the right mass, left mass and clamp."""
 
     def __init__(self, stockbridge: Stockbridge, time_vector: np.ndarray) -> None:
         """Init with args.
@@ -102,21 +102,21 @@ class Result:
         time_vector : np.ndarray
             The time vector for the simulation.
         """
-        self.right = simtools.Results(
+        self.right = simulation.Results(
             lot=time_vector,
             lov=stockbridge.mass_right.var_name,
             lov_dims=stockbridge.mass_right.var_dim,
             los=np.linspace(0, 1, stockbridge.nr),
         )
 
-        self.left = simtools.Results(
+        self.left = simulation.Results(
             lot=time_vector,
             lov=stockbridge.mass_left.var_name,
             lov_dims=stockbridge.mass_left.var_dim,
             los=np.linspace(0, 1, stockbridge.nl),
         )
 
-        self.general = simtools.Results(
+        self.general = simulation.Results(
             lot=time_vector,
             lov=stockbridge.clamp.var_name,
             lov_dims=stockbridge.clamp.var_dim,

@@ -50,8 +50,12 @@ def solve_dynamic_with_sb(
         Initial position of the beam.
     initial_velocity : np.ndarray
         Initial velocity of the beam.
-    force : np.ndarray
-        External force acting on the beam.
+    force : callable, optional
+        ``force(x, t, y, z, vy, vz) -> (fy, fz)``, the interface of
+        :mod:`slenderpy.future.force.core`, as for
+        :func:`slenderpy.future.beam.dynamic.solve_dynamic`: the beam is
+        planar, it is called with ``y = vy = 0`` and only ``fz`` (N/m, may be
+        a scalar) is used. Default a null force.
     approx_curvature : bool
         Whether to use an approximation for the curvature.
     initial_bending_moment : Optional[np.ndarray], optional
@@ -67,8 +71,11 @@ def solve_dynamic_with_sb(
 
     Returns
     -------
-    tuple[simtools.Results, dict[str, Result]]
-        The first element is a simtools.Results object containing the results for the beam, and the second element is a dictionary of Result objects for each stockbridge damper.
+    tuple[simulation.Results, dict[str, Result]]
+        The beam results, with the variables of
+        :func:`slenderpy.future.beam.dynamic.solve_dynamic` (``z``, ``vz``,
+        ``curvature``, ``moment``, ``eta``, ``n_iter``), and a dictionary of
+        Result objects for each stockbridge damper.
     """
     model = BendingModel(model)
 
@@ -80,7 +87,7 @@ def solve_dynamic_with_sb(
     # discretisation
     ns = parameters.ns
     ds = span.length / (ns - 1)
-    dt = (parameters.tf - parameters.t0) / parameters.nt
+    dt = parameters.dt
     dt2 = 0.5 * dt
     x = np.linspace(0.0, span.length, ns)
     bc = span.boundary_conditions
@@ -126,8 +133,14 @@ def solve_dynamic_with_sb(
 
     if force is None:
 
-        def force(x, t, y, v):
-            return np.zeros_like(x)
+        def force(x, t, y, z, vy, vz):
+            return 0.0, 0.0
+
+    # the beam is planar: y and vy are zero, only fz is used
+    zeros = np.zeros(ns)
+
+    def vertical_force(t, z, vz):
+        return zeros + force(x, t, zeros, z, zeros, vz)[1]
 
     # initial state
     if initial_velocity is None:
@@ -136,7 +149,7 @@ def solve_dynamic_with_sb(
         initial_position = shape.solve(
             conductor,
             span,
-            force(x, parameters.t0, np.zeros(ns), np.zeros(ns)),
+            vertical_force(parameters.t0, zeros, zeros),
             ns,
             model=model,
             ei=ei,
@@ -156,7 +169,7 @@ def solve_dynamic_with_sb(
     eta_old = law.initial_eta(initial_bending_moment, chi_old)
 
     # output
-    lov = ["y", "v", "c", "M", "eta", "n_iter"]  # TODO ajouter energies
+    lov = ["z", "vz", "curvature", "moment", "eta", "n_iter"]  # TODO ajouter energies
     lot = parameters.time_vector_output().tolist()
     res_cable = simulation.Results(
         lot=lot,
@@ -234,9 +247,9 @@ def solve_dynamic_with_sb(
         force_sb_new[id_pos_stockbridge - 1] += -0.25 * 2 * force_clamp / d
 
         load = (
-            force(x, t_old, y_old, v_old)
+            vertical_force(t_old, y_old, v_old)
             + force_sb_old
-            + force(x, t_new, y_old, v_old)
+            + vertical_force(t_new, y_old, v_old)
             + force_sb_new
         )
         rhs_bc = (
@@ -302,11 +315,11 @@ def solve_dynamic_with_sb(
                 # giving up: only max_iter ends the iteration.
                 relaxation = 1.0
                 trial = step_state(v_new + increment)
-                while np.abs(trial[3]).max() >= error and relaxation > _MIN_RELAXATION:
+                while np.abs(trial[-1]).max() >= error and relaxation > _MIN_RELAXATION:
                     relaxation *= 0.5
                     trial = step_state(v_new + relaxation * increment)
 
-                if np.abs(trial[3]).max() >= error:
+                if np.abs(trial[-1]).max() >= error:
                     relaxation = 1.0
                     trial = step_state(v_new + increment)
 
@@ -328,7 +341,7 @@ def solve_dynamic_with_sb(
         # This acceleration is passed back to the stockbridge model.
         bending_moment = law.dynamic_moment(chi_new, eta_new)
         acc_clamp_new = (
-            force(x, t_new, y_old, v_old)[id_pos_stockbridge]
+            vertical_force(t_new, y_old, v_old)[id_pos_stockbridge]
             + force_sb_new[id_pos_stockbridge]
             + span.tension * (D2 @ y_new)[id_pos_stockbridge]
             - (D2 @ bending_moment)[id_pos_stockbridge]
@@ -425,10 +438,10 @@ def solve_dynamic_with_sb(
     if converged:
         res_cable.set_state(
             {
-                "y": y_old,
-                "v": v_old,
-                "c": chi_old,
-                "M": law.dynamic_moment(chi_old, eta_old),
+                "z": y_old,
+                "vz": v_old,
+                "curvature": chi_old,
+                "moment": law.dynamic_moment(chi_old, eta_old),
                 "eta": eta_old,
             }
         )
