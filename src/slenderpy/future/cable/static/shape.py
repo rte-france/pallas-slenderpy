@@ -10,8 +10,13 @@ same grid, uniform in arc length::
 
 with ``e`` the uniform strain, the integral over the cable of
 ``-un / vt2 + (1/2)(un_s^2 + ub_s^2)``. For a fixed ``e`` both equations are
-linear, so the problem reduces to the scalar equation ``e = E(un(e), ub(e))``,
-solved by secant.
+linear, so the problem reduces to the scalar equation ``e = E(un(e), ub(e))``.
+Its residual tends to ``+inf`` as the tension ``b(e)`` vanishes and to ``-inf``
+for a large ``e``, so a root is bracketed on the tensioned side and found with
+Brent's method.
+
+The small-displacement model cannot detect a slack cable: a load lifting the
+whole weight still gives a tensioned, nearly slack shape.
 
 The load comes on top of the weight, which is part of the model, as for the
 ``force`` of :func:`slenderpy.future.cable.dynamic.solve`: no load gives the
@@ -22,7 +27,7 @@ from __future__ import annotations
 
 import numpy as np
 from scipy.linalg import solve_banded
-from scipy.optimize import root_scalar
+from scipy.optimize import brentq
 
 from slenderpy.future._constant import _GRAVITY
 from slenderpy.future.cable import _model
@@ -55,10 +60,11 @@ def solve(
     ns : int
         Number of nodes, evenly spaced along the cable, at least 3.
     tol : float, optional
-        Convergence threshold on the strain residual, relative to
-        ``max(|e|, vt2 / vl2)``. Default 1e-12.
+        Convergence threshold on the strain, relative to ``vt2 / vl2`` (the
+        strain that would release the whole tension). Default 1e-12.
     max_iter : int, optional
-        Maximum number of secant iterations. Default 64.
+        Maximum number of iterations of the root finder, and of the doublings
+        of the upper bracket. Default 64.
 
     Returns
     -------
@@ -66,8 +72,8 @@ def solve(
         Global position of the nodes, shape ``(3, ns)``, rows ``x``, ``y``,
         ``z``, ready to pass as ``initial_position`` to
         :func:`slenderpy.future.cable.dynamic.solve`. All nan when the solve
-        fails: no convergence, a non-finite state, or a compressed cable
-        (``b(e) <= 0`` at the root, e.g. an upward load equal to the weight).
+        fails: a non-finite load or state, or no convergence. The model cannot
+        detect a slack cable (see the module docstring).
 
     Raises
     ------
@@ -113,28 +119,40 @@ def solve(
         h = -un / vt2 + 0.5 * ((first @ un) ** 2 + (first @ ub) ** 2)
         return 0.5 * np.sum((h[:-1] + h[1:]) * geom.ds) - strain
 
-    try:
-        root = root_scalar(
-            residual,
-            x0=0.0,
-            x1=1.0e-06 * scale,
-            method="secant",
-            xtol=tol * scale,
-            rtol=tol,
-            maxiter=max_iter,
-        )
-        strain = root.root
-        error = abs(residual(strain))  # also leaves (un, ub) at the root
-    except (np.linalg.LinAlgError, ValueError, ZeroDivisionError):
+    if not (np.all(np.isfinite(fn)) and np.all(np.isfinite(fb))):
         return failed
 
-    if (
-        not root.converged
-        or not np.isfinite(strain)
-        or error > tol * max(abs(strain), scale)
-        or vt2 + vl2 * strain <= 0.0
-        or not (np.all(np.isfinite(un)) and np.all(np.isfinite(ub)))
-    ):
+    if not (np.any(fn[1:-1]) or np.any(fb[1:-1])):
+        # no load: the catenary itself, exactly
+        strain = 0.0
+    else:
+        # g(e) -> +inf as b(e) -> 0+, g(e) -> -inf as e -> +inf: bracket a root
+        # on the tensioned side, b(e) > 0
+        try:
+            low = -scale * (1.0 - 1.0e-09)
+            high = scale
+            for _ in range(max_iter):
+                if residual(high) < 0.0:
+                    break
+                high = 2.0 * high + scale
+            else:
+                return failed
+            strain, report = brentq(
+                residual,
+                low,
+                high,
+                xtol=tol * scale,
+                maxiter=max_iter,
+                full_output=True,
+                disp=False,
+            )
+        except (np.linalg.LinAlgError, ValueError):
+            return failed
+        if not report.converged:
+            return failed
+
+    residual(strain)  # leaves (un, ub) at the root
+    if not (np.all(np.isfinite(un)) and np.all(np.isfinite(ub))):
         return failed
 
     ut, _ = _model._stretching(un, ub, first, geom.ds, vt2)

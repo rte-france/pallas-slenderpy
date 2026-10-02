@@ -215,8 +215,9 @@ def solve(
         initial_position = shape.solve(conductor, span, fy0, fz0, ns)
         if not np.all(np.isfinite(initial_position)):
             raise ValueError(
-                "no static shape under the force at t0 (the cable would be "
-                "compressed or the solve did not converge): pass initial_position"
+                "no static shape under the force at t0 (non-finite load, or "
+                "the static solve did not converge): pass initial_position, "
+                "e.g. from cable.static.shape.solve with another tol or max_iter"
             )
     else:
         initial_position = _check_position(initial_position, geom, span)
