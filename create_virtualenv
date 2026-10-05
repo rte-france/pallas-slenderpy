@@ -16,7 +16,7 @@ python3 -m pip install --upgrade pip
 
 # -- install local package
 rm -rf build
-pip install .[examples,dev]
+pip install .[dev]
 
 # -- end text
 echo "---"

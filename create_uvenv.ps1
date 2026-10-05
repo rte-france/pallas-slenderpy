@@ -37,7 +37,7 @@ uv pip install --upgrade pip
 
 # -- install local package
 if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
-uv pip install .[examples,dev]
+uv pip install .[dev]
 
 # -- end text
 Write-Host "---"
