@@ -117,7 +117,8 @@ class PointExcitation(Force):
     amplitude
         Amplitude (N); positive goes up first.
     position
-        Horizontal distance from support 1 (m).
+        Horizontal distance from support 1 (m), at most the span length;
+        checked when the force is evaluated, since the span is not known here.
     t_start
         Start of the excitation (s).
     t_end
@@ -145,6 +146,11 @@ class PointExcitation(Force):
 
     def __call__(self, x, t, y, z, vy, vz):
         x = np.asarray(x, dtype=float)
+        # relative margin for the round-off of the last node position
+        if self.position > x[-1] * (1.0 + 1.0e-12):
+            raise ValueError(
+                f"position ({self.position}) is past the span end ({x[-1]})"
+            )
         fz = np.zeros_like(x)
         if self.t_start <= t <= self.t_end:
             node = int(np.argmin(np.abs(x - self.position)))

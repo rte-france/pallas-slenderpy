@@ -69,7 +69,7 @@ def test_point_excitation_is_off_outside_its_window():
     assert np.any(_call(force, t=1.25)[1] != 0.0)
 
 
-@pytest.mark.parametrize("position, node", [(0.0, 1), (10.0, 9), (25.0, 9)])
+@pytest.mark.parametrize("position, node", [(0.0, 1), (10.0, 9)])
 def test_point_excitation_never_on_a_support(position, node):
     force = PointExcitation(frequency=1.0, amplitude=1.0, position=position)
     _, fz = _call(force, t=0.25)
@@ -103,3 +103,13 @@ def test_point_excitation_picks_the_nearest_node():
 def test_invalid_inputs_raise(factory):
     with pytest.raises(ValueError):
         factory()
+
+
+def test_point_excitation_past_the_span_raises():
+    with pytest.raises(ValueError, match="past the span end"):
+        _call(PointExcitation(frequency=1.0, amplitude=1.0, position=10.5))
+
+
+def test_point_excitation_at_the_span_end_is_accepted():
+    _, fz = _call(PointExcitation(frequency=1.0, amplitude=1.0, position=10.0), t=0.1)
+    assert np.count_nonzero(fz) == 1
