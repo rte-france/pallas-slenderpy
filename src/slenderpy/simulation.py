@@ -278,11 +278,13 @@ class Results:
     def update(self, k, s, lov, lod):
         """Record a snapshot. Internal or expert use only."""
         los = self.los()
+        # write into the numpy arrays: xarray item assignment is about ten
+        # times slower and is called at every output step
         for i, v in enumerate(lov):
             if self.lov_dims[v] == 2:
-                self.data[v][k, :] = np.interp(los, s, lod[i])
+                self.data[v].values[k, :] = np.interp(los, s, lod[i])
             else:
-                self.data[v][k] = lod[i]
+                self.data[v].values[k] = lod[i]
 
     def __getitem__(self, key):
         return self.data[key]
@@ -333,6 +335,8 @@ class Results:
         """
         if lov is not None:
             self.data = self.data.drop_vars(lov)
+            for v in lov:
+                del self.lov_dims[v]
 
         aot = np.array(self.lot())
         ttk = np.where((aot >= tmin) & (aot <= tmax))[0].tolist()

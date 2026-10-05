@@ -477,3 +477,37 @@ def test_multiplot_keeps_negative_times_by_default():
     res.data["a"][:] = [1.0, 2.0, 3.0, 4.0]
     _, ax = multiplot(res)
     assert ax[0, 0].get_lines()[0].get_xdata() == pytest.approx([-2.0, -1.0, 0.0, 1.0])
+
+
+def test_results_drop_variable_keeps_multiplot_working():
+    res = _filled_results()
+    res.drop(lov=["scalar"])
+    assert list(res.lov_dims) == ["vector"]
+    _, ax = multiplot(res)
+    assert ax.shape[0] == 1
+
+
+def test_results_to_netcdf_roundtrip():
+    import xarray as xr
+
+    res = _filled_results()
+    data = xr.load_dataset(res.to_netcdf())
+    assert np.array_equal(data["vector"].values, res["vector"].values)
+
+
+@pytest.mark.parametrize(
+    "other",
+    [
+        Results(lot=[0.0, 1.0], lov=["scalar", "vector"], lov_dims=[1, 2], los=[0.5]),
+        Results(
+            lot=[0.0, 1.0],
+            lov=["scalar", "vector"],
+            lov_dims=[2, 2],
+            los=[0.25, 0.5, 0.75],
+        ),
+    ],
+    ids=["positions", "dimensions"],
+)
+def test_multiplot_results_must_match_positions_and_dimensions(other):
+    with pytest.raises(ValueError):
+        multiplot([_filled_results(), other])

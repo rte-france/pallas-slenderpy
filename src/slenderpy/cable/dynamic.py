@@ -23,7 +23,7 @@ from __future__ import annotations
 import warnings
 
 import numpy as np
-from scipy.linalg import solve_banded
+from scipy.linalg import lapack
 
 import slenderpy.simulation as simulation
 from slenderpy import _progress_bar as spb
@@ -76,7 +76,7 @@ def equilibrium(
     return geom.x, np.zeros_like(geom.x), geom.z
 
 
-def _check_position(position: np.ndarray, geom: _Geometry, span: Span) -> np.ndarray:
+def _check_position(position: np.ndarray, geom: _Geometry) -> np.ndarray:
     """Validate a (3, ns) global array and return it as floats."""
     ns = len(geom.s)
     array = np.asarray(position, dtype=float)
@@ -219,7 +219,7 @@ def solve(
                 "e.g. from cable.static.shape.solve with another tol or max_iter"
             )
     else:
-        initial_position = _check_position(initial_position, geom, span)
+        initial_position = _check_position(initial_position, geom)
         ends = initial_position[:, [0, -1]] - geom.equilibrium()[:, [0, -1]]
         if np.abs(ends).max() > _END_TOLERANCE * span.length:
             raise ValueError(
@@ -227,7 +227,7 @@ def solve(
                 f"(largest offset {np.abs(ends).max():.3e} m)"
             )
     if initial_velocity is not None:
-        initial_velocity = _check_position(initial_velocity, geom, span)
+        initial_velocity = _check_position(initial_velocity, geom)
 
     un, ub, vn, vb = _to_local(initial_position, initial_velocity, geom)
     un, ub = un / length, ub / length
@@ -236,9 +236,12 @@ def solve(
     un[0], un[-1], ub[0], ub[-1] = 0.0, 0.0, 0.0, 0.0
     vn[0], vn[-1], vb[0], vb[-1] = 0.0, 0.0, 0.0, 0.0
 
-    ds = geom.ds
     first, second = _operators(ns)
-    ut, dtension = _stretching(un, ub, first, ds, vt2)
+    ut, dtension, strain = _stretching(un, ub, first, geom, vt2)
+    # second scaled by dt * wave, updated in place at each step
+    scaled = second.copy()
+    lower, diagonal, upper = (second.diagonal(k=k) for k in (-1, 0, 1))
+    min_ds = np.min(geom.ds)
 
     dt = parameters.dt / time_scale
     ht = 0.5 * dt
@@ -275,17 +278,15 @@ def solve(
     res.start_timer()
     snapshot(0, ut, un, ub, dtension)
 
-    banded = np.zeros((3, ns - 2))
     t = parameters.t0 / time_scale
     warned = False
 
     pb = spb.generate(parameters.pp, parameters.nt, desc=__name__)
     for step in range(parameters.nt):
-        h = -un / vt2 + 0.5 * ((first * un) ** 2 + (first * ub) ** 2)
-        strain = 0.5 * np.sum((h[:-1] + h[1:]) * ds)
+        # strain is the one _stretching computed at the end of the last step
         wave = vt2 + vl2 * strain
 
-        cfl = np.sqrt(wave) * dt / np.min(ds)
+        cfl = np.sqrt(wave) * dt / min_ds
         if cfl > 1.0 and not warned:
             warnings.warn(
                 f"CFL number is {cfl:.3e} > 1 at step {step + 1}: increase the "
@@ -300,23 +301,28 @@ def solve(
         fn1, fb1 = local_force(t * time_scale, position, velocity)
         fn2, fb2 = local_force((t + dt) * time_scale, position, velocity)
 
+        scaled.data[:] = (dt * wave) * second.data
         rhs_n = (
-            (dt * wave) * second * (un[1:-1] + 0.5 * ht * vn[1:-1])
+            scaled @ (un[1:-1] + 0.5 * ht * vn[1:-1])
             + (1.0 + damping) * vn[1:-1]
             + dt * (0.5 * (fn1[1:-1] + fn2[1:-1]) + vl2 / vt2 * strain)
         )
         rhs_b = (
-            (dt * wave) * second * (ub[1:-1] + 0.5 * ht * vb[1:-1])
+            scaled @ (ub[1:-1] + 0.5 * ht * vb[1:-1])
             + (1.0 + damping) * vb[1:-1]
             + ht * (fb1[1:-1] + fb2[1:-1])
         )
 
+        # tridiagonal solve, the lapack routine solve_banded calls for (1, 1)
         tau = -(ht**2) * wave
-        banded[0, 1:] = tau * second.diagonal(k=1)
-        banded[1, :] = 1.0 - damping + tau * second.diagonal(k=0)
-        banded[2, :-1] = tau * second.diagonal(k=-1)
-
-        speed = solve_banded((1, 1), banded, np.column_stack((rhs_n, rhs_b)))
+        *_, speed, info = lapack.dgtsv(
+            tau * lower,
+            1.0 - damping + tau * diagonal,
+            tau * upper,
+            np.column_stack((rhs_n, rhs_b)),
+        )
+        if info != 0:
+            raise np.linalg.LinAlgError("singular matrix")
 
         un[1:-1] += ht * (vn[1:-1] + speed[:, 0])
         ub[1:-1] += ht * (vb[1:-1] + speed[:, 1])
@@ -324,7 +330,7 @@ def solve(
         vb[1:-1] = speed[:, 1]
         t += dt
 
-        ut, dtension = _stretching(un, ub, first, ds, vt2)
+        ut, dtension, strain = _stretching(un, ub, first, geom, vt2)
 
         if (step + 1) % parameters.rr == 0:
             snapshot((step + 1) // parameters.rr, ut, un, ub, dtension)
