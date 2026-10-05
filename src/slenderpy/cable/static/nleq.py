@@ -3,7 +3,6 @@
 from typing import Union
 
 import numpy as np
-from pyntb.optimize import qnewt2d_v
 
 from slenderpy import floatArrayLike
 from slenderpy._constant import _GRAVITY
@@ -11,16 +10,74 @@ from slenderpy.cable.static import blondel
 from slenderpy.cable.static.parabolic import _f
 
 _RTOL = 1.0e-12
-_MAXITER = 16
+_MAXITER = 64
+
+# relative step of the centered finite differences of the newton jacobian
+_FD_STEP = 1.0e-06
+# halvings of a newton step tried before giving up on a case
+_MAX_HALVINGS = 30
 
 
-def _msg(name, c, e):
+def _msg(name, err, rtol):
     """Print msg when convergence fails."""
     print(
-        f"{name} : max count is {np.max(c)}, "
-        f"log10 max err is {np.log10(np.max(e)):.2f}"
+        f"{name} : {np.count_nonzero(~(err <= rtol))} case(s) did not "
+        f"converge, log10 max residual is {np.log10(np.nanmax(err)):.2f}"
     )
-    return
+
+
+def _newton2d(fun1, fun2, x, y, scale, valid, rtol, maxiter):
+    """Damped newton on the system [fun1(x, y), fun2(x, y)] = [0, 0], per case.
+
+    The jacobian is estimated with centered finite differences. Each step is
+    halved until it decreases the residual norm and keeps ``valid(x)`` true; a
+    case stops once ``max(|fun1|, |fun2|) <= rtol * scale``, so converged cases
+    are left untouched while others iterate.
+
+    Returns the solution and the final residual relative to ``scale``.
+    """
+    x, y, scale = np.broadcast_arrays(
+        np.asarray(x, dtype=float), np.asarray(y, dtype=float), scale
+    )
+    x, y = x.copy(), y.copy()
+    f1, f2 = fun1(x, y), fun2(x, y)
+    err = np.maximum(np.abs(f1), np.abs(f2)) / scale
+
+    for _ in range(maxiter):
+        active = err > rtol
+        if not active.any():
+            break
+
+        hx = _FD_STEP * np.maximum(np.abs(x), 1.0)
+        hy = _FD_STEP * np.maximum(np.abs(y), 1.0)
+        a = (fun1(x + hx, y) - fun1(x - hx, y)) / (2.0 * hx)
+        b = (fun1(x, y + hy) - fun1(x, y - hy)) / (2.0 * hy)
+        c = (fun2(x + hx, y) - fun2(x - hx, y)) / (2.0 * hx)
+        d = (fun2(x, y + hy) - fun2(x, y - hy)) / (2.0 * hy)
+        det = a * d - b * c
+        dx = (d * f1 - b * f2) / det
+        dy = (a * f2 - c * f1) / det
+
+        # backtrack, case by case, until the step decreases the residual
+        norm = np.hypot(f1, f2)
+        relaxation = np.ones_like(x)
+        for _ in range(_MAX_HALVINGS):
+            x_new = x - relaxation * dx
+            y_new = y - relaxation * dy
+            g1, g2 = fun1(x_new, y_new), fun2(x_new, y_new)
+            accepted = (np.hypot(g1, g2) < norm) & valid(x_new)
+            if np.all(accepted | ~active):
+                break
+            relaxation = np.where(accepted, relaxation, 0.5 * relaxation)
+
+        update = active & accepted
+        x = np.where(update, x_new, x)
+        y = np.where(update, y_new, y)
+        f1 = np.where(update, g1, f1)
+        f2 = np.where(update, g2, f2)
+        err = np.maximum(np.abs(f1), np.abs(f2)) / scale
+
+    return x, y, err
 
 
 def _xpos(s, tension, linw, axs, lve):
@@ -45,7 +102,8 @@ def _xpos(s, tension, linw, axs, lve):
 
     Returns
     -------
-    Horizontal position (m)
+    float or array
+        Horizontal position (m).
 
     """
     return (tension * s / axs) + (tension / linw) * (
@@ -75,7 +133,8 @@ def _ypos(s, tension, linw, axs, lve):
 
     Returns
     -------
-    Vertical position (m)
+    float or array
+        Vertical position (m).
 
     """
     return (s / axs) * (lve - 0.5 * linw * s) + (tension / linw) * (
@@ -91,16 +150,16 @@ def solve(
     linm: floatArrayLike,
     axs: floatArrayLike,
     g: floatArrayLike = _GRAVITY,
-    rtol: int = _RTOL,
+    rtol: float = _RTOL,
     maxiter: int = _MAXITER,
 ) -> floatArrayLike:
-    """Solve cable equilibrium with quasi-newton.
+    """Solve cable equilibrium with a damped newton.
 
     From Pierre Latteur, "Calculer une structure : de la théorie à l'exemple",
     Bruylant, 2006. Chap. 13, paragraph 7. See
     https://www.issd.be/PDF/13_Chap13_6Juillet2006.pdf.
 
-    Here we solve the equation system [1-2] with a quasi-newton algorithm.
+    Here we solve the equation system [1-2] with a damped newton algorithm.
 
     If more than one arg is an array, they must have the same size (no check).
 
@@ -119,16 +178,17 @@ def solve(
     g
         Gravitational acceleration (m.s**-2).
     rtol
-        Relative tolerance for quasi-newton algorithm.
+        Tolerance on the equilibrium residuals, relative to the span length.
     maxiter
-        Maximum number of iterations in quasi-newton algorithm.
+        Maximum number of newton iterations.
 
     Returns
     -------
-    lcab: cable length before applying load (m)
-    lve: left vertical effort (N)
-
-    Return arrays have the same size as the given inputs.
+    lcab : float or array
+        Cable length before applying load (m). Same shape as the broadcast
+        inputs.
+    lve : float or array
+        Left vertical effort (N). Same shape as ``lcab``.
 
     """
 
@@ -139,19 +199,19 @@ def solve(
     lg = np.sqrt(lspan**2 + sld**2)
     rg = 0.5 * linw * lg
 
-    # functions in quasi-newton (equilibrium equation to zero)
+    # functions in newton (equilibrium equation to zero)
     def fun1(l_, r_):
         return lspan - _xpos(l_, tension, linw, axs, r_)
 
     def fun2(l_, r_):
         return sld - _ypos(l_, tension, linw, axs, r_)
 
-    # solve
-    lcab, lve, c, e = qnewt2d_v(fun1, fun2, lg, rg, rtol=rtol, maxiter=maxiter)
-
-    # print if problem
-    if np.max(c) >= maxiter or np.max(e) >= rtol:
-        _msg("solve", c, e)
+    # solve; the cable length stays positive
+    lcab, lve, err = _newton2d(
+        fun1, fun2, lg, rg, lspan, lambda l_: l_ > 0.0, rtol, maxiter
+    )
+    if not np.all(err <= rtol):
+        _msg("solve", err, rtol)
 
     return lcab, lve
 
@@ -166,8 +226,8 @@ def shape(
     lcab=None,
     lve=None,
     g: floatArrayLike = _GRAVITY,
-    rtol=_RTOL,
-    maxiter=_MAXITER,
+    rtol: float = _RTOL,
+    maxiter: int = _MAXITER,
 ) -> floatArrayLike:
     """Cable position at equilibrium.
 
@@ -192,21 +252,24 @@ def shape(
         Linear mass (kg.m**-1).
     axs
         Axial stiffness (N).
-    lcab: cable length before applying load (m)
-    lve: left vertical effort (N)
+    lcab
+        Cable length before applying load (m), from `solve`.
+    lve
+        Left vertical effort (N), from `solve`.
     g
         Gravitational acceleration (m.s**-2).
     rtol
-        Relative tolerance for quasi-newton algorithm.
+        Tolerance on the equilibrium residuals, relative to the span length.
     maxiter
-        Maximum number of iterations in quasi-newton algorithm.
+        Maximum number of newton iterations.
 
     Returns
     -------
-    x : Horizontal position (m)
-    y : Vertical position (m)
-
-    Return arrays have the same size as the given inputs.
+    x : float or array
+        Horizontal position (m). Same shape as ``s`` broadcast with the other
+        inputs.
+    y : float or array
+        Vertical position (m). Same shape as ``x``.
 
     """
     if lcab is None or lve is None:
@@ -233,7 +296,7 @@ def stress(
     lcab=None,
     lve=None,
     g: floatArrayLike = _GRAVITY,
-    rtol: int = _RTOL,
+    rtol: float = _RTOL,
     maxiter: int = _MAXITER,
 ):
     """Stress in cable when moving along curvilinear abscissa.
@@ -263,18 +326,22 @@ def stress(
         Linear mass (kg.m**-1).
     axs
         Axial stiffness (N).
-    lcab: cable length before applying load (m)
-    lve: left vertical effort (N)
+    lcab
+        Cable length before applying load (m), from `solve`.
+    lve
+        Left vertical effort (N), from `solve`.
     g
         Gravitational acceleration (m.s**-2).
     rtol
-        Relative tolerance for quasi-newton algorithm.
+        Tolerance on the equilibrium residuals, relative to the span length.
     maxiter
-        Maximum number of iterations in quasi-newton algorithm.
+        Maximum number of newton iterations.
 
     Returns
     -------
-    Stress along cable (N). Return arrays have the same size as the given inputs.
+    float or array
+        Stress along cable (N). Same shape as ``s`` broadcast with the other
+        inputs.
 
     """
     if lcab is None or lve is None:
@@ -299,7 +366,7 @@ def mean_stress(
     lcab=None,
     lve=None,
     g: floatArrayLike = _GRAVITY,
-    rtol: int = _RTOL,
+    rtol: float = _RTOL,
     maxiter: int = _MAXITER,
 ):
     """Average stress in cable.
@@ -318,18 +385,21 @@ def mean_stress(
         Linear mass (kg.m**-1).
     axs
         Axial stiffness (N).
-    lcab: cable length before applying load (m)
-    lve: left vertical effort (N)
+    lcab
+        Cable length before applying load (m), from `solve`.
+    lve
+        Left vertical effort (N), from `solve`.
     g
         Gravitational acceleration (m.s**-2).
     rtol
-        Relative tolerance for quasi-newton algorithm.
+        Tolerance on the equilibrium residuals, relative to the span length.
     maxiter
-        Maximum number of iterations in quasi-newton algorithm.
+        Maximum number of newton iterations.
 
     Returns
     -------
-    Average stress (N). Return array has the same size as the given inputs.
+    float or array
+        Average stress (N). Same shape as the broadcast inputs.
 
     """
     if lcab is None or lve is None:
@@ -351,7 +421,7 @@ def length(
     lcab=None,
     lve=None,
     g: floatArrayLike = _GRAVITY,
-    rtol: int = _RTOL,
+    rtol: float = _RTOL,
     maxiter: int = _MAXITER,
 ):
     """Cable length (after applying load).
@@ -370,18 +440,21 @@ def length(
         Linear mass (kg.m**-1).
     axs
         Axial stiffness (N).
-    lcab: cable length before applying load (m)
-    lve: left vertical effort (N)
+    lcab
+        Cable length before applying load (m), from `solve`.
+    lve
+        Left vertical effort (N), from `solve`.
     g
         Gravitational acceleration (m.s**-2).
     rtol
-        Relative tolerance for quasi-newton algorithm.
+        Tolerance on the equilibrium residuals, relative to the span length.
     maxiter
-        Maximum number of iterations in quasi-newton algorithm.
+        Maximum number of newton iterations.
 
     Returns
     -------
-    Cable length (m). Return array has the same size as the given inputs.
+    float or array
+        Cable length (m). Same shape as the broadcast inputs.
 
     """
     if lcab is None or lve is None:
@@ -412,7 +485,7 @@ def argsag(
     lcab=None,
     lve=None,
     g: floatArrayLike = _GRAVITY,
-    rtol: int = _RTOL,
+    rtol: float = _RTOL,
     maxiter: int = _MAXITER,
 ) -> floatArrayLike:
     """Find curvilinear abscissa where sag occurs.
@@ -434,18 +507,21 @@ def argsag(
         Linear mass (kg.m**-1).
     axs
         Axial stiffness (N).
-    lcab: cable length before applying load (m)
-    lve: left vertical effort (N)
+    lcab
+        Cable length before applying load (m), from `solve`.
+    lve
+        Left vertical effort (N), from `solve`.
     g
         Gravitational acceleration (m.s**-2).
     rtol
-        Relative tolerance for quasi-newton algorithm.
+        Tolerance on the equilibrium residuals, relative to the span length.
     maxiter
-        Maximum number of iterations in quasi-newton algorithm.
+        Maximum number of newton iterations.
 
     Returns
     -------
-    Curvilinear abscissa where sag occurs (m)
+    float or array
+        Curvilinear abscissa where sag occurs (m). Same shape as the broadcast inputs.
 
     """
     if lcab is None or lve is None:
@@ -465,7 +541,7 @@ def sag(
     lcab=None,
     lve=None,
     g: floatArrayLike = _GRAVITY,
-    rtol: int = _RTOL,
+    rtol: float = _RTOL,
     maxiter: int = _MAXITER,
 ) -> floatArrayLike:
     """Compute sag given a suspended cable characteristics.
@@ -492,19 +568,21 @@ def sag(
         Linear mass (kg.m**-1).
     axs
         Axial stiffness (N).
-    lcab: cable length before applying load (m)
-    lve: left vertical effort (N)
+    lcab
+        Cable length before applying load (m), from `solve`.
+    lve
+        Left vertical effort (N), from `solve`.
     g
         Gravitational acceleration (m.s**-2).
     rtol
-        Relative tolerance for quasi-newton algorithm.
+        Tolerance on the equilibrium residuals, relative to the span length.
     maxiter
-        Maximum number of iterations in quasi-newton algorithm.
+        Maximum number of newton iterations.
 
     Returns
     -------
-    Cable sag at equilibrium (m). Return array has the same size as the given
-    inputs.
+    float or array
+        Cable sag at equilibrium (m). Same shape as the broadcast inputs.
 
     """
 
@@ -546,7 +624,7 @@ def max_chord(
     lcab=None,
     lve=None,
     g: floatArrayLike = _GRAVITY,
-    rtol: int = _RTOL,
+    rtol: float = _RTOL,
     maxiter: int = _MAXITER,
 ) -> floatArrayLike:
     """Maximum value taken by chord length.
@@ -573,18 +651,21 @@ def max_chord(
         Linear mass (kg.m**-1).
     axs
         Axial stiffness (N).
-    lcab: cable length before applying load (m)
-    lve: left vertical effort (N)
+    lcab
+        Cable length before applying load (m), from `solve`.
+    lve
+        Left vertical effort (N), from `solve`.
     g
         Gravitational acceleration (m.s**-2).
     rtol
-        Relative tolerance for quasi-newton algorithm.
+        Tolerance on the equilibrium residuals, relative to the span length.
     maxiter
-        Maximum number of iterations in quasi-newton algorithm.
+        Maximum number of newton iterations.
 
     Returns
     -------
-    Max chord length (m). Return array has the same size as the given inputs.
+    float or array
+        Max chord length (m). Same shape as the broadcast inputs.
 
     """
 
@@ -613,7 +694,7 @@ def thermal_expansion_tension(
     axs: floatArrayLike,
     alpha: floatArrayLike,
     g: floatArrayLike = _GRAVITY,
-    rtol: int = _RTOL,
+    rtol: float = _RTOL,
     maxiter: int = _MAXITER,
 ):
     """Compute new tension with temperature change.
@@ -641,14 +722,15 @@ def thermal_expansion_tension(
     g
         Gravitational acceleration (m.s**-2).
     rtol
-        Relative tolerance for quasi-newton algorithm.
+        Tolerance on the equilibrium residuals, relative to the span length.
     maxiter
-        Maximum number of iterations in quasi-newton algorithm.
+        Maximum number of newton iterations.
 
     Returns
     -------
-    Mechanical tension in final state (N). Return array has the same size as
-    the given inputs.
+    float or array
+        Mechanical tension in final state (N), nan where the solver did not
+        converge. Same shape as the broadcast inputs.
 
     """
 
@@ -670,18 +752,20 @@ def thermal_expansion_tension(
     )
     rg = lve_i
 
-    # functions in quasi-newton (equilibrium equation to zero)
+    # functions in newton (equilibrium equation to zero)
     def fun1(t_, r_):
         return lspan - _xpos(lcab_f, t_, linw, axs, r_)
 
     def fun2(t_, r_):
         return sld - _ypos(lcab_f, t_, linw, axs, r_)
 
-    # solve
-    tension_f, _, c, e = qnewt2d_v(fun1, fun2, tg, rg, rtol=rtol, maxiter=maxiter)
-    if np.max(c) >= maxiter or np.max(e) >= rtol:
-        _msg("thermexp_tension", c, e)
-    tension_f[e > rtol] = np.nan
+    # solve; the tension stays positive
+    tension_f, _, err = _newton2d(
+        fun1, fun2, tg, rg, lspan, lambda t_: t_ > 0.0, rtol, maxiter
+    )
+    if not np.all(err <= rtol):
+        _msg("thermal_expansion_tension", err, rtol)
+    tension_f = np.where(err <= rtol, tension_f, np.nan)
 
     return tension_f
 
@@ -696,10 +780,10 @@ def thermal_expansion_temperature(
     axs: floatArrayLike,
     alpha: floatArrayLike,
     g: floatArrayLike = _GRAVITY,
-    rtol: int = _RTOL,
+    rtol: float = _RTOL,
     maxiter: int = _MAXITER,
 ):
-    """Inverse of thermexp_tension, ie compute new temperature with tension change.
+    """Inverse of thermal_expansion_tension: new temperature from a tension change.
 
     If more than one arg is an array, they must have the same size (no check).
 
@@ -724,14 +808,15 @@ def thermal_expansion_temperature(
     g
         Gravitational acceleration (m.s**-2).
     rtol
-        Relative tolerance for quasi-newton algorithm.
+        Tolerance on the equilibrium residuals, relative to the span length.
     maxiter
-        Maximum number of iterations in quasi-newton algorithm.
+        Maximum number of newton iterations.
 
     Returns
     -------
-    Mechanical tension in final state (N). Return array has the same size as
-    the given inputs.
+    float or array
+        Temperature in final state (K), nan where the solver did not converge.
+        Same shape as the broadcast inputs.
 
     """
 
@@ -746,7 +831,7 @@ def thermal_expansion_temperature(
     )
     rg = lve_i
 
-    # functions in quasi-newton (equilibrium equation to zero)
+    # functions in newton (equilibrium equation to zero)
     def fun1(t_, r_):
         lcab = lcab_i * (1.0 + alpha * (t_ - temperature_i))
         linw = -g / (1 / linm_i * (1.0 + alpha * (t_ - temperature_i)))
@@ -757,9 +842,13 @@ def thermal_expansion_temperature(
         linw = -g / (1 / linm_i * (1.0 + alpha * (t_ - temperature_i)))
         return sld - _ypos(lcab, tension_f, linw, axs, r_)
 
-    # solve
-    temperature_f, _, c, e = qnewt2d_v(fun1, fun2, tg, rg, rtol=rtol, maxiter=maxiter)
-    if np.max(c) >= maxiter or np.max(e) >= rtol:
-        _msg("thermexp_temperature", c, e)
+    # solve; the cable length stays positive
+    def valid(t_):
+        return 1.0 + alpha * (t_ - temperature_i) > 0.0
+
+    temperature_f, _, err = _newton2d(fun1, fun2, tg, rg, lspan, valid, rtol, maxiter)
+    if not np.all(err <= rtol):
+        _msg("thermal_expansion_temperature", err, rtol)
+    temperature_f = np.where(err <= rtol, temperature_f, np.nan)
 
     return temperature_f
