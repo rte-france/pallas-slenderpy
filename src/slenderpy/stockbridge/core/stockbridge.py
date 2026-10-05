@@ -170,8 +170,8 @@ class Result:
             self.sb.mass_left.var_name,
             [
                 *value_left[0:6],
-                value_left[6 : 6 + self.sb.nr],
-                value_left[6 + self.sb.nr :],
+                value_left[6 : 6 + self.sb.nl],
+                value_left[6 + self.sb.nl :],
             ],
         )
 
