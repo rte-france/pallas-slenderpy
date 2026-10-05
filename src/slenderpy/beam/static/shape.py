@@ -165,11 +165,14 @@ def solve(
     Raises
     ------
     ValueError
-        If boundary conditions are missing, ``rhs`` has the wrong length, or the
-        bending-stiffness parameters required by ``model`` are not set.
+        If boundary conditions are missing or not of order 4, ``rhs`` has the
+        wrong length, or the bending-stiffness parameters required by ``model``
+        are not set.
     """
     if span.boundary_conditions is None:
         raise ValueError("span.boundary_conditions is required for a beam solve")
+    if span.boundary_conditions.order != 4:
+        raise ValueError("a beam solve needs order-4 boundary conditions")
 
     rhs = np.asarray(rhs)
     if rhs.shape != (n,):

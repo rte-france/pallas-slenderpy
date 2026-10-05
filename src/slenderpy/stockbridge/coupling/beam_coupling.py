@@ -254,6 +254,8 @@ def solve_dynamic_with_sb(
     converged = True
     # curvature increment of the previous step, for the lagged branch
     dchi_old = np.zeros(ns)
+    # velocity of the step before, for the newton initial guess
+    v_prev = v_old
 
     force_sb_old = np.zeros(ns)
     # time iteration
@@ -314,8 +316,12 @@ def solve_dynamic_with_sb(
                 return y, chi, dchi, eta, residual
 
             def newton(branch=None):
-                """Newton on the step residual, on ``branch`` (default the law's own)."""
-                v = v_old
+                """Newton on the step residual, on ``branch`` (default the law's own).
+
+                It starts from the velocity extrapolated from the two previous
+                steps, as in ``beam.dynamic.solve_dynamic``.
+                """
+                v = 2.0 * v_old - v_prev
                 state = step_state(v, branch)
                 error = np.abs(state[-1]).max()
                 n_iter = 0
@@ -490,6 +496,7 @@ def solve_dynamic_with_sb(
                 )
 
         t_old = t_new
+        v_prev = v_old
         y_old, v_old, chi_old, eta_old = y_new, v_new, chi_new, eta_new
         if not linear:
             dchi_old = dchi_new
