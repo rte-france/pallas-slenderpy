@@ -52,3 +52,24 @@ def test_stiffness_ordering_clamped_pinned_string():
     clamped = frequency.natural_frequencies_clamped(LENGTH, TENSION, MASS, EI, N)
     assert np.all(pinned > string)
     assert np.all(clamped >= pinned)
+
+
+def test_clamped_matches_the_exact_roots():
+    # roots of 2ab(1 - cosh a cos b) + (a^2 - b^2) sinh a sin b = 0, also
+    # matched by a finite-difference eigen-solve
+    clamped = frequency.natural_frequencies_clamped(50.0, 2.0e4, 1.5, 2000.0, 6)
+    expected = [1.16973, 2.34084, 3.51473, 4.69278, 5.87636, 7.06683]
+    assert clamped == pytest.approx(expected, abs=1e-5)
+
+
+def test_clamped_reduces_to_the_clamped_beam_without_tension():
+    # cos(b) cosh(b) = 1, omega = b^2 sqrt(EI / (m L^4))
+    clamped = frequency.natural_frequencies_clamped(1.0, 1.0e-08, 1.0, 1.0, 3)
+    b = np.array([4.730041, 7.853205, 10.995608])
+    assert clamped == pytest.approx(b**2 / (2.0 * np.pi), rel=1e-6)
+
+
+def test_clamped_reduces_to_string_for_small_ei():
+    string = frequency.natural_frequencies(LENGTH, TENSION, MASS, N)
+    clamped = frequency.natural_frequencies_clamped(LENGTH, TENSION, MASS, 1e-08, N)
+    assert clamped == pytest.approx(string, rel=1e-5)

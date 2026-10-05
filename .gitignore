@@ -10,6 +10,8 @@ build
 dist
 _build
 meta.yaml
+docs
+uv.lock
 # documentation (Quarto) and coverage outputs
 doc/_site/
 doc/.quarto/

@@ -38,7 +38,7 @@ uv pip install --upgrade pip
 
 # -- install local package
 rm -rf build
-uv pip install .[examples,dev]
+uv pip install .[dev]
 
 # -- end text
 echo "---"

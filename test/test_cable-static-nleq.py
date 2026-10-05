@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from slenderpy.cable.static import nleq
 
@@ -133,3 +134,44 @@ def test_chord(ast570, random_spans):
     assert np.allclose(x1, x0, atol=atolx, rtol=rtol) and np.allclose(
         s1, s0, atol=atoly, rtol=rtol
     )
+
+
+def test_thermal_expansion_scalar(ast570):
+    """Scalar input works and the temperature inverse recovers the change."""
+    linm, axs, rts, _ = ast570
+    lspan, sld, alpha = 400.0, 20.0, 2.3e-05
+    tension_i = 0.2 * rts
+    tension_f = nleq.thermal_expansion_tension(
+        lspan, tension_i, sld, 288.0, 338.0, linm, axs, alpha
+    )
+    assert np.ndim(tension_f) == 0
+    assert np.isfinite(tension_f) and tension_f < tension_i
+    temperature_f = nleq.thermal_expansion_temperature(
+        lspan, tension_i, tension_f, sld, 288.0, linm, axs, alpha
+    )
+    assert np.isclose(temperature_f, 338.0, rtol=1e-09)
+
+
+@pytest.mark.parametrize("delta", [-40.0, 1.0, 30.0, 150.0])
+def test_thermal_expansion_array(ast570, random_spans, capsys, delta):
+    """Array round trip tension -> temperature over the random spans.
+
+    Every case converges, sloped spans and large changes included, and no
+    convergence message is printed.
+    """
+    linm, axs, rts, _ = ast570
+    lspan, tratio, sld = random_spans
+    alpha = 2.3e-05
+    tension_i = rts * tratio
+    temperature_i = np.full_like(lspan, 288.0)
+    temperature_f = temperature_i + delta
+    tension_f = nleq.thermal_expansion_tension(
+        lspan, tension_i, sld, temperature_i, temperature_f, linm, axs, alpha
+    )
+    assert tension_f.shape == lspan.shape
+    assert np.all(tension_f > 0.0)
+    back = nleq.thermal_expansion_temperature(
+        lspan, tension_i, tension_f, sld, temperature_i, linm, axs, alpha
+    )
+    assert np.allclose(back, temperature_f, rtol=0.0, atol=1e-06)
+    assert capsys.readouterr().out == ""

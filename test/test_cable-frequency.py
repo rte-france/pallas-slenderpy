@@ -72,7 +72,7 @@ def test_natural_all_methods_positive():
 
 def test_op_frequencies_are_harmonics():
     n = 5
-    fq = frequency._op_frequencies(LSPAN, TENSION, SLD, LINM, AXS, n=n)
+    fq = frequency._op_frequencies(LSPAN, TENSION, SLD, LINM, n=n)
     assert fq.shape == (n,)
     f0 = _taut_f0(LSPAN, TENSION, SLD, LINM)
     assert fq == pytest.approx(f0 * np.arange(1, n + 1))
@@ -179,3 +179,16 @@ def test_irvine_frequencies_are_bracketed_and_increasing():
     assert np.all(np.diff(x) > 0.0)
     for k in range(n):
         assert (2 * k + 1) * np.pi < x[k] < (2 * k + 3) * np.pi
+
+
+def test_ip_frequencies_depend_on_gravity():
+    n = 3
+    earth = frequency._ip_frequencies(LSPAN, TENSION, SLD, LINM, AXS, g=9.81, n=n)
+    heavy = frequency._ip_frequencies(LSPAN, TENSION, SLD, LINM, AXS, g=50.0, n=n)
+    assert heavy[0] > earth[0]
+    assert heavy[1] == pytest.approx(earth[1])
+
+
+def test_natural_nleq_needs_axs():
+    with pytest.raises(ValueError, match="axs"):
+        natural(LSPAN, TENSION, SLD, LINM, method="nleq")

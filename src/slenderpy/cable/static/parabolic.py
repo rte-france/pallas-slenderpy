@@ -14,13 +14,6 @@ def _f(z: float) -> float:
     return 0.5 * (z * q + np.log(z + q))
 
 
-def _g(x, a, b):
-    """Primitive used to compute an integral."""
-    y = x + b
-    s = np.sqrt(a + y**2)
-    return 0.5 * (y * s + a * np.log(y + s))
-
-
 def shape(
     x: floatArrayLike,
     lspan: floatArrayLike,
@@ -50,8 +43,8 @@ def shape(
 
     Returns
     -------
-    Vertical position of the cable (m). Return array has the same size as
-    the given inputs.
+    float or array
+        Vertical position of the cable (m). Same shape as the broadcast inputs.
 
     """
     a = tension / (linm * g)
@@ -91,8 +84,8 @@ def length(
 
     Returns
     -------
-    An estimation of the cable length (m). Return array has the same size as
-    the given inputs.
+    float or array
+        An estimation of the cable length (m). Same shape as the broadcast inputs.
 
     """
     a = tension / (linm * g)
@@ -127,8 +120,8 @@ def argsag(
 
     Returns
     -------
-    Horizontal position of the cable's lowest point (m). Return array has the
-    same size as the given inputs.
+    float or array
+        Horizontal position of the cable's lowest point (m). Same shape as the broadcast inputs.
 
     """
     return np.minimum(
@@ -167,7 +160,8 @@ def sag(
 
     Returns
     -------
-    Sag value (m). Return array has the same size as the given inputs.
+    float or array
+        Sag value (m). Same shape as the broadcast inputs.
 
     """
     # NB : exact formula -> put this in docstring ?
@@ -210,7 +204,8 @@ def max_chord(
 
     Returns
     -------
-    Max chord length (m) Return array has the same size as the given inputs.
+    float or array
+        Max chord length (m). Same shape as the broadcast inputs.
 
     """
     return 0.125 * linm * g * lspan**2 / tension
@@ -245,8 +240,8 @@ def stress(
 
     Returns
     -------
-    Stress along x position (N). Return array has the same size as
-    the given inputs.
+    float or array
+        Stress along x position (N). Same shape as the broadcast inputs.
 
     """
     a = tension / (linm * g)
@@ -281,17 +276,14 @@ def mean_stress(
 
     Returns
     -------
-    Average stress (N). Return array has the same size as the given inputs.
+    float or array
+        Average stress (N). Same shape as the broadcast inputs.
 
     """
     a = tension / (linm * g)
     b = 0.5 * lspan / a - sld / lspan
     N = tension * a / lspan * (_f(lspan / a - b) - _f(-b))
     return N
-
-
-_RTOL = 1.0e-12
-_MAXITER = 16
 
 
 def thermal_expansion_tension(
@@ -329,8 +321,8 @@ def thermal_expansion_tension(
 
     Returns
     -------
-    Mechanical tension in final state (N). Return array has the same size as
-    the given inputs.
+    float or array
+        Mechanical tension in final state (N). Same shape as the broadcast inputs.
 
     """
     length_i = length(lspan, tension_i, sld, linm_i, g)
@@ -340,7 +332,7 @@ def thermal_expansion_tension(
 
     def fun(tension):
         linm_f = linm_i / dl
-        return np.abs(length(lspan, tension, sld, linm_f, g) - length_f)
+        return length(lspan, tension, sld, linm_f, g) - length_f
 
     tension_guess = blondel.tension(
         weight, tension_i, temperature_i, temperature_f, 1.0e12, alpha
@@ -348,7 +340,7 @@ def thermal_expansion_tension(
 
     sol = root(fun, tension_guess)
 
-    return sol.x
+    return np.reshape(sol.x, np.shape(tension_guess))
 
 
 def thermal_expansion_temperature(
@@ -386,8 +378,8 @@ def thermal_expansion_temperature(
 
     Returns
     -------
-    Mechanical tension in final state (N). Return array has the same size as
-    the given inputs.
+    float or array
+        Temperature in final state (K). Same shape as the broadcast inputs.
 
     """
 
@@ -398,7 +390,7 @@ def thermal_expansion_temperature(
         dl = 1.0 + alpha * (temperature - temperature_i)
         length_f = length_i * dl
         linm_f = linm_i / dl
-        return np.abs(length(lspan, tension_f, sld, linm_f, g) - length_f)
+        return length(lspan, tension_f, sld, linm_f, g) - length_f
 
     temperature_guess = blondel.temperature(
         weight, tension_i, tension_f, temperature_i, 1.0e12, alpha
@@ -406,4 +398,4 @@ def thermal_expansion_temperature(
 
     sol = root(fun, temperature_guess)
 
-    return sol.x
+    return np.reshape(sol.x, np.shape(temperature_guess))

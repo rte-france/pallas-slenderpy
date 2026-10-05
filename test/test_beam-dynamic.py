@@ -967,3 +967,11 @@ def test_fine_grid_converges(model):
         approx_curvature=False,
     )
     assert np.all(np.isfinite(res["z"].values))
+
+
+def test_order_2_boundary_conditions_raise():
+    conductor = Conductor(mass=1.0, ei_max=10.0)
+    span = Span(length=1.0, tension=100.0, boundary_conditions=BoundaryCondition(2))
+    parameters = simulation.Parameters(ns=11, tf=1.0, dt=0.01)
+    with pytest.raises(ValueError, match="order-4"):
+        solve_dynamic(conductor, span, parameters)

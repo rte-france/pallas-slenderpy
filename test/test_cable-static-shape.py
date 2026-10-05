@@ -130,3 +130,8 @@ def test_static_shape_is_a_dynamic_fixed_point(fy, fz):
     for name in ("x", "y", "z"):
         values = res[name].values
         assert np.abs(values - values[0]).max() < 1e-8 * scale, name
+
+
+def test_no_convergence_returns_nan():
+    position = shape.solve(_conductor(), _span(), 0.0, -0.5 * WEIGHT, NS, max_iter=1)
+    assert np.isnan(position).all()

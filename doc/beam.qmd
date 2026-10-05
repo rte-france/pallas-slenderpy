@@ -148,7 +148,8 @@ For the constant model with the approximate curvature $G$ vanishes: the
 problem is linear, $A$ is factorised once and each step is one solve.
 
 In the three other cases the step is solved with a Newton iteration on its
-residual, with the tangent
+residual, started from the velocity extrapolated from the two previous steps,
+$2 v^n - v^{n-1}$, with the tangent
 
 $$
 A + \frac{\Delta t^2}{4} \left( D_2 \, \mathrm{diag}\left(\frac{dM}{d\chi}\right) \frac{d\chi}{dy} - EI_{lin} D_4 \right)
@@ -173,7 +174,8 @@ the remaining ones are left at ``nan``.
 
 ## Boundary Conditions
 
-For all the previous resolutions, there are always four boundary conditions. Two for each side of the beam.
+For all the previous resolutions, there are always four boundary conditions. Two for each side of the beam:
+the beam solvers raise a `ValueError` for a [](`~slenderpy.boundary_condition.BoundaryCondition`) of order 2.
 Considering the left side of the beam at $x=0$ and the right side at $x=L$, the boundary conditions supported are under the form:
 
 $$
@@ -227,4 +229,7 @@ we thus derivate with respect to time the equation above obtaining the same matr
 $d_i(t) \forall i \in \left\{1,2,3,4\right\}$.
 
 Thus when using [](`~slenderpy.beam.dynamic.solve_dynamic`) the user should set `dynamic_values` with $\frac{\partial d_i}{\partial t} \forall i \in \left\{1,2,3,4\right\}$
-in the [](`~slenderpy.boundary_condition.BoundaryCondition`) constructor.
+in the [](`~slenderpy.boundary_condition.BoundaryCondition`) constructor. Each item is a callable `f(x, t)`, evaluated at the
+bound its condition applies to ($x = 0$ for $d_1, d_2$, $x = L$ for $d_3, d_4$), and the tuple follows the rows from the
+first to the last node: $(d_1, d_2, d_3, d_4)$ is `(left[0], left[1], right[1], right[0])`. Without `dynamic_values` the
+constant $d_i$ only enter the static solve, and the dynamic solve keeps the boundary values of the initial state.

@@ -155,5 +155,5 @@ def solve(
     if not (np.all(np.isfinite(un)) and np.all(np.isfinite(ub))):
         return failed
 
-    ut, _ = _model._stretching(un, ub, first, geom.ds, vt2)
+    ut, _, _ = _model._stretching(un, ub, first, geom, vt2)
     return _model._to_global(ut * length, un * length, ub * length, geom)

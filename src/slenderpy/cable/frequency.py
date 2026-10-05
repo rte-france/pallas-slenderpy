@@ -93,9 +93,11 @@ def natural(
 
     The ``method`` argument accepts a [](`~slenderpy.cable.frequency.FrequencyMethod`) member or its
     string value ("taut", "parabolic", "catenary" or "nleq"); an invalid value
-    raises ``ValueError``.
+    raises ``ValueError``. The "nleq" method needs ``axs``.
     """
     method = FrequencyMethod(method)
+    if method is FrequencyMethod.NLEQ and axs is None:
+        raise ValueError('method "nleq" needs the axial stiffness axs')
     if method is FrequencyMethod.TAUT:
         return _natural_taut(lspan, tension, sld, linm)
     elif method is FrequencyMethod.PARABOLIC:
@@ -197,7 +199,7 @@ def _ip_frequencies(
     fq = f0 * np.arange(1, n + 1)
     ni = (1 + n) // 2
     tf = _irvine_frequencies(
-        lspan, tension, sld, linm, axs, n=ni, tol=tol, maxiter=maxiter
+        lspan, tension, sld, linm, axs, g=g, n=ni, tol=tol, maxiter=maxiter
     )
     fq[::2] = tf
     return fq
@@ -208,8 +210,6 @@ def _op_frequencies(
     tension: float,
     sld: float,
     linm: float,
-    axs: float,
-    g=_GRAVITY,
     n: int = 10,
 ) -> np.ndarray:
     """Compute out-of-plane natural frequencies (binormal direction).

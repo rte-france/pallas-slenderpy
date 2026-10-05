@@ -294,3 +294,28 @@ def test_fine_grid_converges(model, ei):
     assert np.all(np.isfinite(y))
     # same sag as a coarse grid that converges without the floor
     assert y.min() == pytest.approx(coarse.min(), rel=1e-2)
+
+
+def test_order_2_boundary_conditions_raise():
+    bc = BoundaryCondition(2)
+    conductor = Conductor(mass=1.0, ei_max=10.0)
+    span = Span(length=1.0, tension=100.0, boundary_conditions=bc)
+    with pytest.raises(ValueError, match="order-4"):
+        solve(conductor, span, rhs=np.zeros(10), n=10)
+
+
+def test_non_convergence_returns_nan():
+    conductor = Conductor(
+        mass=1.57, ei_min=28.28, ei_max=2155.07, beta_flexion=6.438e-07
+    )
+    span = Span(length=20.0, tension=2.0e03, boundary_conditions=clamped())
+    n = 101
+    y = solve(
+        conductor,
+        span,
+        np.full(n, -9.81 * conductor.mass),
+        n,
+        model=BendingModel.VARYING,
+        max_iter=1,
+    )
+    assert np.isnan(y).all()

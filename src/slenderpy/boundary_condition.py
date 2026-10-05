@@ -38,7 +38,8 @@ class BoundaryCondition:
             a * y(x) + b * (dy/dx)(x) + c * (d2y/dx2)(x) = d(t)
 
         x is either the left bound or either the right bound depending if the sub tuple belong to left or right.
-        d can be a function that depend on time.
+        The d values are used by the static solve; a time-dependent right-hand
+        side goes through ``dynamic_values`` instead.
 
         If None values are used for left or right, Dirichlet boundary conditions are
         used.
@@ -52,7 +53,14 @@ class BoundaryCondition:
         right : Optional[ Tuple[Tuple[float, float, float, float], Tuple[float, float, float, float]] ], optional
             Coefficients for the right boundary condition(s), by default None
         dynamic_values : Optional[Tuple[callable, callable, callable, callable]], optional
-            Function of the right-hand side of the boundary conditions (if not constant), by default None
+            Time-dependent right-hand side for the dynamic solve, by default None
+            (the relations keep the value of the initial state). The dynamic
+            solve enforces the boundary conditions on the velocity, so each
+            callable ``f(x, t)`` returns the time derivative ``d'(t)`` of a
+            relation, not ``d(t)``; ``x`` is the bound the relation applies to.
+            The order is (left[0], left[1], right[1], right[0]), i.e. the rows
+            from the first to the last node; with order 2 only the first and
+            last items are used.
 
         Raises
         ------
@@ -220,14 +228,32 @@ class BoundaryCondition:
         return bc_matrix, rhs
 
     def update_rhs(self, n: int, x: np.ndarray[float], t: float) -> np.ndarray[float]:
+        """Evaluate ``dynamic_values`` at time ``t``.
+
+        Parameters
+        ----------
+        n : int
+            Number of nodes.
+        x : np.ndarray[float]
+            Node positions; only the bounds ``x[0]`` and ``x[-1]`` are used.
+        t : float
+            Time.
+
+        Returns
+        -------
+        np.ndarray[float]
+            Right-hand side of size ``n``, non-zero on the boundary rows only:
+            rows 0 and 1 hold left[0] and left[1], rows -2 and -1 hold right[1]
+            and right[0].
+        """
         rhs = np.zeros(n)
 
         rhs[0] = self.dynamic_values[0](x[0], t)
         rhs[-1] = self.dynamic_values[-1](x[-1], t)
 
         if self.order == 4:
-            rhs[1] = self.dynamic_values[1](x[1], t)
-            rhs[-2] = self.dynamic_values[-2](x[-2], t)
+            rhs[1] = self.dynamic_values[1](x[0], t)
+            rhs[-2] = self.dynamic_values[-2](x[-1], t)
 
         return rhs
 
@@ -255,7 +281,7 @@ def hinged(y_left: float = 0, y_right: float = 0) -> BoundaryCondition:
 
 
 def clamped(y_left: float = 0, y_right: float = 0) -> BoundaryCondition:
-    """_summary_
+    """Get boundary condition with constrained value and zero derivative.
 
     Parameters
     ----------

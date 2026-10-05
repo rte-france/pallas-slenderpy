@@ -14,6 +14,7 @@ from typing import Optional
 
 import numpy as np
 import scipy as sp
+from scipy.linalg import lapack
 
 import slenderpy.beam.bending as bending
 import slenderpy.beam.curvature as curvature
@@ -39,7 +40,7 @@ def solve_dynamic(
     initial_position: np.ndarray[float] | None = None,
     initial_velocity: np.ndarray[float] | None = None,
     initial_bending_moment: Optional[np.ndarray[float]] = None,
-    zeta: Optional[float] = 0,
+    zeta: float = 0.0,
     tol: float = 1.0e-06,
     max_iter: int = 64,
 ) -> simulation.Results:
@@ -106,10 +107,10 @@ def solve_dynamic(
         Conductor properties. ``mass`` and the bending-stiffness fields required
         by ``model`` must be set.
     span : Span
-        Span geometry and loading; ``boundary_conditions`` must be set. For the
-        varying model the critical curvature is ``beta_flexion * tension``.
-        ``span.sld`` is ignored: the end heights are the boundary-condition
-        values.
+        Span geometry and loading; ``boundary_conditions`` must be set, of
+        order 4. For the varying model the critical curvature is
+        ``beta_flexion * tension``. ``span.sld`` is ignored: the end heights
+        are the boundary-condition values.
     parameters : simulation.Parameters
         Simulation parameters. ``ns`` sets the space discretisation, ``t0``,
         ``tf`` and the derived ``nt`` the time stepping, ``nr``/``rr`` the output
@@ -170,6 +171,8 @@ def solve_dynamic(
 
     if span.boundary_conditions is None:
         raise ValueError("span.boundary_conditions is required for a beam solve")
+    if span.boundary_conditions.order != 4:
+        raise ValueError("a beam solve needs order-4 boundary conditions")
 
     law = bending.create(conductor, span, model, ei)
 
@@ -197,6 +200,7 @@ def solve_dynamic(
     damped_mass = (conductor.mass + dt2 * damp) * identity
     A = damped_mass + dt2**2 * stiffness + BC
     B = 2.0 * conductor.mass * identity - damped_mass - dt2**2 * stiffness
+    dt_stiffness = dt * stiffness
     lu = sp.sparse.linalg.splu(sp.sparse.csc_matrix(A))
 
     # round-off floor of the step residual: A @ v and dt * K @ y cannot be
@@ -212,6 +216,10 @@ def solve_dynamic(
     # curvature the right factor is the constant D2 as well, so only the tangent
     # stiffness varies from one iteration to the next
     jacobian_base = fdu.banded(A - dt2**2 * ei_D4)
+    # lapack band storage, the BANDWIDTH first rows being the workspace of the
+    # LU fill-in; the call solve_banded makes, without its allocations
+    band = fdu.BANDWIDTH
+    lapack_storage = np.zeros((band + jacobian_base.shape[0], ns))
     left_rows = fdu.tridiagonal(D2)
     if approx_curvature:
         constant_rows = fdu.tridiagonal(chi_operator.jacobian(np.zeros(ns)))
@@ -294,6 +302,8 @@ def solve_dynamic(
     converged = True
     # curvature increment of the previous step, for the lagged branch
     dchi_old = np.zeros(ns)
+    # velocity of the step before, for the newton initial guess
+    v_prev = v_old
 
     for step in range(parameters.nt):
         t_new = t_old + dt
@@ -302,7 +312,7 @@ def solve_dynamic(
             np.zeros(ns) if bc.dynamic_values is None else bc.update_rhs(ns, x, t_new)
         )
         inertia = B @ v_old
-        elastic = dt * stiffness @ y_old
+        elastic = dt_stiffness @ y_old
         external = dt2 * fdu.clean_rhs(order, load)
         rhs = inertia - elastic + external + rhs_bc
         threshold = max(
@@ -337,8 +347,12 @@ def solve_dynamic(
                 return y, chi, dchi, eta, residual
 
             def newton(branch=None):
-                """Newton on the step residual, on ``branch`` (default the law's own)."""
-                v = v_old
+                """Newton on the step residual, on ``branch`` (default the law's own).
+
+                It starts from the velocity extrapolated from the two previous
+                steps, which halves the backtracking compared with ``v_old``.
+                """
+                v = 2.0 * v_old - v_prev
                 state = step_state(v, branch)
                 error = np.abs(state[-1]).max()
                 n_iter = 0
@@ -354,14 +368,15 @@ def solve_dynamic(
                         2.0 * law.dynamic_tangent(eta, dchi, branch) - law.ei_linear
                     )
 
-                    jacobian = jacobian_base + dt2**2 * fdu.product_band(
-                        left_rows, right_rows(y), tangent
+                    np.add(
+                        jacobian_base,
+                        dt2**2 * fdu.product_band(left_rows, right_rows(y), tangent),
+                        out=lapack_storage[band:],
                     )
-                    try:
-                        increment = sp.linalg.solve_banded(
-                            (fdu.BANDWIDTH, fdu.BANDWIDTH), jacobian, -step_residual
-                        )
-                    except np.linalg.LinAlgError:
+                    *_, increment, info = lapack.dgbsv(
+                        band, band, lapack_storage, -step_residual, overwrite_ab=True
+                    )
+                    if info != 0:
                         break
 
                     # backtrack while the increment increases the residual,
@@ -437,6 +452,7 @@ def solve_dynamic(
             pb.update(parameters.rr)
 
         t_old = t_new
+        v_prev = v_old
         y_old, v_old, chi_old, eta_old = y_new, v_new, chi_new, eta_new
         if not linear:
             dchi_old = dchi_new

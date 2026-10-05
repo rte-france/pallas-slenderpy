@@ -1,5 +1,6 @@
 """Using Blondel formulae to compute changes of tension or temperature."""
 
+import numpy as np
 from pyntb.polynomial import solve_p3_v
 
 from slenderpy import floatArrayLike
@@ -34,8 +35,9 @@ def tension(
 
     Returns
     -------
-    Mechanical tension in final state (N). Return array has the same size as
-    the given inputs.
+    float or array
+        Mechanical tension in final state (N). Same shape as the broadcast
+        inputs.
 
     """
     a = 1.0 / axs
@@ -47,7 +49,12 @@ def tension(
     c = 0.0
     d = -(weight**2) / 24
 
-    tension_f, _, _ = solve_p3_v(a, b, c, d)
+    # a > 0 and d < 0: by Descartes' rule of signs the cubic has exactly one
+    # positive root, and solve_p3_v returns it first (the only real root, or the
+    # largest of three). It evaluates sqrt(delta) on both branches of a
+    # np.where, hence the ignored warning when delta < 0
+    with np.errstate(invalid="ignore"):
+        tension_f, _, _ = solve_p3_v(a, b, c, d)
 
     return tension_f
 
@@ -81,8 +88,8 @@ def temperature(
 
     Returns
     -------
-    Final temperature of cable (K). Return array has the same size as the given
-    inputs.
+    float or array
+        Final temperature of cable (K). Same shape as the broadcast inputs.
 
     """
     return (

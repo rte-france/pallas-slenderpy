@@ -118,3 +118,35 @@ def test_stress(ast570, random_spans):
     sm2 = np.sum(0.5 * (s[1:, :] + s[:-1, :]) * np.diff(x, axis=0), axis=0) / lspan
 
     assert np.allclose(sm1, sm2, atol=atol, rtol=rtol)
+
+
+def test_thermal_expansion_scalar(ast570):
+    """Scalar input gives a scalar; the temperature inverse recovers the change."""
+    linm, _, rts, _ = ast570
+    lspan, sld, alpha = 400.0, 20.0, 2.3e-05
+    tension_i = 0.2 * rts
+    tension_f = parabolic.thermal_expansion_tension(
+        lspan, tension_i, sld, 288.0, 338.0, linm, alpha
+    )
+    assert np.ndim(tension_f) == 0
+    assert tension_f < tension_i
+    # the cable length grows by the thermal expansion
+    length_i = parabolic.length(lspan, tension_i, sld, linm)
+    dl = 1.0 + alpha * 50.0
+    length_f = parabolic.length(lspan, tension_f, sld, linm / dl)
+    assert np.isclose(length_f, length_i * dl, rtol=1e-12)
+    temperature_f = parabolic.thermal_expansion_temperature(
+        lspan, tension_i, tension_f, sld, 288.0, linm, alpha
+    )
+    assert np.isclose(temperature_f, 338.0, rtol=1e-09)
+
+
+def test_thermal_expansion_array(ast570):
+    linm, _, rts, _ = ast570
+    lspan = np.array([200.0, 400.0, 600.0])
+    tension_i = 0.2 * rts * np.ones(3)
+    tension_f = parabolic.thermal_expansion_tension(
+        lspan, tension_i, 0.0, 288.0, 338.0, linm, 2.3e-05
+    )
+    assert tension_f.shape == (3,)
+    assert np.all(tension_f < tension_i)

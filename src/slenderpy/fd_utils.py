@@ -51,7 +51,7 @@ def first_derivative(n: int, ds: float) -> sp.sparse.dia_matrix:
     Parameters
     ----------
     n : int
-       Matrix size, at least 3.
+        Matrix size, at least 3.
     ds : float
         Space discretization step.
 

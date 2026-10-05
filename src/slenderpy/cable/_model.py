@@ -132,17 +132,21 @@ def _operators(ns):
     return first.tocsr(), second
 
 
-def _stretching(un, ub, first, ds, vt2):
-    """Tangential offset and axial strain from the quasi-static condition."""
+def _stretching(un, ub, first, geom: _Geometry, vt2):
+    """Tangential offset and axial strain from the quasi-static condition.
+
+    Returns the tangential offset ``ut``, the local axial strain, and the
+    uniform strain
+    ``e``, the integral over the cable of ``-un/vt2 + (un_s^2 + ub_s^2)/2``.
+    """
     h = -un / vt2 + 0.5 * ((first * un) ** 2 + (first * ub) ** 2)
-    segment = 0.5 * (h[:-1] + h[1:]) * ds
-    ut = np.sum(segment) * np.linspace(0.0, 1.0, len(un)) - np.cumsum(
-        np.concatenate(([0.0], segment))
-    )
+    segment = 0.5 * (h[:-1] + h[1:]) * geom.ds
+    e = np.sum(segment)
+    ut = e * geom.s - np.cumsum(np.concatenate(([0.0], segment)))
     strain = (first * ut) + 0.5 * (
         (first * ut) ** 2 + (first * un) ** 2 + (first * ub) ** 2
     )
-    return ut, np.log(np.sqrt(1.0 + 2.0 * strain))
+    return ut, np.log(np.sqrt(1.0 + 2.0 * strain)), e
 
 
 def _project(fy, fz, geom: _Geometry):
