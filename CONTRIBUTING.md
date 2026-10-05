@@ -30,3 +30,56 @@ For simple modifications (e.g. typos) most of the process above can be done auto
 
 The code follows the PEP8 guidelines for code style. Indentation is done with four spaces. Try to avoid trailing whitespaces whenever possible.
 
+## Tests and coverage
+
+```shell
+uv sync --all-extras
+uv run pytest test --cov=slenderpy --cov-report=term --cov-report=html
+```
+
+The HTML report is written to `htmlcov/index.html`. The report of the `main`
+branch is published with the documentation, at
+https://rte-france.github.io/pallas-slenderpy/coverage/; until the docs
+workflow has run once, the coverage badge of the README shows as broken.
+
+The docs workflow (`.github/workflows/docs.yml`) builds the site on every
+pull request and deploys it from `main`. Deploying requires the repository
+setting Settings > Pages > Source: GitHub Actions.
+
+## Documentation
+
+The documentation is a [Quarto](https://quarto.org/) website in `doc/`; the
+API reference is generated from the docstrings (numpy style) by
+[quartodoc](https://machow.github.io/quartodoc/). Quarto itself is installed
+by the `docs` extra.
+
+```shell
+uv sync --all-extras
+cd doc
+uv run quartodoc build
+uv run quartodoc interlinks
+uv run quarto render
+```
+
+The site is written to `doc/_site/index.html`; `uv run quarto preview`
+serves it with live reload.
+
+On Windows, installing `quarto-cli` can fail on the 260-character path
+limit. Either enable long paths, or point the uv cache and the temporary
+directory to short paths before `uv sync` (PowerShell):
+
+```powershell
+New-Item -ItemType Directory -Force C:/q/c, C:/q/t
+$env:UV_CACHE_DIR = "C:/q/c"; $env:TMP = "C:/q/t"; $env:TEMP = "C:/q/t"
+```
+
+Pages with executed code (examples, getting started) are frozen: their
+results are stored in `doc/_freeze/`, committed, and reused by later builds,
+including the docs workflow, which never runs them. When a page or its
+example script changes, re-render that page locally (a single page is always
+executed), for example `uv run quarto render examples/cable_dynamic.qmd`,
+and commit the updated `doc/_freeze/`. A project render only checks the page
+source: a change to an example script alone is not detected.
+
+A new public module must be added to the `quartodoc` sections of
+`doc/_quarto.yml`; `test/test_documentation.py` fails otherwise.

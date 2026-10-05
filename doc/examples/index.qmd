@@ -1,0 +1,24 @@
+---
+title: "Examples"
+---
+
+Short scripts from the `examples/` folder, each ending with its figures. Run
+one with `uv run python examples/<name>.py`.
+
+Beam:
+
+- [Static shape](beam_static.qmd): sag of a clamped span under its weight
+  with the three bending laws, and the bending boundary layer at the clamps.
+- [Free vibration](beam_dynamic.qmd): a clamped span released from 1.5 times
+  its static shape; the Bouc-Wen hysteresis damps it.
+
+Cable:
+
+- [Under its weight](cable_static.qmd): the catenary, parabolic and elastic
+  closed forms.
+- [Under wind and ice](cable_static_load.qmd): the static solver with a load
+  on top of the weight.
+- [Free vibration](cable_dynamic.qmd): out-of-plane and in-plane frequencies
+  against the taut-string one.
+- [Wind fatigue](cable_wind_fatigue.qmd): a turbulent wind run and the
+  rainflow count at the Poffenberger-Swart point.

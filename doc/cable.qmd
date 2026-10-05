@@ -1,0 +1,111 @@
+---
+title: "Cable"
+---
+
+The cable is a homogeneous, one-dimensional elastic continuum whose bending,
+torsional and shear rigidities are negligible, suspended between two fixed
+supports. slenderpy provides closed forms for its shape under its own weight,
+a static solver under any load, a time-domain solver, and its natural
+frequencies.
+
+## Under its own weight: closed forms
+
+All take the span length `lspan` (m), the tension (N), the support level
+difference `sld` (m) and the mass per unit length `linm` (kg/m):
+
+- [](`slenderpy.cable.static.catenary`): the exact inextensible shape
+  `shape(x, ...)`, `length`, `sag`, `argsag` (where the sag is reached) and
+  `max_chord`;
+- [](`slenderpy.cable.static.parabolic`): the small-sag approximation of the
+  same quantities, plus stresses and thermal expansion;
+- [](`slenderpy.cable.static.nleq`): the elastic catenary, which also needs
+  the axial stiffness `axs`;
+- [](`slenderpy.cable.static.blondel`): Blondel's formula for a change of
+  tension with temperature, and its inverse.
+
+The [cable static example](examples/cable_static.qmd) compares the three
+shapes.
+
+## The model of the dynamic and static solvers
+
+The solvers use the model of [Lee and Perkins
+(1992)](https://link.springer.com/article/10.1007/BF00045648): the state is
+the displacement from the catenary equilibrium of
+[](`slenderpy.cable.static.catenary`), expressed in its local triad and
+non-dimensionalised by the cable length $L$, on a grid uniform in arc length.
+With $\mathrm{slope} = dz/dx$ of the catenary and $N = \sqrt{1 + \mathrm{slope}^2}$,
+the triad is
+
+$$
+e_t = \frac{(1, 0, \mathrm{slope})}{N}, \qquad
+e_n = \frac{(-\mathrm{slope}, 0, 1)}{N}, \qquad
+e_b = (0, -1, 0).
+$$
+
+The normal and binormal displacements $u_n$, $u_b$ follow, with times scaled
+by $\sqrt{L / g}$,
+
+$$
+\begin{aligned}
+\ddot u_n &= (v_t^2 + v_l^2 e)\, u_n'' + \frac{v_l^2}{v_t^2}\, e + f_n, \\
+\ddot u_b &= (v_t^2 + v_l^2 e)\, u_b'' + f_b,
+\end{aligned}
+$$
+
+with $v_t^2 = H / (m g L)$, $v_l^2 = EA / (m g L)$ and $e$ the uniform
+dynamic strain,
+
+$$
+e = \int_0^1 \left( -\frac{u_n}{v_t^2} + \frac{1}{2}\left(u_n'^2 + u_b'^2\right) \right) ds .
+$$
+
+The tangential displacement is not a degree of freedom: it follows from this
+quasi-static stretching condition. Both ends are pinned.
+
+## Static shape under a load
+
+[](`~slenderpy.cable.static.shape.solve`) solves the same equations without
+the time derivatives. For a fixed strain $e$ both are linear, so the problem
+reduces to one scalar equation on $e$, bracketed on the tensioned side and
+solved with Brent's method:
+
+```python
+from slenderpy.cable.static import shape
+
+position = shape.solve(conductor, span, rhs_y, rhs_z, ns)   # (3, ns): x, y, z
+```
+
+The load `rhs_y`, `rhs_z` (N/m) comes **on top of the weight**, which is
+already in the catenary: a zero load returns the catenary, and passing the
+weight again would double it. The small-displacement model cannot detect a
+slack cable: an upward load as large as the weight still returns a
+tensioned, nearly slack shape. See the [static load
+example](examples/cable_static_load.qmd).
+
+## Dynamics
+
+[](`~slenderpy.cable.dynamic.solve`) integrates the equations above with a
+Crank-Nicolson scheme, solved for the velocity on a tridiagonal operator. Its
+interface is global:
+
+- `initial_position`, `initial_velocity`: `(3, ns)` global positions and
+  velocities of the nodes (from [](`~slenderpy.cable.dynamic.equilibrium`)
+  plus a perturbation); the tangential part of the displacement is
+  discarded, and the ends must sit on their supports. By default the run
+  starts at rest in the static shape under the force at `t0`.
+- `force`: the interface of [forces](forces.qmd), projected on the local
+  normal and binormal. The weight must not be included: a `Gravity` force is
+  refused.
+- `zeta`: a damping ratio on the first taut-string mode.
+- Results: global `x`, `y`, `z` and `dtension`, the dynamic increment of
+  axial force; the final state holds `position` and `velocity` for a restart.
+
+A `UserWarning` is raised when the CFL number exceeds 1. See the [cable
+dynamic example](examples/cable_dynamic.qmd).
+
+## Natural frequencies
+
+[](`~slenderpy.cable.frequency.natural`) gives the taut-string frequency with
+the cable length of the chosen model (taut, parabolic, catenary or elastic),
+and [](`~slenderpy.cable.frequency.irvine_number`) the Irvine number, which
+governs the stiffening of the in-plane symmetric modes by the cable stretch.

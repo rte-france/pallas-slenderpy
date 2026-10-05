@@ -1,0 +1,15 @@
+---
+title: "Cable free vibration"
+---
+
+Free vibration of a suspended cable released from a perturbed catenary.
+
+Out of plane the cable vibrates at the taut-string frequency; in plane the
+first symmetric mode is stiffened by the cable stretching (Irvine), so its
+frequency sits above the taut-string one.
+
+Source: `examples/cable_dynamic.py`.
+
+```{python}
+{{< include ../../examples/cable_dynamic.py >}}
+```

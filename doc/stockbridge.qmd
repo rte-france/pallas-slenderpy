@@ -1,0 +1,32 @@
+---
+title: "Stockbridge dampers"
+---
+
+::: {.callout-warning}
+The stockbridge solvers are experimental and still changing: their interface
+and their integration with the rest of slenderpy will be revised as they
+mature.
+:::
+
+A stockbridge damper is modelled as a clamp carrying two inertial masses, each
+on a planar cantilever messenger cable whose bending follows the Bouc-Wen law
+section by section. The damper is built from
+[](`~slenderpy.stockbridge.core.parameters.ClampParameters`),
+[](`~slenderpy.stockbridge.core.parameters.MassParameters`) and
+[](`~slenderpy.stockbridge.core.parameters.MessengerCableParameters`) into a
+[](`~slenderpy.stockbridge.core.stockbridge.Stockbridge`).
+
+Solvers, all re-exported by `slenderpy.stockbridge`:
+
+- [](`~slenderpy.stockbridge.solvers.imposed_acceleration.solve_imposed_acceleration`):
+  the clamp motion is imposed, each mass is solved independently;
+- [](`~slenderpy.stockbridge.solvers.imposed_force.solve_imposed_force`): the
+  force and moment at the clamp are imposed, masses and clamp are solved
+  together;
+- [](`~slenderpy.stockbridge.solvers.linearized.solve_linearized_imposed_force`):
+  the same with linear springs and dashpots instead of the Bouc-Wen cables;
+- [](`~slenderpy.stockbridge.coupling.beam_coupling.solve_dynamic_with_sb`):
+  dampers attached to a beam span, coupled at every time step.
+
+The script `examples/stockbridge.py` runs each of them; it is not rendered in
+this documentation while the API changes.

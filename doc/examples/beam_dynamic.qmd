@@ -1,0 +1,16 @@
+---
+title: "Beam free vibration"
+---
+
+Free vibration of a clamped span released from 1.5 times its static shape.
+
+The constant laws keep their amplitude; the Bouc-Wen law dissipates energy
+through its hysteresis at the clamps, so its vibration decays. The second
+figure shows that hysteresis: the moment-curvature loops at the clamp, inside
+the static envelope of the law.
+
+Source: `examples/beam_dynamic.py`.
+
+```{python}
+{{< include ../../examples/beam_dynamic.py >}}
+```

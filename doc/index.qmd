@@ -1,0 +1,65 @@
+---
+title: "slenderpy"
+subtitle: "Simulation of slender structures: overhead line cables and beams"
+---
+
+slenderpy computes the static shape and the time-domain response of slender
+structures, suspended cables and tensioned beams, under user-defined loads
+such as wind. It is developed for overhead power lines, where these
+vibrations drive conductor fatigue.
+
+- **Cable**: catenary, parabolic and elastic closed forms; the static shape
+  under any load; the nonlinear dynamics of [Lee and Perkins
+  (1992)](https://link.springer.com/article/10.1007/BF00045648); natural
+  frequencies.
+- **Beam**: Euler-Bernoulli beam with a constant bending stiffness or a
+  Bouc-Wen hysteretic law, approximate or exact curvature, static and dynamic.
+- **Forces**: gravity, point excitation, wind drag with a constant or
+  turbulent wind; any force can be written as a plain function.
+- **Fatigue**: rainflow cycle counting at a distance from a support.
+- **Stockbridge dampers** (experimental), and the former API kept in
+  [`slenderpy.legacy`](legacy.qmd).
+
+## Installation
+
+```bash
+python -m pip install "slenderpy @ git+https://github.com/rte-france/pallas-slenderpy"
+```
+
+or, with [uv](https://docs.astral.sh/uv/), `uv add "slenderpy @ git+https://github.com/rte-france/pallas-slenderpy"`.
+
+## A first look
+
+A 400 m span under its weight, then under a steady 25 m/s wind:
+
+```{python}
+import matplotlib.pyplot as plt
+import numpy as np
+
+from slenderpy.cable import dynamic
+from slenderpy.cable.static import shape
+from slenderpy.components import Conductor, Span
+from slenderpy.force.wind import ConstantWind, WindDrag
+
+conductor = Conductor(mass=1.571, diameter=0.0313, axial_stiffness=3.76e07)
+span = Span(length=400.0, tension=3.7e04)
+x, y, z = dynamic.equilibrium(conductor, span, 201)
+
+drag = WindDrag(diameter=conductor.diameter, wind=ConstantWind(25.0))
+zeros = np.zeros_like(x)
+windy = shape.solve(conductor, span, *drag(x, 0.0, y, z, zeros, zeros), 201)
+
+fig, (side, top) = plt.subplots(1, 2, figsize=(10, 3.5))
+side.plot(x, z, "k", label="weight only")
+side.plot(windy[0], windy[2], label="25 m/s wind")
+top.plot(windy[0], windy[1], c="C0")
+side.set(title="side view", xlabel="x (m)", ylabel="z (m)")
+top.set(title="plan view", xlabel="x (m)", ylabel="y (m)")
+side.legend()
+fig.tight_layout()
+plt.show()
+```
+
+Continue with [Getting started](getting-started.qmd), the
+[user guide](simulation.qmd), the [examples](examples/index.qmd) or the
+[API reference](reference/index.qmd).

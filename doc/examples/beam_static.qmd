@@ -1,0 +1,15 @@
+---
+title: "Beam static shape"
+---
+
+Static shape of a clamped span under its weight, and its bending boundary layer.
+
+Away from the clamps the three bending laws give the same sag; within a few
+``sqrt(EI / tension)`` of a clamp the curvature, and with it the stiffness of
+the Bouc-Wen law, changes by orders of magnitude.
+
+Source: `examples/beam_static.py`.
+
+```{python}
+{{< include ../../examples/beam_static.py >}}
+```

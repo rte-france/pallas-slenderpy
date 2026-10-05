@@ -1,0 +1,15 @@
+---
+title: "Cable wind fatigue"
+---
+
+Cable in a turbulent wind, and the rainflow count 89 mm from a support.
+
+The run starts from the static shape under the wind at t = 0. ``count_cycles``
+reads the out-of-plane position at the Poffenberger-Swart point, stored in
+``los``, and returns one row per cycle or half cycle.
+
+Source: `examples/cable_wind_fatigue.py`.
+
+```{python}
+{{< include ../../examples/cable_wind_fatigue.py >}}
+```

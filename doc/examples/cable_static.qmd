@@ -1,0 +1,14 @@
+---
+title: "Cable under its weight"
+---
+
+Cable under its weight: catenary, parabolic and elastic (nleq) closed forms.
+
+At a given tension the three shapes are visually the same; their differences
+grow as the tension drops and the sag increases.
+
+Source: `examples/cable_static.py`.
+
+```{python}
+{{< include ../../examples/cable_static.py >}}
+```
