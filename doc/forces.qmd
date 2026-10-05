@@ -30,7 +30,8 @@ contract](simulation.qmd#the-output-contract).
 
 - [](`~slenderpy.force.core.Gravity`): the weight, `(0, -g m)`, for the beam;
 - [](`~slenderpy.force.core.PointExcitation`): a sinusoidal vertical force
-  applied at the node nearest a position, over a time window.
+  applied at the node nearest a position, over a time window. The position
+  must lie within the span; this is checked when the force is evaluated.
 
 [](`slenderpy.force.wind`):
 
