@@ -39,7 +39,7 @@ from slenderpy.cable._model import (
 )
 from slenderpy.cable.static import shape
 from slenderpy.components import Conductor, Span
-from slenderpy.force.core import ForceSum, Gravity
+from slenderpy.force.core import ForceSum, Gravity, Scaled
 
 # an end further than this (relative to the span) from its support is an error
 _END_TOLERANCE = 1.0e-09
@@ -88,9 +88,12 @@ def _check_position(position: np.ndarray, geom: _Geometry) -> np.ndarray:
 
 
 def _holds_gravity(force) -> bool:
-    """Whether a force is, or sums, a Gravity."""
-    terms = force.terms if isinstance(force, ForceSum) else (force,)
-    return any(isinstance(term, Gravity) for term in terms)
+    """Whether a force is, sums or scales a Gravity."""
+    if isinstance(force, ForceSum):
+        return any(_holds_gravity(term) for term in force.terms)
+    if isinstance(force, Scaled):
+        return _holds_gravity(force.force)
+    return isinstance(force, Gravity)
 
 
 def solve(

@@ -591,7 +591,7 @@ def test_coupling_without_damper_matches_solve_dynamic(approx_curvature):
     y0 = shape.solve(
         CONDUCTOR,
         span,
-        np.zeros(ns) + force(x, 0.0, 0.0, 0.0, 0.0, 0.0)[1],
+        force(x, 0.0, 0.0, 0.0, 0.0, 0.0)[1],
         ns,
         model=BendingModel.VARYING,
         approx_curvature=approx_curvature,

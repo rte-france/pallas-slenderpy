@@ -14,14 +14,16 @@ The frame is the one of [](`slenderpy.simulation`): origin at support
 The beam solver uses ``fz`` only; the cable solver projects both components on
 its local normal and binormal.
 
-The classes below are provided models; they can be summed with ``+``. A plain
-function with the same signature is a valid force too, but cannot take part
-in ``+``.
+The classes below are provided models; they can be summed with ``+``, and
+summed with or multiplied by a float (applied to both components) or a tuple
+``(cy, cz)`` (applied per component). A plain function with the same
+signature is a valid force too, but cannot take part in ``+`` or ``*``.
 """
 
 from __future__ import annotations
 
 import math
+import numbers
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -37,6 +39,19 @@ def _check_finite(name: str, value: float) -> None:
         raise ValueError(f"{name} must be finite, got {value}")
 
 
+def _as_pair(value) -> tuple[float, float] | None:
+    """``(y, z)`` pair from a real or a 2-tuple of reals, None otherwise."""
+    if isinstance(value, numbers.Real):
+        return float(value), float(value)
+    if (
+        isinstance(value, tuple)
+        and len(value) == 2
+        and all(isinstance(v, numbers.Real) for v in value)
+    ):
+        return float(value[0]), float(value[1])
+    return None
+
+
 class Force(ABC):
     """Base of the provided force models."""
 
@@ -45,11 +60,24 @@ class Force(ABC):
         """Force per unit length ``(fy, fz)`` (N/m) at the nodes."""
 
     def __add__(self, other):
+        pair = _as_pair(other)
+        if pair is not None:
+            other = Constant(*pair)
         if not isinstance(other, Force):
             return NotImplemented
         left = self.terms if isinstance(self, ForceSum) else (self,)
         right = other.terms if isinstance(other, ForceSum) else (other,)
         return ForceSum(left + right)
+
+    __radd__ = __add__
+
+    def __mul__(self, other):
+        pair = _as_pair(other)
+        if pair is None:
+            return NotImplemented
+        return Scaled(self, *pair)
+
+    __rmul__ = __mul__
 
 
 @dataclass(frozen=True)
@@ -74,6 +102,63 @@ class ForceSum(Force):
 
 
 @dataclass(frozen=True)
+class Constant(Force):
+    """Uniform force ``(fy, fz)``, built by adding a force and a constant.
+
+    ``force + c`` adds ``c`` to both components, ``force + (cy, cz)`` adds
+    ``cy`` to ``fy`` and ``cz`` to ``fz``.
+
+    Attributes
+    ----------
+    fy
+        Force per unit length along ``y`` (N/m).
+    fz
+        Force per unit length along ``z`` (N/m).
+    """
+
+    fy: float
+    fz: float
+
+    def __post_init__(self) -> None:
+        _check_finite("fy", self.fy)
+        _check_finite("fz", self.fz)
+
+    def __call__(self, x, t, y, z, vy, vz):
+        x = np.asarray(x, dtype=float)
+        return np.full_like(x, self.fy), np.full_like(x, self.fz)
+
+
+@dataclass(frozen=True)
+class Scaled(Force):
+    """Force multiplied by constant factors, built with ``*``.
+
+    ``c * force`` multiplies both components by ``c``, ``(cy, cz) * force``
+    multiplies ``fy`` by ``cy`` and ``fz`` by ``cz``.
+
+    Attributes
+    ----------
+    force
+        The scaled force.
+    factor_y
+        Factor on ``fy``.
+    factor_z
+        Factor on ``fz``.
+    """
+
+    force: Force
+    factor_y: float
+    factor_z: float
+
+    def __post_init__(self) -> None:
+        _check_finite("factor_y", self.factor_y)
+        _check_finite("factor_z", self.factor_z)
+
+    def __call__(self, x, t, y, z, vy, vz):
+        fy, fz = self.force(x, t, y, z, vy, vz)
+        return self.factor_y * fy, self.factor_z * fz
+
+
+@dataclass(frozen=True)
 class Gravity(Force):
     """Weight of the structure, ``(0, -g * mass)``.
 
@@ -92,7 +177,8 @@ class Gravity(Force):
         _check_positive("mass", self.mass)
 
     def __call__(self, x, t, y, z, vy, vz):
-        return 0.0, -_GRAVITY * self.mass
+        x = np.asarray(x, dtype=float)
+        return np.zeros_like(x), np.full_like(x, -_GRAVITY * self.mass)
 
 
 @dataclass(frozen=True)

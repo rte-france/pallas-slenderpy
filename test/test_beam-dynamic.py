@@ -843,9 +843,13 @@ def test_supports_can_be_stored():
 
 
 def test_scalar_force_is_broadcast():
-    """A force may return scalars: Gravity returns (0, -g m)."""
+    """A force may return scalars."""
+
+    def weight(x, t, y, z, vy, vz):
+        return 0.0, -9.81 * CONDUCTOR.mass
+
     parameters = simulation.Parameters(ns=51, t0=0.0, tf=0.2, dt=0.004, dr=0.04)
-    res = solve_dynamic(CONDUCTOR, BRETELLE, parameters, force=Gravity(CONDUCTOR.mass))
+    res = solve_dynamic(CONDUCTOR, BRETELLE, parameters, force=weight)
     assert np.all(np.isfinite(res["z"].values))
     assert res["z"].values[0, len(parameters.los) // 2] < 0.0
 
