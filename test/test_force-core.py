@@ -18,8 +18,9 @@ def _call(force, x=X, t=0.0):
 
 def test_gravity_points_down():
     fy, fz = _call(Gravity(2.0))
-    assert fy == 0.0
-    assert fz == pytest.approx(-_GRAVITY * 2.0)
+    assert fy.shape == fz.shape == X.shape
+    assert np.all(fy == 0.0)
+    assert fz == pytest.approx(np.full_like(X, -_GRAVITY * 2.0))
 
 
 def test_sum_flattens_its_terms():
@@ -45,6 +46,52 @@ def test_adding_a_plain_function_raises():
 
     with pytest.raises(TypeError):
         Gravity(1.0) + plain
+
+
+@pytest.mark.parametrize(
+    "total, expected",
+    [
+        (Gravity(2.0) + 1.0, (1.0, 1.0 - 2.0 * _GRAVITY)),
+        (1.0 + Gravity(2.0), (1.0, 1.0 - 2.0 * _GRAVITY)),
+        (Gravity(2.0) + (3.0, 4.0), (3.0, 4.0 - 2.0 * _GRAVITY)),
+        ((3.0, 4.0) + Gravity(2.0), (3.0, 4.0 - 2.0 * _GRAVITY)),
+        (Gravity(2.0) * 3.0, (0.0, -6.0 * _GRAVITY)),
+        (3.0 * Gravity(2.0), (0.0, -6.0 * _GRAVITY)),
+        ((5.0, 3.0) * Gravity(2.0), (0.0, -6.0 * _GRAVITY)),
+        (sum([Gravity(1.0), Gravity(2.0)]), (0.0, -3.0 * _GRAVITY)),
+    ],
+)
+def test_force_with_constants(total, expected):
+    fy, fz = _call(total)
+    assert fy.shape == fz.shape == X.shape
+    assert fy == pytest.approx(np.full_like(X, expected[0]))
+    assert fz == pytest.approx(np.full_like(X, expected[1]))
+
+
+def test_scaling_a_sum_scales_each_component():
+    excitation = PointExcitation(frequency=1.0, amplitude=3.0, position=5.0)
+    total = (2.0, -1.0) * (Gravity(2.0) + excitation + (1.0, 1.0))
+    t = 0.2
+    fy, fz = _call(total, t=t)
+    assert fy == pytest.approx(np.full_like(X, 2.0))
+    expected = -(-2.0 * _GRAVITY + _call(excitation, t=t)[1] + 1.0)
+    assert fz == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("other", ["1.0", (1.0,), (1.0, 2.0, 3.0), (1.0, "2.0")])
+def test_invalid_constants_raise(other):
+    with pytest.raises(TypeError):
+        Gravity(1.0) + other
+    with pytest.raises(TypeError):
+        Gravity(1.0) * other
+
+
+@pytest.mark.parametrize("other", [math.nan, (1.0, math.inf)])
+def test_non_finite_constants_raise(other):
+    with pytest.raises(ValueError):
+        Gravity(1.0) + other
+    with pytest.raises(ValueError):
+        Gravity(1.0) * other
 
 
 @pytest.mark.parametrize(

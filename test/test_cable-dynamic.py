@@ -430,6 +430,7 @@ def test_cfl_violation_warns():
     [
         Gravity(MASS),
         PointExcitation(frequency=1.0, amplitude=1.0, position=200.0) + Gravity(MASS),
+        2.0 * Gravity(MASS) + 1.0,
     ],
 )
 def test_gravity_is_refused(force):
