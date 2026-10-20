@@ -66,21 +66,40 @@ class EnergyBalance:
         self.scale = scale
         # the grid of the solver's operators, uniform in arc fraction
         self.h = 1.0 / (len(geom.s) - 1)
-        self.energies = dict.fromkeys(NAMES, 0.0)
+        self.works = dict.fromkeys(NAMES[3:], 0.0)
 
-    def _state(self, un, ub, vn, vb) -> None:
-        """Energies that are functions of the state."""
+    def start(self) -> None:
+        """Set the works to zero."""
+        self.works = dict.fromkeys(NAMES[3:], 0.0)
+
+    def step(self, dun, dub, fn, fb, dt) -> None:
+        """Add the works of one time step.
+
+        Only the works are accumulated here: the state energies are computed
+        by ``values`` when needed.
+
+        Parameters
+        ----------
+        dun, dub : np.ndarray
+            Normal and binormal displacement increments of the step, on the
+            interior nodes.
+        fn, fb : np.ndarray
+            Force the step uses, the mean of its two evaluations, on all
+            nodes.
+        dt : float
+            Time step.
+        """
         h = self.h
-        slope = (np.diff(un) / h) ** 2 + (np.diff(ub) / h) ** 2
-        strain = _strain(un, ub, self.geom, self.vt2)
-        self.energies["kinetic_energy"] = (
-            0.5 * h * np.sum(vn[1:-1] ** 2 + vb[1:-1] ** 2)
-        )
-        self.energies["tension_energy"] = 0.5 * self.vt2 * h * np.sum(slope)
-        self.energies["axial_energy"] = 0.5 * self.vl2 * strain**2
+        self.works["external_work"] += h * np.sum(fn[1:-1] * dun + fb[1:-1] * dub)
+        # the scheme's damping term is damping * (v_old + v_new), and
+        # (v_old + v_new) / 2 = du / dt
+        if self.damping:
+            self.works["damping_work"] += (
+                -2.0 * self.damping * h * np.sum(dun**2 + dub**2) / dt**2
+            )
 
-    def start(self, un, ub, vn, vb) -> None:
-        """Energies of the initial state, works set to zero.
+    def values(self, un, ub, vn, vb) -> list[float]:
+        """Energies of the state and works so far.
 
         Parameters
         ----------
@@ -88,37 +107,20 @@ class EnergyBalance:
             Normal and binormal displacement at the nodes.
         vn, vb : np.ndarray
             Normal and binormal velocity at the nodes.
-        """
-        self.energies = dict.fromkeys(NAMES, 0.0)
-        self._state(un, ub, vn, vb)
 
-    def step(self, un_old, ub_old, un_new, ub_new, vn_new, vb_new, fn, fb, dt) -> None:
-        """Add the works of one time step and update the state energies.
-
-        Parameters
-        ----------
-        un_old, ub_old : np.ndarray
-            Displacement at the start of the step.
-        un_new, ub_new : np.ndarray
-            Displacement at the end of the step.
-        vn_new, vb_new : np.ndarray
-            Velocity at the end of the step.
-        fn, fb : np.ndarray
-            Force the step uses, the mean of its two evaluations.
-        dt : float
-            Time step.
+        Returns
+        -------
+        list of float
+            The values in the order of ``NAMES`` (J).
         """
         h = self.h
-        dun = (un_new - un_old)[1:-1]
-        dub = (ub_new - ub_old)[1:-1]
-        self.energies["external_work"] += h * np.sum(fn[1:-1] * dun + fb[1:-1] * dub)
-        # the scheme's damping term is damping * (v_old + v_new), and
-        # (v_old + v_new) / 2 = du / dt
-        self.energies["damping_work"] += (
-            -2.0 * self.damping * h * np.sum(dun**2 + dub**2) / dt**2
-        )
-        self._state(un_new, ub_new, vn_new, vb_new)
-
-    def values(self) -> list[float]:
-        """Current energies and works in J, in the order of ``NAMES``."""
-        return [self.scale * self.energies[name] for name in NAMES]
+        slope = (np.diff(un) / h) ** 2 + (np.diff(ub) / h) ** 2
+        strain = _strain(un, ub, self.geom, self.vt2)
+        energies = [
+            0.5 * h * np.sum(vn[1:-1] ** 2 + vb[1:-1] ** 2),
+            0.5 * self.vt2 * h * np.sum(slope),
+            0.5 * self.vl2 * strain**2,
+        ]
+        return [self.scale * value for value in energies] + [
+            self.scale * self.works[name] for name in NAMES[3:]
+        ]

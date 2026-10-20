@@ -301,7 +301,7 @@ def solve_dynamic(
         lov += list(_energy.NAMES)
         lov_dims += [1] * len(_energy.NAMES)
         balance = _energy.EnergyBalance(conductor.mass, span.tension, damp, law, ds, dt)
-        balance.start(y_old, v_old, chi_old)
+        balance.start(y_old)
     res = simulation.Results(
         lot=parameters.time_vector_output().tolist(),
         lov=lov,
@@ -315,7 +315,7 @@ def solve_dynamic(
         x / span.length,
         lov,
         [y_old, v_old, chi_old, moment_old, eta_old, 0]
-        + ([] if balance is None else balance.values()),
+        + ([] if balance is None else balance.values(y_old, v_old, chi_old)),
     )
 
     # time loop
@@ -462,7 +462,6 @@ def solve_dynamic(
             balance.step(
                 y_old,
                 y_new,
-                v_new,
                 chi_old,
                 chi_new,
                 moment_old,
@@ -478,7 +477,7 @@ def solve_dynamic(
                 x / span.length,
                 lov,
                 [y_new, v_new, chi_new, moment_new, eta_new, n_iter]
-                + ([] if balance is None else balance.values()),
+                + ([] if balance is None else balance.values(y_new, v_new, chi_new)),
             )
             pb.update(parameters.rr)
 

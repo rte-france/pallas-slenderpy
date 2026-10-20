@@ -305,7 +305,7 @@ def solve(
         lov += list(_energy.NAMES)
         lov_dims += [1] * len(_energy.NAMES)
         balance = _energy.EnergyBalance(geom, vt2, vl2, damping, weight * length**2)
-        balance.start(un, ub, vn, vb)
+        balance.start()
     res = simulation.Results(
         lot=parameters.time_vector_output().tolist(),
         lov=lov,
@@ -325,7 +325,7 @@ def solve(
                 position[2],
                 dtension * conductor.axial_stiffness,
             ]
-            + ([] if balance is None else balance.values()),
+            + ([] if balance is None else balance.values(un, ub, vn, vb)),
         )
 
     # implicit strain: newton tangent and round-off floor of the step residual
@@ -465,25 +465,15 @@ def solve(
                 converged = False
                 break
 
-        if balance is not None:
-            un_old, ub_old = un.copy(), ub.copy()
-        un[1:-1] += ht * (vn[1:-1] + speed[:, 0])
-        ub[1:-1] += ht * (vb[1:-1] + speed[:, 1])
+        dun = ht * (vn[1:-1] + speed[:, 0])
+        dub = ht * (vb[1:-1] + speed[:, 1])
+        un[1:-1] += dun
+        ub[1:-1] += dub
         vn[1:-1] = speed[:, 0]
         vb[1:-1] = speed[:, 1]
         t += dt
         if balance is not None:
-            balance.step(
-                un_old,
-                ub_old,
-                un,
-                ub,
-                vn,
-                vb,
-                0.5 * (fn1 + fn2),
-                0.5 * (fb1 + fb2),
-                dt,
-            )
+            balance.step(dun, dub, 0.5 * (fn1 + fn2), 0.5 * (fb1 + fb2), dt)
 
         ut, dtension, strain = _stretching(
             un, ub, first, geom, vt2, half_node=implicit_strain

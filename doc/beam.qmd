@@ -308,20 +308,22 @@ Limits:
 
 ### Compute cost
 
-The balance adds a fixed number of vector operations on the ``ns`` nodes per
-time step, about 80 $\mu$s at ``ns = 401``. Measured on the 440 m span with
-hinged supports, ``ns = 401``, 1600 steps, gravity and a point excitation
-(median of 7 runs, ``compute_time``):
+The works are accumulated at every time step, since they depend on the whole
+path; the energies, functions of the state, are only computed at the output
+steps. The balance thus adds a fixed number of vector operations on the
+``ns`` nodes per step, about 45 $\mu$s at ``ns = 401``. Measured on the
+440 m span with hinged supports, ``ns = 401``, 1600 steps with one output
+every 10, gravity and a point excitation (fastest of 9 runs,
+``compute_time``):
 
 | case | ``energy=False`` | ``energy=True`` | overhead |
 |------|------------------|-----------------|----------|
-| constant model, approximate curvature | 0.086 s | 0.154 s | about 80 % |
-| varying model, exact curvature | 1.41 s | 1.42 s | about 1 % |
+| constant model, approximate curvature | 0.104 s | 0.173 s | about 65 % |
+| varying model, exact curvature | 0.883 s | 0.958 s | about 8 % |
 
 The overhead shows in the linear case, where a step is a single triangular
-solve (about 50 $\mu$s). A Newton step costs 0.6 to 0.9 ms, so the balance
-adds at most about 10 % there, less than the spread between repeated runs
-(1.0 to 1.4 s for the same case).
+solve (about 65 $\mu$s); it is small next to the Newton iterations of the
+other cases (about 0.55 ms per step).
 
 
 ## Boundary Conditions

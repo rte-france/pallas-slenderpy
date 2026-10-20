@@ -178,10 +178,18 @@ is constant up to the Newton tolerance (relative drifts of $10^{-13}$ to
 $10^{-10}$ on the span above); with the explicit scheme it drifts as shown in
 the table above. The names shared with the beam solver have the same meaning.
 
-On the span above, ``ns = 101``, 10 periods at 400 steps per period
-(median of 9 runs, ``compute_time``), the implicit strain costs about twice
-the explicit step, and ``energy=True`` adds about 55 % to an explicit run and
-25 % to an implicit one.
+The works are accumulated at every time step; the energies, functions of the
+state, are only computed at the output steps. On the span above, ``ns = 101``,
+10 periods at 400 steps per period with one output every 10 steps (fastest of
+9 runs, ``compute_time``):
+
+| case | ``energy=False`` | ``energy=True`` | overhead |
+|------|------------------|-----------------|----------|
+| explicit | 0.355 s | 0.403 s | about 14 % |
+| ``implicit_strain=True`` | 0.914 s | 0.966 s | about 6 % |
+
+The implicit strain costs about 2.5 times the explicit step, and the balance
+adds about 12 $\mu$s per step in both modes.
 
 ## Natural frequencies
 
