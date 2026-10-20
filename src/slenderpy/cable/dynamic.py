@@ -25,14 +25,17 @@ import warnings
 import numpy as np
 from scipy.linalg import lapack
 
+import slenderpy.fd_utils as fdu
 import slenderpy.simulation as simulation
 from slenderpy import _progress_bar as spb
 from slenderpy._constant import _GRAVITY
+from slenderpy.cable import _energy
 from slenderpy.cable._model import (
     _Geometry,
     _geometry,
     _operators,
     _project,
+    _strain,
     _stretching,
     _to_global,
     _to_local,
@@ -104,6 +107,10 @@ def solve(
     zeta: float = 0.0,
     initial_position: np.ndarray | None = None,
     initial_velocity: np.ndarray | None = None,
+    implicit_strain: bool = False,
+    tol: float = 1.0e-10,
+    max_iter: int = 64,
+    energy: bool = False,
 ) -> simulation.Results:
     """Dynamic solver for a suspended cable under an external force.
 
@@ -165,6 +172,27 @@ def solve(
         model derives it from the stretching condition.
     initial_velocity : numpy.ndarray, optional
         Global ``(3, ns)`` velocity of the nodes at ``t0``. Default at rest.
+    implicit_strain : bool, optional
+        If True, the strain of the equations is the mean of its values at the
+        start and at the end of the step, computed with half-node slopes,
+        instead of its value at the start of the step. The step is then
+        solved by Newton, started from the explicit step, and conserves the
+        energy up to ``tol`` whatever the time step; it costs a few explicit
+        steps and raises no CFL warning. ``dtension`` uses the same strain.
+        A step that does not converge within ``max_iter`` stops the run: the
+        snapshots already computed are kept, the remaining ones are left at
+        nan and no final state is recorded. Default False.
+    tol : float, optional
+        Implicit strain only: convergence threshold on ``max|step residual|``,
+        relative to the largest term of that residual. Default 1e-10, tight
+        on purpose: the explicit first iterate already meets a loose
+        threshold, and stopping there keeps its energy drift.
+    max_iter : int, optional
+        Implicit strain only: maximum number of Newton iterations per step.
+        Default 64.
+    energy : bool, optional
+        If True, adds the energy balance of the solve to the results, see
+        Returns. Default False.
 
     Returns
     -------
@@ -177,6 +205,18 @@ def solve(
         [](`~slenderpy.simulation.Results.set_state`), holds the global ``position`` and
         ``velocity`` at full ``ns`` resolution, so a restart is
         ``initial_position=state["position"]``.
+
+        With ``energy=True``, five scalars per output time are added (J):
+        the state energies ``kinetic_energy``, ``tension_energy`` (of the
+        static tension) and ``axial_energy`` (of the uniform dynamic
+        strain), and the works cumulated from ``t0``: ``external_work``
+        (done by ``force``) and ``damping_work`` (dissipated by ``zeta``).
+        They are computed on the nodes, whatever ``los``. ``kinetic_energy
+        + tension_energy + axial_energy + damping_work - external_work`` is
+        constant up to the Newton residual with ``implicit_strain=True``.
+        It drifts with the explicit scheme: the strain of the previous step
+        pumps energy into the symmetric in-plane mode, at a rate
+        proportional to the time step.
 
     Notes
     -----
@@ -240,7 +280,9 @@ def solve(
     vn[0], vn[-1], vb[0], vb[-1] = 0.0, 0.0, 0.0, 0.0
 
     first, second = _operators(ns)
-    ut, dtension, strain = _stretching(un, ub, first, geom, vt2)
+    ut, dtension, strain = _stretching(
+        un, ub, first, geom, vt2, half_node=implicit_strain
+    )
     # second scaled by dt * wave, updated in place at each step
     scaled = second.copy()
     lower, diagonal, upper = (second.diagonal(k=k) for k in (-1, 0, 1))
@@ -257,10 +299,17 @@ def solve(
         return fn / weight, fb / weight
 
     lov = ["x", "y", "z", "dtension"]
+    lov_dims = [2, 2, 2, 2]
+    balance = None
+    if energy:
+        lov += list(_energy.NAMES)
+        lov_dims += [1] * len(_energy.NAMES)
+        balance = _energy.EnergyBalance(geom, vt2, vl2, damping, weight * length**2)
+        balance.start(un, ub, vn, vb)
     res = simulation.Results(
         lot=parameters.time_vector_output().tolist(),
         lov=lov,
-        lov_dims=[2, 2, 2, 2],
+        lov_dims=lov_dims,
         los=parameters.los,
     )
 
@@ -275,11 +324,87 @@ def solve(
                 position[1],
                 position[2],
                 dtension * conductor.axial_stiffness,
-            ],
+            ]
+            + ([] if balance is None else balance.values()),
         )
+
+    # implicit strain: newton tangent and round-off floor of the step residual
+    h = 1.0 / (ns - 1)
+    second_norm = fdu.inf_norm(second)
+    full_n, full_b = np.zeros(ns), np.zeros(ns)
+
+    def implicit_step(speed, e_old, fn, fb):
+        """Newton on the step with the strain averaged over the step.
+
+        ``speed`` is the explicit step, the first iterate. The tangent is the
+        tridiagonal matrix of the explicit step, built with the averaged
+        strain, minus the rank-one term ``g a^T`` from the dependence of
+        that strain on the new state, solved by Sherman-Morrison: one call
+        on four right-hand sides. Returns the velocity, the residual and the
+        threshold it was compared to.
+        """
+        v = speed.copy()
+
+        def residual(v):
+            full_n[1:-1] = un[1:-1] + ht * (vn[1:-1] + v[:, 0])
+            full_b[1:-1] = ub[1:-1] + ht * (vb[1:-1] + v[:, 1])
+            e_mean = 0.5 * (e_old + _strain(full_n, full_b, geom, vt2))
+            wave = vt2 + vl2 * e_mean
+            d2n = second @ (0.5 * (un[1:-1] + full_n[1:-1]))
+            d2b = second @ (0.5 * (ub[1:-1] + full_b[1:-1]))
+            terms = (
+                (1.0 - damping) * v,
+                (1.0 + damping) * np.column_stack((vn[1:-1], vb[1:-1])),
+                dt * wave * np.column_stack((d2n, d2b)),
+                dt * vl2 * e_mean / vt2,
+                dt * np.column_stack((fn[1:-1], fb[1:-1])),
+            )
+            r = terms[0] - terms[1] - terms[2] - terms[4]
+            r[:, 0] -= terms[3]
+            return r, wave, d2n, d2b, e_mean, terms
+
+        r, wave, d2n, d2b, e_mean, terms = residual(v)
+        threshold = max(
+            tol * fdu.residual_scale(terms),
+            fdu.round_off_floor(
+                [
+                    (1.0 - damping, v),
+                    (dt * wave * second_norm, full_n),
+                    (dt * wave * second_norm, full_b),
+                ]
+            ),
+        )
+        error = np.abs(r).max()
+        n_iter = 0
+        while n_iter < max_iter and error > threshold:
+            tau = -(ht**2) * wave
+            g = dt * vl2 * np.column_stack((d2n + 1.0 / vt2, d2b))
+            a = (
+                0.25
+                * dt
+                * h
+                * np.column_stack(
+                    (-(1.0 / vt2 + second @ full_n[1:-1]), -(second @ full_b[1:-1]))
+                )
+            )
+            *_, sol, info = lapack.dgtsv(
+                tau * lower,
+                1.0 - damping + tau * diagonal,
+                tau * upper,
+                np.column_stack((-r, g)),
+            )
+            if info != 0:
+                break
+            x, y = sol[:, :2], sol[:, 2:]
+            v = v + x + y * np.sum(a * x) / (1.0 - np.sum(a * y))
+            r, wave, d2n, d2b, e_mean, terms = residual(v)
+            error = np.abs(r).max()
+            n_iter += 1
+        return v, error, threshold
 
     res.start_timer()
     snapshot(0, ut, un, ub, dtension)
+    converged = True
 
     t = parameters.t0 / time_scale
     warned = False
@@ -290,7 +415,7 @@ def solve(
         wave = vt2 + vl2 * strain
 
         cfl = np.sqrt(wave) * dt / min_ds
-        if cfl > 1.0 and not warned:
+        if cfl > 1.0 and not warned and not implicit_strain:
             warnings.warn(
                 f"CFL number is {cfl:.3e} > 1 at step {step + 1}: increase the "
                 "number of time steps or decrease parameters.ns",
@@ -327,13 +452,42 @@ def solve(
         if info != 0:
             raise np.linalg.LinAlgError("singular matrix")
 
+        if implicit_strain:
+            speed, error, threshold = implicit_step(
+                speed, strain, 0.5 * (fn1 + fn2), 0.5 * (fb1 + fb2)
+            )
+            if not (error <= threshold and np.all(np.isfinite(speed))):
+                print(
+                    f"dynamic solve did not converge at step {step + 1}"
+                    f"/{parameters.nt} (t = {(t + dt) * time_scale:.6g} s): "
+                    f"max|residual| = {error:.3e} for a target of {threshold:.3e}"
+                )
+                converged = False
+                break
+
+        if balance is not None:
+            un_old, ub_old = un.copy(), ub.copy()
         un[1:-1] += ht * (vn[1:-1] + speed[:, 0])
         ub[1:-1] += ht * (vb[1:-1] + speed[:, 1])
         vn[1:-1] = speed[:, 0]
         vb[1:-1] = speed[:, 1]
         t += dt
+        if balance is not None:
+            balance.step(
+                un_old,
+                ub_old,
+                un,
+                ub,
+                vn,
+                vb,
+                0.5 * (fn1 + fn2),
+                0.5 * (fb1 + fb2),
+                dt,
+            )
 
-        ut, dtension, strain = _stretching(un, ub, first, geom, vt2)
+        ut, dtension, strain = _stretching(
+            un, ub, first, geom, vt2, half_node=implicit_strain
+        )
 
         if (step + 1) % parameters.rr == 0:
             snapshot((step + 1) // parameters.rr, ut, un, ub, dtension)
@@ -341,11 +495,12 @@ def solve(
 
     pb.close()
     res.stop_timer()
-    res.set_state(
-        {
-            "position": _to_global(ut * length, un * length, ub * length, geom),
-            "velocity": (vn * geom.en + vb * geom.eb) * speed_scale,
-        }
-    )
+    if converged:
+        res.set_state(
+            {
+                "position": _to_global(ut * length, un * length, ub * length, geom),
+                "velocity": (vn * geom.en + vb * geom.eb) * speed_scale,
+            }
+        )
 
     return res

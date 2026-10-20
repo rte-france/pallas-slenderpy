@@ -21,11 +21,12 @@ triad; SI units. Shared variable names (the output contract):
 | ``eta`` | Bouc-Wen internal variable | no | yes |
 | ``n_iter`` | Newton iterations of the step (scalar) | no | yes |
 | ``dtension`` | dynamic increment of axial force (N) | yes | no |
-| ``kinetic_energy`` | kinetic energy (J, scalar, ``energy=True``) | no | yes |
-| ``tension_energy`` | potential energy of the tension (J, scalar, ``energy=True``) | no | yes |
+| ``kinetic_energy`` | kinetic energy (J, scalar, ``energy=True``) | yes | yes |
+| ``tension_energy`` | potential energy of the tension (J, scalar, ``energy=True``) | yes | yes |
+| ``axial_energy`` | energy of the uniform dynamic strain (J, scalar, ``energy=True``) | yes | no |
 | ``bending_energy`` | energy of the linear bending moment (J, scalar, ``energy=True``) | no | yes |
-| ``external_work`` | work done by the force (J, scalar, ``energy=True``) | no | yes |
-| ``damping_work`` | energy dissipated by damping (J, scalar, ``energy=True``) | no | yes |
+| ``external_work`` | work done by the force (J, scalar, ``energy=True``) | yes | yes |
+| ``damping_work`` | energy dissipated by damping (J, scalar, ``energy=True``) | yes | yes |
 | ``hysteresis_work`` | work absorbed by the Bouc-Wen term (J, scalar, ``energy=True``) | no | yes |
 | ``curvature_work`` | bending work not stored with the exact curvature (J, scalar, ``energy=True``) | no | yes |
 | ``boundary_work`` | work done by the supports (J, scalar, ``energy=True``) | no | yes |

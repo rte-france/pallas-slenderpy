@@ -1,11 +1,13 @@
 """Tests for the cable dynamic solver."""
 
+import warnings
+
 import numpy as np
 import pytest
 from scipy.optimize import brentq
 
 from slenderpy._constant import _GRAVITY
-from slenderpy.cable import dynamic
+from slenderpy.cable import _model, dynamic
 from slenderpy.cable.static import catenary
 from slenderpy.components import Conductor, Span
 from slenderpy.force.air import Air
@@ -183,27 +185,29 @@ def _period(t, y):
     return 2.0 * np.mean(np.diff(crossings))
 
 
-def _free_response(offset, direction, tf=60.0, amplitude=0.02):
+def _free_response(offset, direction, tf=60.0, amplitude=0.02, **kwargs):
     """Run a free vibration from a first-mode offset along a triad direction."""
     cd, sp = _conductor(), _span(0.0)
     pm = _parameters(tf=tf, dt=2.0e-03, dr=1.0e-02, ns=101, los=[0.5])
     geom = dynamic._geometry(cd, sp, pm.ns)
     shape = amplitude * np.sin(np.pi * geom.s)
     position = geom.equilibrium() + shape * getattr(geom, direction)
-    res = dynamic.solve(cd, sp, pm, initial_position=position)
+    res = dynamic.solve(cd, sp, pm, initial_position=position, **kwargs)
     return geom, res, np.array(res.lot())
 
 
-def test_out_of_plane_frequency_matches_the_taut_string():
+@pytest.mark.parametrize("implicit", [False, True])
+def test_out_of_plane_frequency_matches_the_taut_string(implicit):
     from slenderpy.cable import frequency
 
-    geom, res, t = _free_response(0.02, "eb")
+    geom, res, t = _free_response(0.02, "eb", implicit_strain=implicit)
     expected = frequency.natural(LSPAN, TENSION, 0.0, MASS, method="catenary")
     measured = 1.0 / _period(t, res["y"].values[:, 0])
     assert measured == pytest.approx(expected, rel=0.02)
 
 
-def test_in_plane_frequency_matches_the_irvine_root():
+@pytest.mark.parametrize("implicit", [False, True])
+def test_in_plane_frequency_matches_the_irvine_root(implicit):
     """The linearised in-plane operator is Irvine's, with lambda^2 = vl2/vt2^3."""
     cd, sp = _conductor(), _span(0.0)
     geom = dynamic._geometry(cd, sp, 101)
@@ -219,7 +223,7 @@ def test_in_plane_frequency_matches_the_irvine_root():
     f0 = np.sqrt(vt2) / (2.0 * np.sqrt(geom.length / G))
     expected = f0 * k / np.pi
 
-    _, res, t = _free_response(0.02, "en")
+    _, res, t = _free_response(0.02, "en", implicit_strain=implicit)
     measured = 1.0 / _period(t, res["z"].values[:, 0])
     assert measured == pytest.approx(expected, rel=0.02)
 
@@ -596,3 +600,236 @@ def test_default_start_on_a_short_slack_span():
     pm = Parameters(ns=401, t0=0.0, tf=0.1, dt=1.0e-03, dr=1.0e-02, los=[0.5])
     res = dynamic.solve(_conductor(), span, pm, force=drag)
     assert np.all(np.isfinite(res["y"].values))
+
+
+# --- half-node strain ------------------------------------------------------
+
+
+def test_half_node_strain_gradient_is_the_solver_operator():
+    """d(e_h)/d(un) = -h (1/vt2 + D2 un) and d(e_h)/d(ub) = -h D2 ub."""
+    ns = 41
+    geom = dynamic._geometry(_conductor(), _span(30.0), ns)
+    vt2 = 3.0
+    rng = np.random.default_rng(0)
+    un, ub = np.zeros(ns), np.zeros(ns)
+    un[1:-1], ub[1:-1] = 1e-3 * rng.standard_normal((2, ns - 2))
+    _, second = _model._operators(ns)
+    h = 1.0 / (ns - 1)
+    expected_n = -h * (1.0 / vt2 + second @ un[1:-1])
+    expected_b = -h * (second @ ub[1:-1])
+    eps = 1e-6
+    for i in range(1, ns - 1):
+        bump = np.zeros(ns)
+        bump[i] = eps
+        dn = (
+            _model._strain(un + bump, ub, geom, vt2)
+            - _model._strain(un - bump, ub, geom, vt2)
+        ) / (2 * eps)
+        db = (
+            _model._strain(un, ub + bump, geom, vt2)
+            - _model._strain(un, ub - bump, geom, vt2)
+        ) / (2 * eps)
+        assert dn == pytest.approx(expected_n[i - 1], rel=1e-7, abs=1e-12)
+        assert db == pytest.approx(expected_b[i - 1], rel=1e-7, abs=1e-12)
+
+
+def test_half_node_stretching_uses_the_half_node_strain():
+    ns = 41
+    geom = dynamic._geometry(_conductor(), _span(30.0), ns)
+    first, _ = _model._operators(ns)
+    un = 1e-3 * np.sin(np.pi * geom.s)
+    ub = 5e-4 * np.sin(2 * np.pi * geom.s)
+    _, _, e = _model._stretching(un, ub, first, geom, 3.0, half_node=True)
+    assert e == pytest.approx(_model._strain(un, ub, geom, 3.0), rel=1e-14)
+    # the default path keeps the centered derivative
+    _, _, centered = _model._stretching(un, ub, first, geom, 3.0)
+    assert centered != e
+
+
+# --- energy balance --------------------------------------------------------
+
+# reference span of the energy tests: a 440 m line span, no level difference
+LINE = Span(length=440.0, tension=31000.0)
+ENERGY = (
+    "kinetic_energy",
+    "tension_energy",
+    "axial_energy",
+    "external_work",
+    "damping_work",
+)
+
+
+def _line_frequency():
+    """First taut-string frequency of the line span."""
+    return 0.5 / LINE.length * np.sqrt(LINE.tension / MASS)
+
+
+def _line_run(ns=101, per_period=400, periods=10, amplitude=0.1, los=None, **kwargs):
+    """Run on the line span from symmetric in-plane and antisymmetric
+    out-of-plane offsets, with the energy balance."""
+    geom = dynamic._geometry(_conductor(), LINE, ns)
+    position = geom.equilibrium() + amplitude * (
+        np.sin(np.pi * geom.s) * geom.en + 0.3 * np.sin(2 * np.pi * geom.s) * geom.eb
+    )
+    dt = 1.0 / (_line_frequency() * per_period)
+    parameters = Parameters(
+        ns=ns,
+        t0=0.0,
+        tf=periods * per_period * dt,
+        dt=dt,
+        dr=dt,
+        los=[0.25, 0.5] if los is None else los,
+    )
+    kwargs.setdefault("energy", True)
+    return dynamic.solve(
+        _conductor(), LINE, parameters, initial_position=position, **kwargs
+    )
+
+
+def _cable_balance(res):
+    """The quantity the energy balance keeps constant."""
+    v = {name: res[name].values for name in ENERGY}
+    return (
+        v["kinetic_energy"]
+        + v["tension_energy"]
+        + v["axial_energy"]
+        + v["damping_work"]
+        - v["external_work"]
+    )
+
+
+def _cable_scale(res):
+    return max(np.nanmax(np.abs(res[name].values)) for name in ENERGY)
+
+
+def _cable_drift(res):
+    """Largest departure of the balance from its initial value, over the scale."""
+    balance = _cable_balance(res)
+    return np.abs(balance - balance[0]).max() / _cable_scale(res)
+
+
+def test_energy_fields_layout():
+    plain = _line_run(periods=0.1, energy=False)
+    assert plain.lov() == ["x", "y", "z", "dtension"]
+    res = _line_run(periods=0.1)
+    assert res.lov() == plain.lov() + list(ENERGY)
+    for name in ENERGY:
+        assert res.lov_dims[name] == 1, name
+        assert res[name].values.shape == (len(res.lot()),), name
+    assert res["external_work"].values[0] == 0.0
+    assert res["damping_work"].values[0] == 0.0
+
+
+def test_explicit_energy_drifts():
+    """The lagged strain pumps energy into the symmetric in-plane mode."""
+    res = _line_run()
+    # measured 3.3 over 10 periods at 400 steps per period
+    assert _cable_drift(res) > 1e-3
+
+
+def test_energy_does_not_depend_on_los():
+    mid = _line_run(periods=1, los=[0.5])
+    ends = _line_run(periods=1, los=[0.0, 0.25, 1.0])
+    for name in ENERGY:
+        np.testing.assert_allclose(
+            ends[name].values, mid[name].values, rtol=1e-14, err_msg=name
+        )
+
+
+def test_explicit_mode_is_unchanged_by_the_energy_flag():
+    with_energy = _line_run(periods=1)
+    without = _line_run(periods=1, energy=False)
+    for name in ("x", "y", "z", "dtension"):
+        assert np.array_equal(with_energy[name].values, without[name].values), name
+
+
+# --- implicit strain -------------------------------------------------------
+
+
+@pytest.mark.parametrize("per_period", [100, 400])
+def test_implicit_free_vibration_conserves_energy(per_period):
+    """Energy conserved to the Newton tolerance, past the CFL limit too.
+
+    The explicit first iterate alone drifts by more than 1 here, so a closed
+    balance also proves that Newton iterated.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        res = _line_run(amplitude=1.0, per_period=per_period, implicit_strain=True)
+    assert _cable_drift(res) <= 1e-8
+
+
+def test_implicit_with_damping_and_excitation_closes_the_balance():
+    excitation = PointExcitation(
+        frequency=_line_frequency(), amplitude=100.0, position=0.3 * LINE.length
+    )
+    res = _line_run(
+        periods=2, amplitude=0.0, implicit_strain=True, zeta=0.02, force=excitation
+    )
+    scale = _cable_scale(res)
+    assert _cable_drift(res) <= 1e-8
+    damping = res["damping_work"].values
+    assert np.diff(damping).min() >= -1e-12 * scale
+    assert damping[-1] > 0.0
+    assert res["external_work"].values[-1] != 0.0
+
+
+def test_implicit_with_wind_drag_closes_the_balance():
+    """A state-dependent force, lagged by one step as in the explicit mode."""
+    drag = WindDrag(diameter=DIAMETER, wind=ConstantWind(15.0))
+    res = _line_run(periods=2, amplitude=0.0, implicit_strain=True, force=drag)
+    assert np.all(np.isfinite(res["y"].values))
+    assert _cable_drift(res) <= 1e-8
+
+
+def test_modes_converge_to_the_same_solution():
+    gaps = []
+    for per_period in (400, 1600):
+        runs = [
+            _line_run(periods=1, per_period=per_period, implicit_strain=implicit)
+            for implicit in (False, True)
+        ]
+        gaps.append(
+            max(
+                np.abs(runs[0][name].values - runs[1][name].values).max()
+                for name in ("y", "z")
+            )
+        )
+    assert gaps[0] / gaps[1] > 2.0
+
+
+def test_implicit_non_convergence_returns_nan_and_no_state():
+    res = _line_run(
+        periods=1, amplitude=1.0, implicit_strain=True, max_iter=1, tol=1e-30
+    )
+    assert res.state is None
+    assert np.isnan(res["z"].values[-1, :]).all()
+    assert np.isnan(res["kinetic_energy"].values[-1])
+
+
+def test_implicit_state_allows_a_restart():
+    ns, per_period = 101, 400
+    dt = 1.0 / (_line_frequency() * per_period)
+    geom = dynamic._geometry(_conductor(), LINE, ns)
+    position = geom.equilibrium() + 1.0 * np.sin(np.pi * geom.s) * geom.en
+
+    def run(tf, initial_position, initial_velocity=None):
+        parameters = Parameters(ns=ns, t0=0.0, tf=tf, dt=dt, dr=dt, los=[0.5])
+        return dynamic.solve(
+            _conductor(),
+            LINE,
+            parameters,
+            initial_position=initial_position,
+            initial_velocity=initial_velocity,
+            implicit_strain=True,
+        )
+
+    whole = run(2 * per_period * dt, position)
+    first = run(per_period * dt, position)
+    second = run(per_period * dt, first.state["position"], first.state["velocity"])
+    np.testing.assert_allclose(
+        second["z"].values[:, 0],
+        whole["z"].values[per_period:, 0],
+        rtol=1e-9,
+        atol=1e-9,
+    )
