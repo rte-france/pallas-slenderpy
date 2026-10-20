@@ -3,7 +3,9 @@
 The constant laws keep their amplitude; the Bouc-Wen law dissipates energy
 through its hysteresis at the clamps, so its vibration decays. The second
 figure shows that hysteresis: the moment-curvature loops at the clamp, inside
-the static envelope of the law.
+the static envelope of the law. The third one is the energy balance of the
+Bouc-Wen run: the energy of the motion goes into the hysteresis, and the
+stacked total stays constant.
 """
 
 import matplotlib.pyplot as plt
@@ -47,6 +49,7 @@ for model, ei, label in laws:
         ei=ei,
         force=weight,
         initial_position=1.5 * rest,
+        energy=True,
     )
     t = res.lot()
     top.plot(t, 1e3 * (res["z"].values[:, 1] - rest[parameters.ns // 2]), label=label)
@@ -70,5 +73,27 @@ ax.set(xlabel="curvature at the clamp (1/m)", ylabel="moment at the clamp (N.m)"
 ax.set_title("hysteresis at the clamp")
 ax.grid(True)
 ax.legend()
+fig.tight_layout()
+
+# energy balance of the Bouc-Wen run. The weight is a potential energy, minus
+# its work; each term is shifted by its minimum over the run, which keeps the
+# layers positive and only moves the total by a constant
+terms = [
+    ("kinetic", res["kinetic_energy"].values),
+    ("tension", res["tension_energy"].values),
+    ("bending", res["bending_energy"].values),
+    ("weight", -res["external_work"].values),
+    ("hysteresis (absorbed)", res["hysteresis_work"].values),
+]
+layers = [values - values.min() for _, values in terms]
+balance = sum(values for _, values in terms)
+drift = np.abs(balance - balance[0]).max() / np.abs(balance).max()
+fig, ax = plt.subplots(figsize=(10, 4))
+ax.stackplot(t, layers, labels=[name for name, _ in terms])
+ax.plot(t, sum(layers), "k", lw=1, label="total")
+ax.set(xlabel="time (s)", ylabel="energy - its minimum (J)")
+ax.set_title(f"energy balance, Bouc-Wen run (relative drift {drift:.1e})")
+ax.grid(True)
+ax.legend(loc="center left", bbox_to_anchor=(1.01, 0.5))
 fig.tight_layout()
 plt.show()
