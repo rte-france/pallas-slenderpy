@@ -2,7 +2,9 @@
 
 Out of plane the cable vibrates at the taut-string frequency; in plane the
 first symmetric mode is stiffened by the cable stretching (Irvine), so its
-frequency sits above the taut-string one.
+frequency sits above the taut-string one. The run uses the implicit strain,
+which conserves the energy: the second figure stacks the kinetic, tension and
+axial energies, whose total stays constant.
 """
 
 import matplotlib.pyplot as plt
@@ -20,7 +22,12 @@ parameters = simulation.Parameters(ns=101, tf=120.0, dt=2.0e-03, dr=2.0e-02, los
 x, y, z = dynamic.equilibrium(conductor, span, parameters.ns)
 bump = 0.5 * np.sin(np.pi * x / span.length)
 res = dynamic.solve(
-    conductor, span, parameters, initial_position=np.stack([x, y + bump, z + bump])
+    conductor,
+    span,
+    parameters,
+    initial_position=np.stack([x, y + bump, z + bump]),
+    implicit_strain=True,
+    energy=True,
 )
 spc = simulation.spectrum(res)
 f_taut = frequency.natural(span.length, span.tension, span.sld, conductor.mass)
@@ -41,5 +48,24 @@ for ax in (top, bottom):
     ax.grid(True)
     ax.legend(loc="upper right")
 fig.suptitle("400 m span, tension 37 kN, free vibration")
+fig.tight_layout()
+
+# energy balance; each term is shifted by its minimum over the run, which
+# keeps the layers positive and only moves the total by a constant
+terms = [
+    ("kinetic", res["kinetic_energy"].values),
+    ("tension", res["tension_energy"].values),
+    ("axial", res["axial_energy"].values),
+]
+layers = [values - values.min() for _, values in terms]
+balance = sum(values for _, values in terms)
+drift = np.abs(balance - balance[0]).max() / np.abs(balance).max()
+fig, ax = plt.subplots(figsize=(10, 4))
+ax.stackplot(res.lot(), layers, labels=[name for name, _ in terms])
+ax.plot(res.lot(), sum(layers), "k", lw=1, label="total")
+ax.set(xlabel="time (s)", ylabel="energy - its minimum (J)")
+ax.set_title(f"energy balance, implicit strain (relative drift {drift:.1e})")
+ax.grid(True)
+ax.legend(loc="center left", bbox_to_anchor=(1.01, 0.5))
 fig.tight_layout()
 plt.show()

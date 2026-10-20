@@ -7,7 +7,9 @@ Free vibration of a clamped span released from 1.5 times its static shape.
 The constant laws keep their amplitude; the Bouc-Wen law dissipates energy
 through its hysteresis at the clamps, so its vibration decays. The second
 figure shows that hysteresis: the moment-curvature loops at the clamp, inside
-the static envelope of the law.
+the static envelope of the law. The third one is the energy balance of the
+Bouc-Wen run (``energy=True``): the energy of the motion goes into the
+hysteresis, and the stacked total stays constant.
 
 Source: `examples/beam_dynamic.py`.
 

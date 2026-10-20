@@ -6,7 +6,10 @@ Free vibration of a suspended cable released from a perturbed catenary.
 
 Out of plane the cable vibrates at the taut-string frequency; in plane the
 first symmetric mode is stiffened by the cable stretching (Irvine), so its
-frequency sits above the taut-string one.
+frequency sits above the taut-string one. The run uses the implicit strain
+(``implicit_strain=True``), which conserves the energy: the second figure
+stacks the kinetic, tension and axial energies (``energy=True``), whose total
+stays constant.
 
 Source: `examples/cable_dynamic.py`.
 
