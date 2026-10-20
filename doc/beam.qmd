@@ -171,6 +171,158 @@ tangent of $EI_{max}$ its gain is $EI_{max}/EI_{min}$. A step that
 does not converge stops the run; the snapshots already computed are kept and
 the remaining ones are left at ``nan``.
 
+## Energy balance
+
+### Continuous balance
+
+Multiplying the beam equation
+$m \ddot{y} + c \dot{y} + \frac{\partial^2 M}{\partial x^2} - H \frac{\partial^2 y}{\partial x^2} = F$
+by the velocity $v = \dot{y}$, integrating over the span and by parts gives
+
+$$
+\frac{d}{dt} \left( E_k + E_H + E_B \right) + P_c + P_\eta + P_\chi = P_F + P_b
+$$
+
+with the kinetic, tension and bending energies
+
+$$
+E_k = \int_0^L \frac{m}{2} v^2 dx, \quad
+E_H = \int_0^L \frac{H}{2} \left( \frac{\partial y}{\partial x} \right)^2 dx, \quad
+E_B = \int_0^L \frac{EI_{lin}}{2} \chi^2 dx
+$$
+
+the powers dissipated by the damping, absorbed by the Bouc-Wen term
+$M - EI_{lin} \chi = (EI_{max} - EI_{min}) \chi_0 \eta$ (varying model only)
+and by the exact curvature
+
+$$
+P_c = \int_0^L c v^2 dx, \quad
+P_\eta = \int_0^L (EI_{max} - EI_{min}) \chi_0 \eta \dot{\chi} dx, \quad
+P_\chi = \int_0^L M \left( \frac{\partial^2 v}{\partial x^2} - \dot{\chi} \right) dx
+$$
+
+the power of the external force $P_F = \int_0^L F v dx$ and the power of the
+supports
+
+$$
+P_b = \left[ H \frac{\partial y}{\partial x} v - \frac{\partial M}{\partial x} v + M \frac{\partial v}{\partial x} \right]_0^L
+$$
+
+$P_\chi$ is zero for the approximate curvature, where
+$\frac{\partial^2 v}{\partial x^2} = \dot{\chi}$. With the exact curvature
+it is not: the term $\frac{\partial^2 M}{\partial x^2}$ of the equation is not
+the variation of $E_B$, so part of the bending work is not stored as $E_B$.
+$P_b$ is zero for fixed hinged or clamped supports.
+
+### Usage
+
+[](`~slenderpy.beam.dynamic.solve_dynamic`) with ``energy=True`` adds eight
+scalars per output time to the results, in J:
+
+| name | meaning |
+|------|---------|
+| ``kinetic_energy`` | $E_k$ |
+| ``tension_energy`` | $E_H$ |
+| ``bending_energy`` | $E_B$, energy stored by the linear part of the moment |
+| ``external_work`` | work done by the force on the beam, gravity included |
+| ``damping_work`` | energy dissipated by $\zeta$, never negative |
+| ``hysteresis_work`` | work absorbed by the Bouc-Wen term, zero for the constant model |
+| ``curvature_work`` | work of the moment not stored as $E_B$, zero for the approximate curvature |
+| ``boundary_work`` | work provided (positive) or absorbed (negative) by the supports |
+
+The works are cumulated from ``t0``, where they are zero, and
+
+    kinetic_energy + tension_energy + bending_energy
+        + damping_work + hysteresis_work + curvature_work
+        - external_work - boundary_work
+
+is constant in time.
+
+### Discrete balance
+
+The balance is computed on the discrete equation the solver solves, not with
+a separate quadrature. The Crank-Nicolson step gives
+$y^{n+1} - y^n = \Delta t \, v^{n+1/2}$, so the row $i$ of the step
+multiplied by $\delta y_i = y_i^{n+1} - y_i^n$ is the work of each term over
+the step. Let $I$ be the rows the scheme solves (nodes 2 to $N-3$, the others
+carry the boundary conditions), $J$ the nodes 1 to $N-2$, $D_2$ the centered
+second difference, $\bar{a} = (a^n + a^{n+1})/2$ and
+$\delta a = a^{n+1} - a^n$. The state energies are
+
+$$
+E_k = \frac{m}{2} \Delta x \sum_I v_i^2, \quad
+E_H = \frac{H}{2} \Delta x \sum_{j=0}^{N-2} \left( \frac{y_{j+1} - y_j}{\Delta x} \right)^2, \quad
+E_B = \frac{EI_{lin}}{2} \Delta x \sum_J \chi_j^2
+$$
+
+and the works are increased at each step by
+
+$$
+\begin{aligned}
+\delta W_F &= \Delta x \sum_I \bar{F}_i \delta y_i, \quad
+\delta W_c = \frac{c}{\Delta t} \Delta x \sum_I \delta y_i^2, \quad
+\delta W_\eta = (EI_{max} - EI_{min}) \chi_0 \Delta x \sum_J \bar{\eta}_j \delta \chi_j \\
+\delta W_\chi &= \Delta x \sum_J \bar{M}_j \left( (D_2 \delta y)_j - \delta \chi_j \right) \\
+\delta W_b &= \Delta x \sum_J \bar{M}_j (D_2 \delta y)_j - \Delta x \sum_I (D_2 \bar{M})_i \delta y_i
++ H \Delta x \sum_I (D_2 \bar{y})_i \delta y_i + \delta E_H
+\end{aligned}
+$$
+
+$\bar{M} \delta \chi$ is exactly $\delta (EI_{lin} \chi^2 / 2)$ plus the
+Bouc-Wen term, and $\delta W_b$ collects what summation by parts leaves at the
+ends. The balance therefore holds to the residual of each step: to round-off
+for the constant model with the approximate curvature, to the Newton
+tolerance otherwise.
+
+The discrete supports are not exactly inert. On a 440 m span
+($H$ = 31000 N, first mode of 0.5 m amplitude, 4 periods, constant model,
+approximate curvature), the drift of the balance relative to the initial
+energy is:
+
+| supports | ns | without ``boundary_work`` | with ``boundary_work`` |
+|----------|----|---------------------------|------------------------|
+| clamped | 201 | 2.8e-13 | 2.8e-13 |
+| clamped | 401 | 1.4e-12 | 1.4e-12 |
+| clamped | 801 | 5.8e-12 | 5.8e-12 |
+| hinged | 201 | 3.9e-05 | 3.1e-13 |
+| hinged | 401 | 4.9e-06 | 1.4e-12 |
+| hinged | 801 | 6.2e-07 | 5.9e-12 |
+
+``boundary_work`` is round-off for clamped supports and falls as
+$\Delta x^3$ for hinged ones, thanks to the curvature stencil of the boundary
+rows (see [Boundary Conditions](#boundary-conditions)). With moving supports
+(``dynamic_values``) it also holds their physical work. The remaining drift is
+the round-off of the $D_4$ operator, which grows like $EI / \Delta x^4$.
+
+Limits:
+
+* $E_k$ is summed on $I$: the velocity of nodes 0, 1, $N-2$ and $N-1$ is set
+  by the boundary rows, zero at a fixed clamped end and of order $\Delta x$ at
+  a fixed hinged one;
+* on a Bouc-Wen step solved by the fallback (branch lagged, see
+  [](`~slenderpy.beam.dynamic.solve_dynamic`)) the balance only holds to first
+  order;
+* the force is evaluated at the state of the previous step, as in the solver,
+  so a state-dependent force is lagged by one step in ``external_work`` too;
+* the coupled Stockbridge solver does not compute the balance.
+
+### Compute cost
+
+The balance adds a fixed number of vector operations on the ``ns`` nodes per
+time step, about 80 $\mu$s at ``ns = 401``. Measured on the 440 m span with
+hinged supports, ``ns = 401``, 1600 steps, gravity and a point excitation
+(median of 7 runs, ``compute_time``):
+
+| case | ``energy=False`` | ``energy=True`` | overhead |
+|------|------------------|-----------------|----------|
+| constant model, approximate curvature | 0.086 s | 0.154 s | about 80 % |
+| varying model, exact curvature | 1.41 s | 1.42 s | about 1 % |
+
+The overhead shows in the linear case, where a step is a single triangular
+solve (about 50 $\mu$s). A Newton step costs 0.6 to 0.9 ms, so the balance
+adds at most about 10 % there, less than the spread between repeated runs
+(1.0 to 1.4 s for the same case).
+
 
 ## Boundary Conditions
 
@@ -195,11 +347,19 @@ To take into account properly these boundary conditions in the finite difference
 $$
 \begin{aligned}
 a_1 y_0 + b_1 \frac{y_1 - y_0}{\Delta x} + c_1 \frac{y_0 - 2y_1 + y_2}{\Delta x^2} = d_1 \\
-a_2 y_0 + b_2 \frac{y_1 - y_0}{\Delta x} + c_2 \frac{y_0 - 2y_1 + y_2}{\Delta x^2} = d_2 \\
-a_3 y_N + b_3 \frac{y_N - y_{N-1}}{\Delta x} + c_3 \frac{y_N - 2y_{N-1} + y_{N-2}}{\Delta x^2} = d_3 \\
+a_2 y_0 + b_2 \frac{y_1 - y_0}{\Delta x} + c_2 \frac{2y_0 - 5y_1 + 4y_2 - y_3}{\Delta x^2} = d_2 \\
+a_3 y_N + b_3 \frac{y_N - y_{N-1}}{\Delta x} + c_3 \frac{2y_N - 5y_{N-1} + 4y_{N-2} - y_{N-3}}{\Delta x^2} = d_3 \\
 a_4 y_N + b_4 \frac{y_N - y_{N-1}}{\Delta x} + c_4 \frac{y_N - 2y_{N-1} + y_{N-2}}{\Delta x^2} = d_4
 \end{aligned}
 $$
+
+The curvature of the second relation of each end uses the one-sided
+second-order stencil, so that a hinged condition holds at the support node
+itself. The centered stencil, which the first relation keeps, would place
+the second relation one node inside and make the support provide or absorb
+energy at first order in $\Delta x$ (see [Energy balance](#energy-balance));
+the first relation keeps it because a four-point stencil there would not fit
+the pentadiagonal band of the solvers.
 
 Thus the corresponding matrix and vector of the equation above are:
 
@@ -207,9 +367,9 @@ $$
 \begin{aligned}
 A &= \begin{pmatrix}
 a_1 - \frac{b_1}{\Delta x} + \frac{c_1}{\Delta x^2} & \frac{b_1}{\Delta x} - \frac{2c_1}{\Delta x^2}  & \frac{c_1}{\Delta x^2} & 0 & \cdots & \cdots & 0 \\
-a_2 - \frac{b_2}{\Delta x} + \frac{c_2}{\Delta x^2} & \frac{b_2}{\Delta x} - \frac{2c_2}{\Delta x^2}  & \frac{c_2}{\Delta x^2} & 0 & \cdots & \cdots  & 0 \\
+a_2 - \frac{b_2}{\Delta x} + \frac{2c_2}{\Delta x^2} & \frac{b_2}{\Delta x} - \frac{5c_2}{\Delta x^2}  & \frac{4c_2}{\Delta x^2} & - \frac{c_2}{\Delta x^2} & \cdots & \cdots  & 0 \\
 0 &\ddots & \ddots &  \ddots &  \ddots &  \ddots & 0 \\
-0 & \cdots & \cdots & 0 & \frac{c_3}{\Delta x^2} & - \frac{b_3}{\Delta x} - \frac{2c_3}{\Delta x^2} & a_3 + \frac{b_3}{\Delta x} + \frac{c_3}{\Delta x^2} \\
+0 & \cdots & \cdots & - \frac{c_3}{\Delta x^2} & \frac{4c_3}{\Delta x^2} & - \frac{b_3}{\Delta x} - \frac{5c_3}{\Delta x^2} & a_3 + \frac{b_3}{\Delta x} + \frac{2c_3}{\Delta x^2} \\
 0 & \cdots & \cdots & 0 & \frac{c_4}{\Delta x^2} & - \frac{b_4}{\Delta x} - \frac{2c_4}{\Delta x^2} & a_4 + \frac{b_4}{\Delta x} + \frac{c_4}{\Delta x^2}
 \end{pmatrix} \\
 b &= \begin{pmatrix}

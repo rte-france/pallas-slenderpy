@@ -44,7 +44,7 @@ def test_compute_fills_the_boundary_rows():
     n, ds = 6, 0.5
     matrix, rhs = hinged(1.0, 2.0).compute(n, ds)
     assert matrix[0, 0] == 1.0
-    assert matrix[1, :3].toarray().ravel() == pytest.approx([4.0, -8.0, 4.0])
+    assert matrix[1, :4].toarray().ravel() == pytest.approx([8.0, -20.0, 16.0, -4.0])
     assert matrix[-1, -1] == 1.0
     assert rhs == pytest.approx([1.0, 0.0, 0.0, 0.0, 0.0, 2.0])
 
@@ -67,3 +67,34 @@ def test_update_rhs_order_2_uses_first_and_last():
     )
     rhs = bc.update_rhs(4, np.linspace(0.0, 1.0, 4), 0.0)
     assert rhs == pytest.approx([1.0, 0.0, 0.0, 2.0])
+
+
+def test_hinged_curvature_rows_use_the_one_sided_stencil():
+    # the curvature of the second relation is taken at the bound node, not
+    # one node inside
+    ds = 0.5
+    dense = hinged().compute(7, ds)[0].toarray()
+    np.testing.assert_allclose(dense[1], np.array([2, -5, 4, -1, 0, 0, 0]) / ds**2)
+    np.testing.assert_allclose(dense[-2], np.array([0, 0, 0, -1, 4, -5, 2]) / ds**2)
+    np.testing.assert_allclose(dense[0], [1, 0, 0, 0, 0, 0, 0])
+    np.testing.assert_allclose(dense[-1], [0, 0, 0, 0, 0, 0, 1])
+
+
+def test_mixed_second_relation_keeps_its_slope_term():
+    ds = 0.5
+    bc = BoundaryCondition(
+        4,
+        left=((1, 0, 0, 0), (0, 1, 1, 0)),
+        right=((1, 0, 0, 0), (0, 1, 1, 0)),
+    )
+    dense = bc.compute(7, ds)[0].toarray()
+    np.testing.assert_allclose(
+        dense[1],
+        np.array([-1, 1, 0, 0, 0, 0, 0]) / ds
+        + np.array([2, -5, 4, -1, 0, 0, 0]) / ds**2,
+    )
+    np.testing.assert_allclose(
+        dense[-2],
+        np.array([0, 0, 0, 0, 0, -1, 1]) / ds
+        + np.array([0, 0, 0, -1, 4, -5, 2]) / ds**2,
+    )

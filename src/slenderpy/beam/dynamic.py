@@ -21,6 +21,7 @@ import slenderpy.beam.curvature as curvature
 import slenderpy.fd_utils as fdu
 import slenderpy.simulation as simulation
 from slenderpy import _progress_bar as spb
+from slenderpy.beam import _energy
 from slenderpy.beam.bending import BendingModel
 from slenderpy.beam.static import shape
 from slenderpy.components import Conductor, Span
@@ -43,6 +44,7 @@ def solve_dynamic(
     zeta: float = 0.0,
     tol: float = 1.0e-06,
     max_iter: int = 64,
+    energy: bool = False,
 ) -> simulation.Results:
     """Dynamic solver for beam equations (either 1-2-3 or 1-2-3bis-4) :
     (1) mass*(d^2/dt^2)*y + 2*mass*w0*zeta*(d/dt)*y + (d^2/dx^2)*M - tension*(d^2/dx^2)*y = force
@@ -154,6 +156,9 @@ def solve_dynamic(
     max_iter : int, optional
         Maximum number of Newton iterations per step, and per fallback
         solve. Default 64.
+    energy : bool, optional
+        If True, adds the energy balance of the solve to the results, see
+        Returns. Default False.
 
     Returns
     -------
@@ -166,6 +171,21 @@ def solve_dynamic(
         left at nan. The final state, recorded with
         [](`~slenderpy.simulation.Results.set_state`), keeps the same five fields, under
         the same names, at full ``ns`` resolution.
+
+        With ``energy=True``, eight scalars per output time are added (J):
+        the state energies ``kinetic_energy``, ``tension_energy`` and
+        ``bending_energy`` (of the linear part ``ei_linear * chi`` of the
+        moment), and the works cumulated from ``t0``: ``external_work``
+        (done by ``force``), ``damping_work`` (dissipated by ``zeta``),
+        ``hysteresis_work`` (absorbed by the Bouc-Wen term, zero for the
+        constant model), ``curvature_work`` (the part of the bending work
+        the exact curvature does not store in ``bending_energy``, zero for
+        the approximate curvature) and ``boundary_work`` (done on the beam
+        at the boundary rows). ``kinetic_energy + tension_energy +
+        bending_energy + damping_work + hysteresis_work + curvature_work -
+        external_work - boundary_work`` is then constant up to the step
+        residual, except on the fallback steps above, where the error is
+        first order. They are computed on the nodes, whatever ``los``.
     """
     model = BendingModel(model)
 
@@ -275,25 +295,27 @@ def solve_dynamic(
 
     # output
     lov = ["z", "vz", "curvature", "moment", "eta", "n_iter"]
+    lov_dims = [2, 2, 2, 2, 2, 1]
+    balance = None
+    if energy:
+        lov += list(_energy.NAMES)
+        lov_dims += [1] * len(_energy.NAMES)
+        balance = _energy.EnergyBalance(conductor.mass, span.tension, damp, law, ds, dt)
+        balance.start(y_old, v_old, chi_old)
     res = simulation.Results(
         lot=parameters.time_vector_output().tolist(),
         lov=lov,
-        lov_dims=[2, 2, 2, 2, 2, 1],
+        lov_dims=lov_dims,
         los=parameters.los,
     )
     res.start_timer()
+    moment_old = law.dynamic_moment(chi_old, eta_old)
     res.update(
         0,
         x / span.length,
         lov,
-        [
-            y_old,
-            v_old,
-            chi_old,
-            law.dynamic_moment(chi_old, eta_old),
-            eta_old,
-            0,
-        ],
+        [y_old, v_old, chi_old, moment_old, eta_old, 0]
+        + ([] if balance is None else balance.values()),
     )
 
     # time loop
@@ -435,23 +457,33 @@ def solve_dynamic(
                 converged = False
                 break
 
+        moment_new = law.dynamic_moment(chi_new, eta_new)
+        if balance is not None:
+            balance.step(
+                y_old,
+                y_new,
+                v_new,
+                chi_old,
+                chi_new,
+                moment_old,
+                moment_new,
+                eta_old,
+                eta_new,
+                load,
+            )
+
         if (step + 1) % parameters.rr == 0:
             res.update(
                 (step + 1) // parameters.rr,
                 x / span.length,
                 lov,
-                [
-                    y_new,
-                    v_new,
-                    chi_new,
-                    law.dynamic_moment(chi_new, eta_new),
-                    eta_new,
-                    n_iter,
-                ],
+                [y_new, v_new, chi_new, moment_new, eta_new, n_iter]
+                + ([] if balance is None else balance.values()),
             )
             pb.update(parameters.rr)
 
         t_old = t_new
+        moment_old = moment_new
         v_prev = v_old
         y_old, v_old, chi_old, eta_old = y_new, v_new, chi_new, eta_new
         if not linear:

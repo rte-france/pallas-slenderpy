@@ -181,6 +181,15 @@ class BoundaryCondition:
     ) -> Tuple[sp.sparse.lil_matrix, np.ndarray[float]]:
         """Compute the matrices of the scheme and the right-hand side linked to the boundary conditions.
 
+        Each relation fills one row: rows 0 and -1 hold the first relation of
+        each end, rows 1 and -2 the second one (order 4). The derivatives are
+        one-sided at the bound, ``(y1 - y0) / ds`` for the slope, and for the
+        curvature ``(y0 - 2*y1 + y2) / ds**2`` in rows 0 and -1 but the
+        second-order ``(2*y0 - 5*y1 + 4*y2 - y3) / ds**2`` in rows 1 and -2,
+        so that a hinged end holds at the support itself; a 4-point stencil
+        in rows 0 and -1 would not fit the pentadiagonal band of the
+        solvers. Mirrored on the right end.
+
         Parameters
         ----------
         n : int
@@ -214,13 +223,20 @@ class BoundaryCondition:
             a2, b2, c2, d2 = self.left[1]
             a3, b3, c3, d3 = self.right[1]
 
-            bc_matrix[1, 0] = a2 - b2 / ds + c2 / ds**2
-            bc_matrix[1, 1] = b2 / ds - 2 * c2 / ds**2
-            bc_matrix[1, 2] = c2 / ds**2
+            # the curvature of the second relation is taken at the bound node
+            # with the one-sided second-order stencil; the centered one would
+            # put it one node inside, which leaks energy at first order (a
+            # hinged end). Four columns still fit the pentadiagonal band from
+            # these rows, not from rows 0 and -1
+            bc_matrix[1, 0] = a2 - b2 / ds + 2 * c2 / ds**2
+            bc_matrix[1, 1] = b2 / ds - 5 * c2 / ds**2
+            bc_matrix[1, 2] = 4 * c2 / ds**2
+            bc_matrix[1, 3] = -c2 / ds**2
 
-            bc_matrix[-2, -1] = a3 + b3 / ds + c3 / ds**2
-            bc_matrix[-2, -2] = -b3 / ds - 2 * c3 / ds**2
-            bc_matrix[-2, -3] = c3 / ds**2
+            bc_matrix[-2, -1] = a3 + b3 / ds + 2 * c3 / ds**2
+            bc_matrix[-2, -2] = -b3 / ds - 5 * c3 / ds**2
+            bc_matrix[-2, -3] = 4 * c3 / ds**2
+            bc_matrix[-2, -4] = -c3 / ds**2
 
             rhs[1] = d2
             rhs[-2] = d3
