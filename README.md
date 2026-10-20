@@ -15,9 +15,11 @@ and beams, under their weight, wind and point excitations.
 ## Features
 
 - Cable: catenary, parabolic and elastic closed forms; static shape under any
-  load; time-domain solver (Lee and Perkins model); natural frequencies.
+  load; time-domain solver (Lee and Perkins model), with an optional
+  energy-conserving implicit strain and an energy balance; natural frequencies.
 - Beam: static shape and dynamics of a tensioned beam, with a constant
-  bending stiffness or a Bouc-Wen (hysteretic) bending law.
+  bending stiffness or a Bouc-Wen (hysteretic) bending law, and an optional
+  energy balance of the dynamic solve.
 - Forces: gravity, point excitation, wind drag with constant or turbulent
   wind and a Reynolds-dependent drag coefficient, composed with `+`.
 - Fatigue: rainflow cycle counting at a distance from a support.

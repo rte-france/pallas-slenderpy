@@ -796,9 +796,11 @@ def test_non_convergence_returns_nan_and_no_state():
         initial_velocity=np.zeros_like(x),
         max_iter=1,
         tol=1e-30,
+        energy=True,
     )
     assert res.state is None
     assert np.isnan(res["z"].values[-1, :]).all()
+    assert np.isnan(res["kinetic_energy"].values[-1])
 
 
 def test_output_layout():
@@ -979,3 +981,252 @@ def test_order_2_boundary_conditions_raise():
     parameters = simulation.Parameters(ns=11, tf=1.0, dt=0.01)
     with pytest.raises(ValueError, match="order-4"):
         solve_dynamic(conductor, span, parameters)
+
+
+# --------------------------------------------------------------------------
+# energy balance
+# --------------------------------------------------------------------------
+
+# reference span of the energy tests, a line span with no support level
+# difference: length (m) and tension (N)
+LINE = (440.0, 31000.0)
+ENERGY = (
+    "kinetic_energy",
+    "tension_energy",
+    "bending_energy",
+    "external_work",
+    "damping_work",
+    "hysteresis_work",
+    "curvature_work",
+    "boundary_work",
+)
+
+
+def _line_span(bc):
+    return Span(length=LINE[0], tension=LINE[1], boundary_conditions=bc)
+
+
+def _line_frequency():
+    """First taut-string frequency of the line span."""
+    return 0.5 / LINE[0] * np.sqrt(LINE[1] / CONDUCTOR.mass)
+
+
+def _line_parameters(ns, periods=4.0, per_period=400, **kwargs):
+    """Time stepping on the first taut-string period of the line span."""
+    f0 = _line_frequency()
+    kwargs.setdefault("dr", 1.0 / (f0 * per_period))
+    return simulation.Parameters(
+        ns=ns, tf=periods / f0, dt=1.0 / (f0 * per_period), **kwargs
+    )
+
+
+def _free_shape(length, ns, amplitude=0.5):
+    """Initial deflection meeting hinged and clamped conditions alike."""
+    x = np.linspace(0.0, length, ns)
+    return amplitude * np.sin(np.pi * x / length) ** 3
+
+
+def _balance(res):
+    """The quantity the energy balance keeps constant."""
+    v = {name: res[name].values for name in ENERGY}
+    return (
+        v["kinetic_energy"]
+        + v["tension_energy"]
+        + v["bending_energy"]
+        + v["damping_work"]
+        + v["hysteresis_work"]
+        + v["curvature_work"]
+        - v["external_work"]
+        - v["boundary_work"]
+    )
+
+
+def _drift(res):
+    """Largest departure of the balance from its initial value."""
+    balance = _balance(res)
+    return np.abs(balance - balance[0]).max()
+
+
+def _energy_scale(res):
+    return max(np.nanmax(np.abs(res[name].values)) for name in ENERGY)
+
+
+def _free_vibration(bc, ns, parameters=None, **kwargs):
+    """Free vibration of the line span from the reference shape."""
+    return solve_dynamic(
+        CONDUCTOR,
+        _line_span(bc),
+        _line_parameters(ns) if parameters is None else parameters,
+        initial_position=_free_shape(LINE[0], ns),
+        energy=True,
+        **kwargs,
+    )
+
+
+def test_energy_fields_layout():
+    parameters = simulation.Parameters(ns=51, t0=0.0, tf=0.4, dt=0.004, dr=0.04)
+    plain = solve_dynamic(CONDUCTOR, BRETELLE, parameters, force=_gravity(CONDUCTOR))
+    assert plain.lov() == ["z", "vz", "curvature", "moment", "eta", "n_iter"]
+
+    res = solve_dynamic(
+        CONDUCTOR, BRETELLE, parameters, force=_gravity(CONDUCTOR), energy=True
+    )
+    assert res.lov() == plain.lov() + list(ENERGY)
+    for name in ENERGY:
+        assert res.lov_dims[name] == 1, name
+        assert res[name].values.shape == (parameters.nr + 1,), name
+    for name in ENERGY[3:]:
+        assert res[name].values[0] == 0.0, name
+
+
+def test_free_vibration_clamped_conserves_energy():
+    res = _free_vibration(clamped(), 201)
+    scale = _energy_scale(res)
+    assert _drift(res) <= 1e-10 * scale
+    assert np.abs(res["boundary_work"].values).max() <= 1e-13 * scale
+
+
+def test_hinged_boundary_work_converges_at_third_order():
+    boundary = []
+    for ns in (201, 401):
+        res = _free_vibration(hinged(), ns)
+        scale = _energy_scale(res)
+        assert _drift(res) <= 1e-10 * scale, ns
+        boundary.append(np.abs(res["boundary_work"].values).max() / scale)
+    # measured 3.9e-05 then 4.9e-06: the term is exercised, and falls as ds**3
+    assert boundary[0] > 1e-6
+    assert boundary[0] / boundary[1] > 6.0
+
+
+def test_curvature_work():
+    ns = 201
+    parameters = simulation.Parameters(ns=ns, tf=0.5, dt=1e-4, dr=1e-3)
+    initial = _free_shape(BRETELLE.length, ns)
+    span = Span(
+        length=BRETELLE.length,
+        tension=BRETELLE.tension,
+        boundary_conditions=clamped(),
+    )
+    for approx in (True, False):
+        res = solve_dynamic(
+            CONDUCTOR,
+            span,
+            parameters,
+            approx_curvature=approx,
+            initial_position=initial,
+            energy=True,
+        )
+        scale = _energy_scale(res)
+        work = np.abs(res["curvature_work"].values).max()
+        if approx:
+            assert work <= 1e-12 * scale
+        else:
+            # measured 8e-02 for this large slope
+            assert work > 1e-2 * scale
+        assert _drift(res) <= 1e-8 * scale, approx
+
+
+@pytest.mark.parametrize("bc", [hinged(), clamped()], ids=["hinged", "clamped"])
+@pytest.mark.parametrize("model, approx", CASES)
+def test_energy_balance_closes(model, approx, bc):
+    excitation = PointExcitation(
+        frequency=_line_frequency(), amplitude=100.0, position=0.3 * LINE[0]
+    )
+    res = solve_dynamic(
+        CONDUCTOR,
+        _line_span(bc),
+        _line_parameters(101, periods=2.0),
+        model=model,
+        approx_curvature=approx,
+        force=_gravity(CONDUCTOR) + excitation,
+        zeta=0.02,
+        tol=1e-10,
+        energy=True,
+    )
+    scale = _energy_scale(res)
+    assert _drift(res) <= 1e-8 * scale
+
+    damping = res["damping_work"].values
+    assert np.diff(damping).min() >= -1e-12 * scale
+    assert damping[-1] > 0.0
+
+    hysteresis = np.abs(res["hysteresis_work"].values).max()
+    if model is BendingModel.CONSTANT:
+        assert hysteresis == 0.0
+    else:
+        assert hysteresis > 0.0
+
+
+def test_external_work_of_a_constant_force():
+    ns = 101
+    res = solve_dynamic(
+        CONDUCTOR,
+        _line_span(hinged()),
+        _line_parameters(ns, periods=1.0, los=ns),
+        force=_gravity(CONDUCTOR),
+        initial_position=np.zeros(ns),
+        energy=True,
+    )
+    # the work of a constant force only depends on the end points
+    ds = LINE[0] / (ns - 1)
+    z = res["z"].values
+    weight = -_GRAVITY * CONDUCTOR.mass
+    expected = ds * weight * (z[:, 2:-2] - z[0, 2:-2]).sum(axis=1)
+    np.testing.assert_allclose(
+        res["external_work"].values,
+        expected,
+        rtol=1e-12,
+        atol=1e-12 * _energy_scale(res),
+    )
+
+
+def test_energy_does_not_depend_on_los():
+    ns = 201
+    on_nodes = _free_vibration(clamped(), ns, _line_parameters(ns, los=ns))
+    mid_span = _free_vibration(clamped(), ns, _line_parameters(ns, los=[0.5]))
+    for name in ENERGY:
+        np.testing.assert_allclose(
+            mid_span[name].values, on_nodes[name].values, rtol=1e-14, err_msg=name
+        )
+
+
+def test_energy_does_not_depend_on_output_rate():
+    ns = 201
+    every = _free_vibration(clamped(), ns)
+    dt = every.lot()[1] - every.lot()[0]
+    sparse = _free_vibration(clamped(), ns, _line_parameters(ns, dr=7 * dt))
+    for name in ENERGY:
+        np.testing.assert_allclose(
+            sparse[name].values,
+            every[name].values[::7][: len(sparse.lot())],
+            rtol=1e-12,
+            atol=1e-14 * _energy_scale(every),
+            err_msg=name,
+        )
+
+
+def test_energy_balance_with_moving_supports():
+    """A heaving support works on the beam; the balance still closes."""
+    amplitude, pulsation = 0.01, 2.0 * np.pi * 2.0
+
+    def heave(x, t):
+        return amplitude * pulsation * np.cos(pulsation * t)
+
+    def still(x, t):
+        return 0.0
+
+    bc = BoundaryCondition(4, dynamic_values=[heave, still, still, still])
+    span = Span(
+        length=BRETELLE.length, tension=BRETELLE.tension, boundary_conditions=bc
+    )
+    ns = 101
+    res = solve_dynamic(
+        CONDUCTOR,
+        span,
+        simulation.Parameters(ns=ns, tf=1.0, dt=1e-4, dr=1e-3),
+        initial_position=np.zeros(ns),
+        energy=True,
+    )
+    scale = _energy_scale(res)
+    assert _drift(res) <= 1e-8 * scale
+    assert np.abs(res["boundary_work"].values).max() > 1e-6 * scale

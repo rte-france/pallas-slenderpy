@@ -103,6 +103,94 @@ interface is global:
 A `UserWarning` is raised when the CFL number exceeds 1. See the [cable
 dynamic example](examples/cable_dynamic.qmd).
 
+### Implicit strain
+
+By default the uniform strain $e$ of the equations is taken at the start of
+the step. This explicit treatment pumps energy into the symmetric in-plane
+mode, at a rate proportional to the time step. On a 440 m span
+($H$ = 31000 N, $EA = 3.76 \cdot 10^7$ N, no level difference, ``ns = 101``),
+undamped free vibration from a symmetric in-plane offset, the total energy
+relative to its initial value is:
+
+| steps per period | after 1 period | 5 periods | 10 periods |
+|------------------|----------------|-----------|------------|
+| 400 | 1.14 | 1.76 | 4.29 |
+| 1600 | 1.03 | 1.15 | 1.43 |
+
+With ``implicit_strain=True`` the step uses the mean of the strain at the start
+and at the end of the step, $\bar{e} = (e^n + e^{n+1})/2$, with $e$ computed
+from the slopes of the segments:
+
+$$
+e = \sum_j \Delta s \left( -\frac{u_{n,j} + u_{n,j+1}}{2 v_t^2}
++ \frac{(u_{n,j+1} - u_{n,j})^2 + (u_{b,j+1} - u_{b,j})^2}{2 \Delta s^2} \right)
+$$
+
+whose gradient is exactly the second-difference operator of the scheme. Since
+$e$ is quadratic, $e^{n+1} - e^n$ is that gradient at the mid-step times the
+displacement increment, and the work of the axial term over a step is exactly
+the increment of $v_l^2 e^2 / 2$: the energy is conserved up to the Newton
+tolerance, whatever the time step (no CFL limit; the accuracy still needs a
+small enough step).
+
+The step is solved by Newton, started from the explicit step. Its tangent is
+the tridiagonal matrix of the explicit step plus a rank-one term (the strain
+depends on the whole state), solved by Sherman-Morrison with one call of the
+tridiagonal solver on four right-hand sides; one or two iterations are usual.
+``tol`` defaults to $10^{-10}$, tighter than the beam solver: the explicit
+first iterate already meets a loose tolerance, and stopping there keeps its
+drift. A step that does not converge within ``max_iter`` stops the run, the
+remaining snapshots are left at ``nan`` and no final state is recorded. The
+explicit scheme stays the default.
+
+### Energy balance
+
+Multiplying the equations by the velocity and integrating along the cable,
+with pinned ends, gives
+
+$$
+\frac{d}{dt} \left( E_k + E_H + E_A \right) + P_c = P_F
+$$
+
+with, in dimensional form, $E_k = \int \frac{m}{2} (v_n^2 + v_b^2) ds$,
+$E_H = \int \frac{H}{2} (u_{n,s}^2 + u_{b,s}^2) ds$ the energy of the static
+tension, $E_A = \frac{EA \, L}{2} e^2$ the energy of the uniform dynamic strain,
+$P_c$ the power dissipated by the damping and
+$P_F = \int (f_n v_n + f_b v_b) ds$ the power of the force projected on the
+normal and binormal. [](`~slenderpy.cable.dynamic.solve`) with
+``energy=True`` adds five scalars per output time, in J:
+
+| name | meaning |
+|------|---------|
+| ``kinetic_energy`` | $E_k$, interior nodes |
+| ``tension_energy`` | $E_H$, slopes of the segments |
+| ``axial_energy`` | $E_A$, with the strain above |
+| ``external_work`` | work done by the force, cumulated from ``t0`` |
+| ``damping_work`` | energy dissipated by $\zeta$, cumulated from ``t0``, never negative |
+
+The works add, at each step, the force the step uses times the displacement
+increment, and the damping term of the step times the same increment, on the
+interior nodes. With ``implicit_strain=True``
+
+    kinetic_energy + tension_energy + axial_energy + damping_work - external_work
+
+is constant up to the Newton tolerance (relative drifts of $10^{-13}$ to
+$10^{-10}$ on the span above); with the explicit scheme it drifts as shown in
+the table above. The names shared with the beam solver have the same meaning.
+
+The works are accumulated at every time step; the energies, functions of the
+state, are only computed at the output steps. On the span above, ``ns = 101``,
+10 periods at 400 steps per period with one output every 10 steps (fastest of
+9 runs, ``compute_time``):
+
+| case | ``energy=False`` | ``energy=True`` | overhead |
+|------|------------------|-----------------|----------|
+| explicit | 0.355 s | 0.403 s | about 14 % |
+| ``implicit_strain=True`` | 0.914 s | 0.966 s | about 6 % |
+
+The implicit strain costs about 2.5 times the explicit step, and the balance
+adds about 12 $\mu$s per step in both modes.
+
 ## Natural frequencies
 
 [](`~slenderpy.cable.frequency.natural`) gives the taut-string frequency with

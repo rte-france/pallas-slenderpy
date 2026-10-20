@@ -1,10 +1,10 @@
 import numpy as np
 import pytest
 
-from slenderpy.beam import bending
+from slenderpy.beam import bending, curvature
 from slenderpy.beam.static import shape
 from slenderpy.beam.static.shape import BendingModel, solve
-from slenderpy.boundary_condition import BoundaryCondition, clamped
+from slenderpy.boundary_condition import BoundaryCondition, clamped, hinged
 from slenderpy.components import Conductor, Span
 
 
@@ -319,3 +319,14 @@ def test_non_convergence_returns_nan():
         max_iter=1,
     )
     assert np.isnan(y).all()
+
+
+def test_hinged_static_curvature_vanishes_at_the_supports():
+    """The hinged condition holds at the support node itself."""
+    conductor = Conductor(mass=1.57, ei_max=2155.07)
+    span = Span(length=50.0, tension=2.0e04, boundary_conditions=hinged())
+    n = 101
+    y = solve(conductor, span, np.full(n, -9.81 * conductor.mass), n)
+    chi = curvature.create(n, span.length / (n - 1), True).value(y)
+    assert abs(chi[0]) <= 1e-10 * np.abs(chi).max()
+    assert abs(chi[-1]) <= 1e-10 * np.abs(chi).max()

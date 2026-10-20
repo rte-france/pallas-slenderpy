@@ -132,15 +132,38 @@ def _operators(ns):
     return first.tocsr(), second
 
 
-def _stretching(un, ub, first, geom: _Geometry, vt2):
+def _segments(un, ub, geom: _Geometry, vt2):
+    """Integrand of the uniform strain on each segment, with half-node slopes.
+
+    Trapezoidal ``-un/vt2`` and the squared slopes of the segment. Their sum
+    is the strain whose gradient is the operator of the dynamic solver,
+    ``-ds * (1/vt2 + D2 un)`` and ``-ds * D2 ub`` on the interior nodes.
+    """
+    sn = np.diff(un) / geom.ds
+    sb = np.diff(ub) / geom.ds
+    return (-0.5 * (un[:-1] + un[1:]) / vt2 + 0.5 * (sn**2 + sb**2)) * geom.ds
+
+
+def _strain(un, ub, geom: _Geometry, vt2):
+    """Uniform strain ``e`` built on half-node slopes, see ``_segments``."""
+    return np.sum(_segments(un, ub, geom, vt2))
+
+
+def _stretching(un, ub, first, geom: _Geometry, vt2, half_node=False):
     """Tangential offset and axial strain from the quasi-static condition.
 
     Returns the tangential offset ``ut``, the local axial strain, and the
     uniform strain
     ``e``, the integral over the cable of ``-un/vt2 + (un_s^2 + ub_s^2)/2``.
+    The slopes of that integral come from ``first`` at the nodes, as in the
+    legacy solver, or with ``half_node`` from the segments, which gives the
+    strain of ``_strain``.
     """
-    h = -un / vt2 + 0.5 * ((first * un) ** 2 + (first * ub) ** 2)
-    segment = 0.5 * (h[:-1] + h[1:]) * geom.ds
+    if half_node:
+        segment = _segments(un, ub, geom, vt2)
+    else:
+        h = -un / vt2 + 0.5 * ((first * un) ** 2 + (first * ub) ** 2)
+        segment = 0.5 * (h[:-1] + h[1:]) * geom.ds
     e = np.sum(segment)
     ut = e * geom.s - np.cumsum(np.concatenate(([0.0], segment)))
     strain = (first * ut) + 0.5 * (
