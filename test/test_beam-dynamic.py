@@ -601,7 +601,7 @@ def test_free_vibration_period_matches_theory():
 
 
 def test_undamped_run_conserves_amplitude():
-    """Crank-Nicolson is non-dissipative: the amplitude must not decay."""
+    """A resolved mode keeps its amplitude: the hht damping is negligible on it."""
     ns = 201
     x = np.linspace(0.0, SPAN.length, ns)
     y0 = 0.5 * np.sin(np.pi * x / SPAN.length)
@@ -998,6 +998,7 @@ ENERGY = (
     "damping_work",
     "hysteresis_work",
     "curvature_work",
+    "numerical_work",
     "boundary_work",
 )
 
@@ -1036,6 +1037,7 @@ def _balance(res):
         + v["damping_work"]
         + v["hysteresis_work"]
         + v["curvature_work"]
+        + v["numerical_work"]
         - v["external_work"]
         - v["boundary_work"]
     )

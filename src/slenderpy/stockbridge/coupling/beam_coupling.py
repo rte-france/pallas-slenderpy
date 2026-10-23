@@ -11,6 +11,7 @@ import slenderpy.fd_utils as fdu
 from slenderpy import _progress_bar as spb
 from slenderpy import simulation
 from slenderpy.beam.bending import BendingModel
+from slenderpy.beam.dynamic import _HHT_ALPHA
 from slenderpy.beam.static import shape
 from slenderpy.components import Conductor, Span
 from slenderpy.stockbridge.core.stockbridge import Result
@@ -101,8 +102,17 @@ def solve_dynamic_with_sb(
     ns = parameters.ns
     ds = span.length / (ns - 1)
     dt = parameters.dt
-    dt2 = 0.5 * dt
     x = np.linspace(0.0, span.length, ns)
+
+    # hht weights, as in beam.dynamic.solve_dynamic: y(n+1) = y_base +
+    # dy_dv * v(n+1), and the step equation, multiplied by gamma*dt, weights
+    # the forces at n+1 by weight_new and the forces at n by weight_old
+    alpha = _HHT_ALPHA
+    gamma = 0.5 - alpha
+    beta = 0.25 * (1.0 - alpha) ** 2
+    dy_dv = beta * dt / gamma
+    weight_new = gamma * dt * (1.0 + alpha)
+    weight_old = -gamma * dt * alpha
     bc = span.boundary_conditions
     order = bc.order
 
@@ -113,14 +123,15 @@ def solve_dynamic_with_sb(
     identity = fdu.clean_matrix(order, sp.sparse.identity(ns))
     chi_operator = curvature.create(ns, ds, approx_curvature)
 
-    # crank-nicolson matrices; A is state-independent, factorise it once
+    # hht matrices; A is state-independent, factorise it once
     f0 = 0.5 / span.length * np.sqrt(span.tension / conductor.mass)
     damp = 2.0 * conductor.mass * 2.0 * np.pi * f0 * zeta
     ei_D4 = law.ei_linear * D4
     stiffness = ei_D4 - span.tension * D2
-    damped_mass = (conductor.mass + dt2 * damp) * identity
-    A = damped_mass + dt2**2 * stiffness + BC
-    B = 2.0 * conductor.mass * identity - damped_mass - dt2**2 * stiffness
+    mass_matrix = conductor.mass * identity
+    damping_matrix = damp * identity
+    damped_mass = mass_matrix + weight_new * damping_matrix
+    A = damped_mass + weight_new * dy_dv * stiffness + BC
     lu = sp.sparse.linalg.splu(sp.sparse.csc_matrix(A))
 
     # round-off floor of the step residual: A @ v and dt * K @ y cannot be
@@ -128,14 +139,15 @@ def solve_dynamic_with_sb(
     # EI / ds**4 on fine grids; the stiffest tangent of the law bounds K
     stiffest = max(law.ei_linear, float(np.max(law.tangent(np.zeros(1)))))
     stiff = stiffest * D4 - span.tension * D2
-    step_norm = fdu.inf_norm(damped_mass + dt2**2 * stiff + BC)
+    step_norm = fdu.inf_norm(damped_mass + weight_new * dy_dv * stiff + BC)
     elastic_norm = dt * fdu.inf_norm(stiff)
 
     # newton tangent, assembled and solved in banded storage. Its constant part
     # and the left factor of its bending term never change; for the approximate
     # curvature the right factor is the constant D2 as well, so only the tangent
     # stiffness varies from one iteration to the next
-    jacobian_base = fdu.banded(A - dt2**2 * ei_D4)
+    tangent_weight = weight_new * dy_dv
+    jacobian_base = fdu.banded(A - tangent_weight * ei_D4)
     left_rows = fdu.tridiagonal(D2)
     if approx_curvature:
         constant_rows = fdu.tridiagonal(chi_operator.jacobian(np.zeros(ns)))
@@ -258,6 +270,19 @@ def solve_dynamic_with_sb(
     v_prev = v_old
 
     force_sb_old = np.zeros(ns)
+    # initial acceleration, from the equation of motion on the solved rows; the
+    # boundary rows prescribe the velocity, their acceleration starts at zero
+    a_old = (
+        fdu.clean_rhs(
+            order,
+            vertical_force(t_old, y_old, v_old)
+            + force_sb_old
+            - damping_matrix @ v_old
+            - stiffness @ y_old
+            - (D2 @ law.dynamic_moment(chi_old, eta_old) - ei_D4 @ y_old),
+        )
+        / conductor.mass
+    )
     # time iteration
     for step in range(parameters.nt):
         t_new = t_old + dt
@@ -271,18 +296,25 @@ def solve_dynamic_with_sb(
         force_sb_new[id_pos_stockbridge + 1] += -0.25 * 2 * force_clamp / d
         force_sb_new[id_pos_stockbridge - 1] += -0.25 * 2 * force_clamp / d
 
-        load = (
-            vertical_force(t_old, y_old, v_old)
-            + force_sb_old
-            + vertical_force(t_new, y_old, v_old)
-            + force_sb_new
-        )
+        # the force is evaluated at the state of the previous step
+        load_old = vertical_force(t_old, y_old, v_old) + force_sb_old
+        load_new = vertical_force(t_new, y_old, v_old) + force_sb_new
         rhs_bc = (
             np.zeros(ns) if bc.dynamic_values is None else bc.update_rhs(ns, x, t_new)
         )
-        inertia = B @ v_old
-        elastic = dt * stiffness @ y_old
-        external = dt2 * fdu.clean_rhs(order, load)
+        # newmark predictors: v(n+1) = v_star + gamma*dt*a(n+1) and
+        # y(n+1) = y_base + dy_dv * v(n+1)
+        v_star = v_old + dt * (1.0 - gamma) * a_old
+        y_base = y_old + dt * v_old + dt**2 * (0.5 - beta) * a_old - dy_dv * v_star
+        inertia = mass_matrix @ v_star
+        elastic = stiffness @ (
+            weight_new * y_base + weight_old * y_old
+        ) + weight_old * (damping_matrix @ v_old)
+        external = (
+            gamma
+            * dt
+            * fdu.clean_rhs(order, (1.0 + alpha) * load_new - alpha * load_old)
+        )
         rhs = inertia - elastic + external + rhs_bc
         threshold = max(
             tol * fdu.residual_scale((inertia, elastic, external, rhs_bc)),
@@ -291,7 +323,7 @@ def solve_dynamic_with_sb(
 
         if linear:
             v_new = lu.solve(rhs)
-            y_new = y_old + dt2 * (v_old + v_new)
+            y_new = y_base + dy_dv * v_new
             chi_new = chi_operator.value(y_new)
             eta_new = eta_old
             n_iter = 1
@@ -304,15 +336,16 @@ def solve_dynamic_with_sb(
                 The law is evaluated on ``branch``, or on its own branch when
                 ``branch`` is None.
                 """
-                y = y_old + dt2 * (v_old + v)
+                y = y_base + dy_dv * v
                 chi = chi_operator.value(y)
-                # curvature increment driving the hysteresis, as the curvature
-                # rate at the end of the step times the step: the same fully
-                # implicit discretisation the eta update of the law is built on
-                dchi = dt * chi_operator.rate(y, v)
+                # the hysteresis is driven by the curvature increment of the
+                # step itself, as in beam.dynamic.solve_dynamic
+                dchi = chi - chi_old
                 eta = law.update_eta(eta_old, dchi, branch)
                 remainder = D2 @ law.dynamic_moment(chi, eta) - ei_D4 @ y
-                residual = A @ v - rhs + dt2 * (remainder_old + remainder)
+                residual = (
+                    A @ v - rhs + weight_old * remainder_old + weight_new * remainder
+                )
                 return y, chi, dchi, eta, residual
 
             def newton(branch=None):
@@ -328,16 +361,12 @@ def solve_dynamic_with_sb(
                 while n_iter < max_iter and error > threshold:
                     y, _, dchi, eta, step_residual = state
                     # tangent bending stiffness of the law over the step. The
-                    # moment reaches the velocity twice: once through the
-                    # curvature, whose derivative carries dt2, and once through
-                    # eta, whose increment carries dt, i.e. twice as much. Only
-                    # the hysteretic part of dynamic_tangent takes the second
-                    # path, so it is the only one weighted twice
-                    tangent = (
-                        2.0 * law.dynamic_tangent(eta, dchi, branch) - law.ei_linear
-                    )
+                    # moment reaches the velocity through the curvature and
+                    # through eta, whose increment is the curvature increment:
+                    # both carry dy_dv, so dynamic_tangent applies as is
+                    tangent = law.dynamic_tangent(eta, dchi, branch)
 
-                    jacobian = jacobian_base + dt2**2 * fdu.product_band(
+                    jacobian = jacobian_base + tangent_weight * fdu.product_band(
                         left_rows, right_rows(y), tangent
                     )
                     try:
@@ -403,16 +432,10 @@ def solve_dynamic_with_sb(
                 converged = False
                 break
 
-        # Compute clamp acceleration from the updated cable state.
-        # This acceleration is passed back to the stockbridge model.
-        bending_moment = law.dynamic_moment(chi_new, eta_new)
-        acc_clamp_new = (
-            vertical_force(t_new, y_old, v_old)[id_pos_stockbridge]
-            + force_sb_new[id_pos_stockbridge]
-            + span.tension * (D2 @ y_new)[id_pos_stockbridge]
-            - (D2 @ bending_moment)[id_pos_stockbridge]
-            - damp * v_new[id_pos_stockbridge]
-        ) / conductor.mass
+        # acceleration of the beam at the end of the step, from the newmark
+        # update; its value at the clamps is passed back to the stockbridges
+        a_new = (v_new - v_star) / (gamma * dt)
+        acc_clamp_new = a_new[id_pos_stockbridge]
         acc_ang_clamp_new = 0 * acc_clamp_new
 
         # loop for all stockbridges
@@ -497,7 +520,8 @@ def solve_dynamic_with_sb(
 
         t_old = t_new
         v_prev = v_old
-        y_old, v_old, chi_old, eta_old = y_new, v_new, chi_new, eta_new
+        y_old, v_old, a_old = y_new, v_new, a_new
+        chi_old, eta_old = chi_new, eta_new
         if not linear:
             dchi_old = dchi_new
 
