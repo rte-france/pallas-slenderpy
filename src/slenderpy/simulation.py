@@ -29,6 +29,7 @@ triad; SI units. Shared variable names (the output contract):
 | ``damping_work`` | energy dissipated by damping (J, scalar, ``energy=True``) | yes | yes |
 | ``hysteresis_work`` | work absorbed by the Bouc-Wen term (J, scalar, ``energy=True``) | no | yes |
 | ``curvature_work`` | bending work not stored with the exact curvature (J, scalar, ``energy=True``) | no | yes |
+| ``numerical_work`` | energy dissipated by the time scheme (J, scalar, ``energy=True``) | no | yes |
 | ``boundary_work`` | work done by the supports (J, scalar, ``energy=True``) | no | yes |
 """
 

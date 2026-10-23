@@ -143,6 +143,31 @@ drift. A step that does not converge within ``max_iter`` stops the run, the
 remaining snapshots are left at ``nan`` and no final state is recorded. The
 explicit scheme stays the default.
 
+### Time convergence
+
+Crank-Nicolson leaves the modes the time step cannot resolve undamped. The
+beam solver uses an HHT scheme instead (see [the beam page](beam.qmd)),
+because there those modes switch the branches of the Bouc-Wen law and the
+solution stops converging. The cable has no such switch: its nonlinearity, the
+uniform strain, is smooth, and Crank-Nicolson converges.
+
+It is checked on three spans (440 m at 39 kN, 50 m at 5 kN and a 5 m jumper
+at 50 N, $EA = 3.76 \cdot 10^7$ N), each in free vibration, under a load at
+its first taut-string frequency and under one at 20 Hz, with 20 steps per
+period of the loading at the coarsest step
+(``test/test_cable-dynamic-convergence.py``). Against a run at
+$\Delta t / 64$, the error falls at each refinement to $\Delta t / 4$ and
+$\Delta t / 16$, by 86 to 274 times overall, at second order on most cases.
+With the explicit strain this only holds while the CFL number stays below 1
+(the 20 Hz load on the long and medium spans). Above it, once the strain grows
+the waves travel at the axial speed $\sqrt{EA/m}$, close to 5 km/s, and the
+coarse explicit runs on the medium span are off by orders of magnitude.
+
+The jumper is loaded out of plane, with a few millimetres of motion. Its 1 m
+sag makes it very stiff in plane: 1 mm of symmetric in-plane motion already
+swings its tension to 50 times the static one, compression included. The
+model has no slack state and returns such negative tensions without warning.
+
 ### Energy balance
 
 Multiplying the equations by the velocity and integrating along the cable,

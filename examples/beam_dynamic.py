@@ -4,8 +4,9 @@ The constant laws keep their amplitude; the Bouc-Wen law dissipates energy
 through its hysteresis at the clamps, so its vibration decays. The second
 figure shows that hysteresis: the moment-curvature loops at the clamp, inside
 the static envelope of the law. The third one is the energy balance of the
-Bouc-Wen run: the energy of the motion goes into the hysteresis, and the
-stacked total stays constant.
+Bouc-Wen run: the energy of the motion goes into the hysteresis (the time
+scheme dissipating a negligible part of it), and the stacked total stays
+constant.
 """
 
 import matplotlib.pyplot as plt
@@ -84,6 +85,7 @@ terms = [
     ("bending", res["bending_energy"].values),
     ("weight", -res["external_work"].values),
     ("hysteresis (absorbed)", res["hysteresis_work"].values),
+    ("time scheme (dissipated)", res["numerical_work"].values),
 ]
 layers = [values - values.min() for _, values in terms]
 balance = sum(values for _, values in terms)

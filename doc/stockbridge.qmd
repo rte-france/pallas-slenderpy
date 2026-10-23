@@ -26,7 +26,10 @@ Solvers, all re-exported by `slenderpy.stockbridge`:
 - [](`~slenderpy.stockbridge.solvers.linearized.solve_linearized_imposed_force`):
   the same with linear springs and dashpots instead of the Bouc-Wen cables;
 - [](`~slenderpy.stockbridge.coupling.beam_coupling.solve_dynamic_with_sb`):
-  dampers attached to a beam span, coupled at every time step.
+  dampers attached to a beam span, coupled at every time step. The beam is
+  advanced with the HHT step of [](`~slenderpy.beam.dynamic.solve_dynamic`)
+  (see [the beam page](beam.qmd)); without dampers both give the same steps.
+  The clamp acceleration passed to the dampers is the one of the beam step.
 
 The script `examples/stockbridge.py` runs each of them; it is not rendered in
 this documentation while the API changes.

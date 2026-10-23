@@ -29,6 +29,12 @@ from slenderpy.components import Conductor, Span
 # smallest newton relaxation factor tried before declaring the step useless
 _MIN_RELAXATION = 1.0e-06
 
+# alpha of the hht scheme: 0 is crank-nicolson, which does not damp the
+# unresolved high-frequency modes. -0.2 damps them (spectral radius 2/3 at
+# infinite frequency) enough to keep a saturated jumper, whose bouc-wen
+# branches switch at every reversal, from chattering; -0.05 and -0.1 do not
+_HHT_ALPHA = -0.2
+
 
 def solve_dynamic(
     conductor: Conductor,
@@ -55,18 +61,36 @@ def solve_dynamic(
     (3bis) M = ei_min*chi + (ei_max-ei_min)*chi0*eta
     (4) chi0 * (d/dt)*eta = (d/dt)*chi - 1/2 * ((d/dt)*chi * abs(eta) + abs((d/dt)*chi) * eta)
 
-    Time integration is Crank-Nicolson on the first-order system, solved for the
-    velocity:
+    Time integration is the HHT-alpha scheme (Hilber-Hughes-Taylor), solved for
+    the velocity. With ``p = C @ v + K @ y + G`` the forces of the equation, the
+    step enforces
 
-        A @ v(n+1) = B @ v(n) - dt*K @ y(n) - dt/2*(G(n) + G(n+1)) + dt/2*(f(n) + f(n+1))
-        y(n+1) = y(n) + dt/2*(v(n) + v(n+1))
+        mass*a(n+1) + (1 + alpha)*p(n+1) - alpha*p(n) = (1 + alpha)*f(n+1) - alpha*f(n)
 
-    with ``K = ei_linear*D4 - tension*D2`` the linear part of the equation,
-    ``A = mass*I + dt/2*damp*I + (dt/2)**2*K + BC``, ``B`` the same with the two
-    last signs flipped, and ``G = D2 @ M - ei_linear*D4 @ y`` the nonlinear
-    remainder (hysteresis and, for the exact curvature, geometry). The split
-    between ``K`` and ``G`` is purely algebraic: the step residual is independent
-    of ``ei_linear``.
+    with the Newmark updates, ``gamma = 1/2 - alpha`` and
+    ``beta = (1 - alpha)**2/4``,
+
+        v(n+1) = v(n) + dt*((1 - gamma)*a(n) + gamma*a(n+1))
+        y(n+1) = y(n) + dt*v(n) + dt**2*((1/2 - beta)*a(n) + beta*a(n+1))
+
+    where ``K = ei_linear*D4 - tension*D2`` is the linear part of the equation,
+    ``C = damp*I`` the damping and ``G = D2 @ M - ei_linear*D4 @ y`` the
+    nonlinear remainder (hysteresis and, for the exact curvature, geometry).
+    The split between ``K`` and ``G`` is purely algebraic: the step residual is
+    independent of ``ei_linear``. Eliminating ``a(n+1)`` and ``y(n+1)`` leaves
+    ``A @ v(n+1)`` with ``A = mass*I + w*C + w*h*K + BC``, ``w = gamma*dt*(1 + alpha)``
+    and ``h = beta*dt/gamma`` the derivative of ``y(n+1)`` in ``v(n+1)``.
+
+    ``alpha = 0`` is Crank-Nicolson, second order but undamped: its unresolved
+    high-frequency modes ring from one step to the next, and with the
+    hysteresis active they switch the Bouc-Wen branches and the solution stops
+    converging in time. ``alpha = -0.2`` damps them (spectral radius 2/3 at
+    infinite frequency) and stays second order: on a resolved mode it adds a
+    damping ratio of about 2.5e-4 at 25 steps per period and 3e-5 at 50.
+    Weaker values (-0.05, -0.1) leave a saturated jumper chattering between
+    branches at its reversals, a chaotic solution that does not converge in
+    time. The ``eta`` of (4) is advanced with the curvature increment of the
+    step, ``chi(n+1) - chi(n)``.
 
     ``G`` vanishes identically for a constant model with the approximate
     curvature. That case is linear, and since ``A`` does not depend on the state
@@ -75,14 +99,11 @@ def solve_dynamic(
     stopped on ``max|residual| <= tol * scale`` with ``scale`` the largest term of
     that residual, using the tangent
 
-        d(residual)/dv = A + (dt/2)**2 * (D2 @ diag(dM/dchi) @ dchi/dy
-                                          - ei_linear*D4)
+        d(residual)/dv = A + w*h * (D2 @ diag(dM/dchi) @ dchi/dy - ei_linear*D4)
 
     where ``dM/dchi`` is ``ei`` for the constant model and, for the varying one,
     the tangent of (3bis)-(4) over the step -- ``ei_max`` on the stiff branch,
-    down to ``ei_min`` once the hysteresis saturates -- with its hysteretic part
-    counted twice, since the ``eta`` path reaches ``v`` through ``dt`` where the
-    curvature path reaches it through ``dt/2``. Iterating instead on a
+    down to ``ei_min`` once the hysteresis saturates. Iterating instead on a
     fixed ``A`` (Picard, as slenderpy does) does not converge here: with
     ``ei_linear = ei_min`` in ``A`` and a true tangent of ``ei_max``, the fixed
     point has a gain of ``ei_max/ei_min``, about 76 for an ASTER 570.
@@ -91,8 +112,10 @@ def solve_dynamic(
 
     - the iteration is Newton on the exact tangent rather than a fixed-point
       iteration, for the reason above;
-    - ``d(chi)/dt`` in (4) is evaluated as ``d(chi)/dy @ v(n+1)`` in both
-      curvature options, i.e. fully implicit like the ``eta`` update it feeds.
+    - the curvature increment driving (4) is ``chi(n+1) - chi(n)``, in both
+      curvature options; the rate at the end of the step times ``dt`` would
+      put ``eta`` half a step ahead of the curvature, a numerical damping
+      proportional to ``dt``;
     - a step whose Newton iteration does not converge within ``max_iter`` is
       re-solved once with the Bouc-Wen branch of every node lagged from the
       previous step, a smooth problem, then ``eta`` is recomputed on the law's
@@ -172,7 +195,7 @@ def solve_dynamic(
         [](`~slenderpy.simulation.Results.set_state`), keeps the same five fields, under
         the same names, at full ``ns`` resolution.
 
-        With ``energy=True``, eight scalars per output time are added (J):
+        With ``energy=True``, nine scalars per output time are added (J):
         the state energies ``kinetic_energy``, ``tension_energy`` and
         ``bending_energy`` (of the linear part ``ei_linear * chi`` of the
         moment), and the works cumulated from ``t0``: ``external_work``
@@ -180,10 +203,12 @@ def solve_dynamic(
         ``hysteresis_work`` (absorbed by the Bouc-Wen term, zero for the
         constant model), ``curvature_work`` (the part of the bending work
         the exact curvature does not store in ``bending_energy``, zero for
-        the approximate curvature) and ``boundary_work`` (done on the beam
-        at the boundary rows). ``kinetic_energy + tension_energy +
-        bending_energy + damping_work + hysteresis_work + curvature_work -
-        external_work - boundary_work`` is then constant up to the step
+        the approximate curvature), ``numerical_work`` (dissipated by the
+        HHT scheme, mostly in the unresolved modes) and ``boundary_work``
+        (done on the beam at the boundary rows). ``kinetic_energy +
+        tension_energy + bending_energy + damping_work + hysteresis_work +
+        curvature_work + numerical_work - external_work - boundary_work``
+        is then constant up to the step
         residual, except on the fallback steps above, where the error is
         first order. They are computed on the nodes, whatever ``los``.
     """
@@ -200,8 +225,17 @@ def solve_dynamic(
     ns = parameters.ns
     ds = span.length / (ns - 1)
     dt = parameters.dt
-    dt2 = 0.5 * dt
     x = np.linspace(0.0, span.length, ns)
+
+    # hht weights: y(n+1) = y_base + dy_dv * v(n+1), and the step equation,
+    # multiplied by gamma*dt, weights the forces at n+1 by weight_new and the
+    # forces at n by weight_old
+    alpha = _HHT_ALPHA
+    gamma = 0.5 - alpha
+    beta = 0.25 * (1.0 - alpha) ** 2
+    dy_dv = beta * dt / gamma
+    weight_new = gamma * dt * (1.0 + alpha)
+    weight_old = -gamma * dt * alpha
     bc = span.boundary_conditions
     order = bc.order
 
@@ -212,15 +246,15 @@ def solve_dynamic(
     identity = fdu.clean_matrix(order, sp.sparse.identity(ns))
     chi_operator = curvature.create(ns, ds, approx_curvature)
 
-    # crank-nicolson matrices; A is state-independent, factorise it once
+    # hht matrices; A is state-independent, factorise it once
     f0 = 0.5 / span.length * np.sqrt(span.tension / conductor.mass)
     damp = 2.0 * conductor.mass * 2.0 * np.pi * f0 * zeta
     ei_D4 = law.ei_linear * D4
     stiffness = ei_D4 - span.tension * D2
-    damped_mass = (conductor.mass + dt2 * damp) * identity
-    A = damped_mass + dt2**2 * stiffness + BC
-    B = 2.0 * conductor.mass * identity - damped_mass - dt2**2 * stiffness
-    dt_stiffness = dt * stiffness
+    mass_matrix = conductor.mass * identity
+    damping_matrix = damp * identity
+    damped_mass = mass_matrix + weight_new * damping_matrix
+    A = damped_mass + weight_new * dy_dv * stiffness + BC
     lu = sp.sparse.linalg.splu(sp.sparse.csc_matrix(A))
 
     # round-off floor of the step residual: A @ v and dt * K @ y cannot be
@@ -228,14 +262,15 @@ def solve_dynamic(
     # EI / ds**4 on fine grids; the stiffest tangent of the law bounds K
     stiffest = max(law.ei_linear, float(np.max(law.tangent(np.zeros(1)))))
     stiff = stiffest * D4 - span.tension * D2
-    step_norm = fdu.inf_norm(damped_mass + dt2**2 * stiff + BC)
+    step_norm = fdu.inf_norm(damped_mass + weight_new * dy_dv * stiff + BC)
     elastic_norm = dt * fdu.inf_norm(stiff)
 
     # newton tangent, assembled and solved in banded storage. Its constant part
     # and the left factor of its bending term never change; for the approximate
     # curvature the right factor is the constant D2 as well, so only the tangent
     # stiffness varies from one iteration to the next
-    jacobian_base = fdu.banded(A - dt2**2 * ei_D4)
+    tangent_weight = weight_new * dy_dv
+    jacobian_base = fdu.banded(A - tangent_weight * ei_D4)
     # lapack band storage, the BANDWIDTH first rows being the workspace of the
     # LU fill-in; the call solve_banded makes, without its allocations
     band = fdu.BANDWIDTH
@@ -300,7 +335,9 @@ def solve_dynamic(
     if energy:
         lov += list(_energy.NAMES)
         lov_dims += [1] * len(_energy.NAMES)
-        balance = _energy.EnergyBalance(conductor.mass, span.tension, damp, law, ds, dt)
+        balance = _energy.EnergyBalance(
+            conductor.mass, span.tension, damp, law, ds, dt, alpha
+        )
         balance.start(y_old)
     res = simulation.Results(
         lot=parameters.time_vector_output().tolist(),
@@ -326,16 +363,41 @@ def solve_dynamic(
     dchi_old = np.zeros(ns)
     # velocity of the step before, for the newton initial guess
     v_prev = v_old
+    # initial acceleration, from the equation of motion on the solved rows; the
+    # boundary rows prescribe the velocity, their acceleration starts at zero
+    load_old = vertical_force(t_old, y_old, v_old)
+    a_old = (
+        fdu.clean_rhs(
+            order,
+            load_old
+            - damping_matrix @ v_old
+            - stiffness @ y_old
+            - (D2 @ moment_old - ei_D4 @ y_old),
+        )
+        / conductor.mass
+    )
 
     for step in range(parameters.nt):
         t_new = t_old + dt
-        load = vertical_force(t_old, y_old, v_old) + vertical_force(t_new, y_old, v_old)
+        # the force is evaluated at the state of the previous step
+        load_old = vertical_force(t_old, y_old, v_old)
+        load_new = vertical_force(t_new, y_old, v_old)
         rhs_bc = (
             np.zeros(ns) if bc.dynamic_values is None else bc.update_rhs(ns, x, t_new)
         )
-        inertia = B @ v_old
-        elastic = dt_stiffness @ y_old
-        external = dt2 * fdu.clean_rhs(order, load)
+        # newmark predictors: v(n+1) = v_star + gamma*dt*a(n+1) and
+        # y(n+1) = y_base + dy_dv * v(n+1)
+        v_star = v_old + dt * (1.0 - gamma) * a_old
+        y_base = y_old + dt * v_old + dt**2 * (0.5 - beta) * a_old - dy_dv * v_star
+        inertia = mass_matrix @ v_star
+        elastic = stiffness @ (
+            weight_new * y_base + weight_old * y_old
+        ) + weight_old * (damping_matrix @ v_old)
+        external = (
+            gamma
+            * dt
+            * fdu.clean_rhs(order, (1.0 + alpha) * load_new - alpha * load_old)
+        )
         rhs = inertia - elastic + external + rhs_bc
         threshold = max(
             tol * fdu.residual_scale((inertia, elastic, external, rhs_bc)),
@@ -344,12 +406,12 @@ def solve_dynamic(
 
         if linear:
             v_new = lu.solve(rhs)
-            y_new = y_old + dt2 * (v_old + v_new)
+            y_new = y_base + dy_dv * v_new
             chi_new = chi_operator.value(y_new)
             eta_new = eta_old
             n_iter = 1
         else:
-            remainder_old = D2 @ law.dynamic_moment(chi_old, eta_old) - ei_D4 @ y_old
+            remainder_old = D2 @ moment_old - ei_D4 @ y_old
 
             def step_state(v, branch=None):
                 """State and step residual reached by a candidate velocity.
@@ -357,15 +419,18 @@ def solve_dynamic(
                 The law is evaluated on ``branch``, or on its own branch when
                 ``branch`` is None.
                 """
-                y = y_old + dt2 * (v_old + v)
+                y = y_base + dy_dv * v
                 chi = chi_operator.value(y)
-                # curvature increment driving the hysteresis, as the curvature
-                # rate at the end of the step times the step: the same fully
-                # implicit discretisation the eta update of the law is built on
-                dchi = dt * chi_operator.rate(y, v)
+                # the hysteresis is driven by the curvature increment of the
+                # step itself: driven by the curvature rate at the end of the
+                # step instead, eta would run half a step ahead of the
+                # curvature, a numerical damping proportional to dt
+                dchi = chi - chi_old
                 eta = law.update_eta(eta_old, dchi, branch)
                 remainder = D2 @ law.dynamic_moment(chi, eta) - ei_D4 @ y
-                residual = A @ v - rhs + dt2 * (remainder_old + remainder)
+                residual = (
+                    A @ v - rhs + weight_old * remainder_old + weight_new * remainder
+                )
                 return y, chi, dchi, eta, residual
 
             def newton(branch=None):
@@ -381,18 +446,15 @@ def solve_dynamic(
                 while n_iter < max_iter and error > threshold:
                     y, _, dchi, eta, step_residual = state
                     # tangent bending stiffness of the law over the step. The
-                    # moment reaches the velocity twice: once through the
-                    # curvature, whose derivative carries dt2, and once through
-                    # eta, whose increment carries dt, i.e. twice as much. Only
-                    # the hysteretic part of dynamic_tangent takes the second
-                    # path, so it is the only one weighted twice
-                    tangent = (
-                        2.0 * law.dynamic_tangent(eta, dchi, branch) - law.ei_linear
-                    )
+                    # moment reaches the velocity through the curvature and
+                    # through eta, whose increment is the curvature increment:
+                    # both carry dy_dv, so dynamic_tangent applies as is
+                    tangent = law.dynamic_tangent(eta, dchi, branch)
 
                     np.add(
                         jacobian_base,
-                        dt2**2 * fdu.product_band(left_rows, right_rows(y), tangent),
+                        tangent_weight
+                        * fdu.product_band(left_rows, right_rows(y), tangent),
                         out=lapack_storage[band:],
                     )
                     *_, increment, info = lapack.dgbsv(
@@ -458,17 +520,22 @@ def solve_dynamic(
                 break
 
         moment_new = law.dynamic_moment(chi_new, eta_new)
+        a_new = (v_new - v_star) / (gamma * dt)
         if balance is not None:
             balance.step(
                 y_old,
                 y_new,
+                v_old,
+                v_new,
+                a_new,
                 chi_old,
                 chi_new,
                 moment_old,
                 moment_new,
                 eta_old,
                 eta_new,
-                load,
+                load_old,
+                load_new,
             )
 
         if (step + 1) % parameters.rr == 0:
@@ -484,7 +551,8 @@ def solve_dynamic(
         t_old = t_new
         moment_old = moment_new
         v_prev = v_old
-        y_old, v_old, chi_old, eta_old = y_new, v_new, chi_new, eta_new
+        y_old, v_old, a_old = y_new, v_new, a_new
+        chi_old, eta_old = chi_new, eta_new
         if not linear:
             dchi_old = dchi_new
 
