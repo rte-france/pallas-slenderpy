@@ -163,10 +163,16 @@ def solve_dynamic(
         ``True`` (default) uses the approximate curvature ``D2 @ y``; ``False``
         uses the exact geometric curvature.
     initial_position : np.ndarray, optional
-        Initial position. Default the static shape under ``force`` at ``t0``,
-        from [](`~slenderpy.beam.static.shape.solve`) with the same model and curvature option.
+        Initial position at the ``ns`` nodes. Default the static shape under
+        ``force`` at ``t0``, from [](`~slenderpy.beam.static.shape.solve`) with
+        the same model and curvature option. The solve runs on the extended
+        grid of [](`slenderpy.boundary_condition`): the ghost nodes of the
+        initial position are set by the boundary relations with their values
+        ``d``, which therefore have to be the values at ``t0``.
     initial_velocity : np.ndarray, optional
-        Initial velocity. Default at rest.
+        Initial velocity at the ``ns`` nodes. Default at rest. Its ghost nodes
+        are set by the boundary relations with the values of
+        ``dynamic_values`` at ``t0``, zero without them.
     initial_bending_moment : np.ndarray, optional
         Initial bending moment, used by the varying model to initialise the
         hysteresis variable. Default the static law at the initial curvature.
@@ -205,7 +211,7 @@ def solve_dynamic(
         the exact curvature does not store in ``bending_energy``, zero for
         the approximate curvature), ``numerical_work`` (dissipated by the
         HHT scheme, mostly in the unresolved modes) and ``boundary_work``
-        (done on the beam at the boundary rows). ``kinetic_energy +
+        (done on the beam by the supports). ``kinetic_energy +
         tension_energy + bending_energy + damping_work + hysteresis_work +
         curvature_work + numerical_work - external_work - boundary_work``
         is then constant up to the step
@@ -226,6 +232,10 @@ def solve_dynamic(
     ds = span.length / (ns - 1)
     dt = parameters.dt
     x = np.linspace(0.0, span.length, ns)
+    # the scheme runs on the extended grid, a ghost node beyond each support
+    # carrying the boundary conditions (see slenderpy.boundary_condition); the
+    # span nodes are nodes 1 to ne - 2
+    ne = ns + 2
 
     # hht weights: y(n+1) = y_base + dy_dv * v(n+1), and the step equation,
     # multiplied by gamma*dt, weights the forces at n+1 by weight_new and the
@@ -240,11 +250,11 @@ def solve_dynamic(
     order = bc.order
 
     # operators; fourth_derivative already zeroes its border rows
-    D2 = fdu.clean_matrix(order, fdu.second_derivative(ns, ds))
-    D4 = fdu.fourth_derivative(ns, ds)
-    BC, _ = bc.compute(ns, ds)
-    identity = fdu.clean_matrix(order, sp.sparse.identity(ns))
-    chi_operator = curvature.create(ns, ds, approx_curvature)
+    D2 = fdu.clean_matrix(order, fdu.second_derivative(ne, ds))
+    D4 = fdu.fourth_derivative(ne, ds)
+    BC, _ = bc.compute(ne, ds)
+    identity = fdu.clean_matrix(order, sp.sparse.identity(ne))
+    chi_operator = curvature.create(ne, ds, approx_curvature)
 
     # hht matrices; A is state-independent, factorise it once
     f0 = 0.5 / span.length * np.sqrt(span.tension / conductor.mass)
@@ -274,10 +284,10 @@ def solve_dynamic(
     # lapack band storage, the BANDWIDTH first rows being the workspace of the
     # LU fill-in; the call solve_banded makes, without its allocations
     band = fdu.BANDWIDTH
-    lapack_storage = np.zeros((band + jacobian_base.shape[0], ns))
+    lapack_storage = np.zeros((band + jacobian_base.shape[0], ne))
     left_rows = fdu.tridiagonal(D2)
     if approx_curvature:
-        constant_rows = fdu.tridiagonal(chi_operator.jacobian(np.zeros(ns)))
+        constant_rows = fdu.tridiagonal(chi_operator.jacobian(np.zeros(ne)))
 
         def right_rows(y):
             return constant_rows
@@ -296,11 +306,16 @@ def solve_dynamic(
         def force(x, t, y, z, vy, vz):
             return 0.0, 0.0
 
-    # the beam is planar: y and vy are zero, only fz is used
+    # the beam is planar: y and vy are zero, only fz is used. It is evaluated
+    # on the span nodes, the ghost nodes carry none
     zeros = np.zeros(ns)
 
     def vertical_force(t, z, vz):
-        return zeros + force(x, t, zeros, z, zeros, vz)[1]
+        return np.pad(zeros + force(x, t, zeros, z[1:-1], zeros, vz[1:-1])[1], 1)
+
+    def boundary_rhs(t):
+        """Right-hand side of the boundary rows, on the velocity."""
+        return np.zeros(ne) if bc.dynamic_values is None else bc.update_rhs(ne, x, t)
 
     # initial state
     if initial_velocity is None:
@@ -309,7 +324,7 @@ def solve_dynamic(
         initial_position = shape.solve(
             conductor,
             span,
-            vertical_force(parameters.t0, zeros, zeros),
+            vertical_force(parameters.t0, np.zeros(ne), np.zeros(ne))[1:-1],
             ns,
             model=model,
             ei=ei,
@@ -322,10 +337,15 @@ def solve_dynamic(
     v_old = np.asarray(initial_velocity, dtype=float)
     if y_old.shape != (ns,) or v_old.shape != (ns,):
         raise ValueError(f"initial position and velocity must have length {ns}")
+    y_old = bc.extend(y_old, ds)
+    v_old = bc.extend(v_old, ds, boundary_rhs(parameters.t0))
 
     chi_old = chi_operator.value(y_old)
     if initial_bending_moment is None:
         initial_bending_moment = law.moment(chi_old)
+    else:
+        # the ghost values only set an eta that nothing reads
+        initial_bending_moment = np.pad(initial_bending_moment, 1, mode="edge")
     eta_old = law.initial_eta(initial_bending_moment, chi_old)
 
     # output
@@ -351,7 +371,8 @@ def solve_dynamic(
         0,
         x / span.length,
         lov,
-        [y_old, v_old, chi_old, moment_old, eta_old, 0]
+        [field[1:-1] for field in (y_old, v_old, chi_old, moment_old, eta_old)]
+        + [0]
         + ([] if balance is None else balance.values(y_old, v_old, chi_old)),
     )
 
@@ -360,11 +381,14 @@ def solve_dynamic(
     t_old = parameters.t0
     converged = True
     # curvature increment of the previous step, for the lagged branch
-    dchi_old = np.zeros(ns)
+    dchi_old = np.zeros(ne)
     # velocity of the step before, for the newton initial guess
     v_prev = v_old
     # initial acceleration, from the equation of motion on the solved rows; the
-    # boundary rows prescribe the velocity, their acceleration starts at zero
+    # boundary rows prescribe the velocity, their acceleration starts at zero at
+    # the supports. The ghosts take theirs from the relations, as the position
+    # does: the newmark updates then keep the relations on the position, where a
+    # ghost starting from zero would drift from the node it mirrors
     load_old = vertical_force(t_old, y_old, v_old)
     a_old = (
         fdu.clean_rhs(
@@ -376,15 +400,14 @@ def solve_dynamic(
         )
         / conductor.mass
     )
+    a_old = bc.extend(a_old[1:-1], ds, np.zeros(ne))
 
     for step in range(parameters.nt):
         t_new = t_old + dt
         # the force is evaluated at the state of the previous step
         load_old = vertical_force(t_old, y_old, v_old)
         load_new = vertical_force(t_new, y_old, v_old)
-        rhs_bc = (
-            np.zeros(ns) if bc.dynamic_values is None else bc.update_rhs(ns, x, t_new)
-        )
+        rhs_bc = boundary_rhs(t_new)
         # newmark predictors: v(n+1) = v_star + gamma*dt*a(n+1) and
         # y(n+1) = y_base + dy_dv * v(n+1)
         v_star = v_old + dt * (1.0 - gamma) * a_old
@@ -543,7 +566,8 @@ def solve_dynamic(
                 (step + 1) // parameters.rr,
                 x / span.length,
                 lov,
-                [y_new, v_new, chi_new, moment_new, eta_new, n_iter]
+                [field[1:-1] for field in (y_new, v_new, chi_new, moment_new, eta_new)]
+                + [n_iter]
                 + ([] if balance is None else balance.values(y_new, v_new, chi_new)),
             )
             pb.update(parameters.rr)
@@ -562,11 +586,11 @@ def solve_dynamic(
     if converged:
         res.set_state(
             {
-                "z": y_old,
-                "vz": v_old,
-                "curvature": chi_old,
-                "moment": law.dynamic_moment(chi_old, eta_old),
-                "eta": eta_old,
+                "z": y_old[1:-1],
+                "vz": v_old[1:-1],
+                "curvature": chi_old[1:-1],
+                "moment": law.dynamic_moment(chi_old, eta_old)[1:-1],
+                "eta": eta_old[1:-1],
             }
         )
 

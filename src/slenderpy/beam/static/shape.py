@@ -53,24 +53,30 @@ def _solve(
     assembled analytically as ``D2 @ diag(law.tangent) @ chi.jacobian + linear
     part``, and each step is relaxed until it decreases the residual norm.
 
-    Returns the displacement, or an array of ``nan`` when ``max|residual|`` does
-    not reach ``tol`` relative to the load level within ``max_iter`` iterations.
+    The system is solved on the extended grid of ``n + 2`` nodes, a ghost node
+    beyond each support carrying the boundary conditions (see
+    [](`slenderpy.boundary_condition`)).
+
+    Returns the displacement at the ``n`` span nodes, or an array of ``nan``
+    when ``max|residual|`` does not reach ``tol`` relative to the load level
+    within ``max_iter`` iterations.
     The threshold is floored at the round-off level of the residual, about
     ``eps * ||operator|| * max|y|``: the ``D4`` term scales like ``EI / ds**4``, so
     on a fine grid even the exact solution cannot reach ``tol`` times the load.
     """
     ds = length / (n - 1)
     order = bc.order
-    D2 = fdu.clean_matrix(order, fdu.second_derivative(n, ds))
-    D4 = fdu.fourth_derivative(n, ds)
-    BC, rhs_bc = bc.compute(n, ds)
-    rhs_tot = fdu.clean_rhs(order, rhs) + rhs_bc
+    ne = n + 2
+    D2 = fdu.clean_matrix(order, fdu.second_derivative(ne, ds))
+    D4 = fdu.fourth_derivative(ne, ds)
+    BC, rhs_bc = bc.compute(ne, ds)
+    rhs_tot = fdu.clean_rhs(order, np.pad(rhs, 1)) + rhs_bc
 
     # linear part of the equation, and constant-stiffness solution as first guess
     linear = -tension * D2 + BC
     y = sp.sparse.linalg.spsolve(law.ei_linear * D4 + linear, rhs_tot)
 
-    chi = curvature.create(n, ds, approx_curvature)
+    chi = curvature.create(ne, ds, approx_curvature)
 
     def residual(y):
         return D2 @ law.moment(chi.value(y)) + linear @ y - rhs_tot
@@ -87,7 +93,7 @@ def _solve(
 
     for _ in range(max_iter):
         if np.abs(res).max() <= threshold(y):
-            return y
+            return y[1:-1]
 
         tangent = sp.sparse.diags(law.tangent(chi.value(y)))
         jacobian = sp.sparse.csr_matrix(D2 @ tangent @ chi.jacobian(y) + linear)

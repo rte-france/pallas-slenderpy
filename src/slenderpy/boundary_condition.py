@@ -8,6 +8,14 @@ linear relations of the form::
 and builds the matrix and right-hand side contributions that enforce them in a
 finite-difference scheme. The [](`~slenderpy.boundary_condition.hinged`) and [](`~slenderpy.boundary_condition.clamped`) helpers
 build the two most common cases (pinned and clamped ends).
+
+The two relations of an order-4 condition are taken at the support with the
+centered stencils, through a ghost node one step beyond each support: the
+scheme runs on the extended grid of ``n + 2`` nodes, the supports being nodes
+1 and ``n``. This is second order, and keeps the discrete energy exact at a
+clamped or hinged end, where a one-sided slope ``(y1 - y0) / ds`` is first
+order. [](`~slenderpy.boundary_condition.BoundaryCondition.extend`) fills the
+ghost nodes of a field given on the span nodes.
 """
 
 from typing import Optional, Tuple
@@ -182,18 +190,24 @@ class BoundaryCondition:
         """Compute the matrices of the scheme and the right-hand side linked to the boundary conditions.
 
         Each relation fills one row: rows 0 and -1 hold the first relation of
-        each end, rows 1 and -2 the second one (order 4). The derivatives are
-        one-sided at the bound, ``(y1 - y0) / ds`` for the slope, and for the
-        curvature ``(y0 - 2*y1 + y2) / ds**2`` in rows 0 and -1 but the
-        second-order ``(2*y0 - 5*y1 + 4*y2 - y3) / ds**2`` in rows 1 and -2,
-        so that a hinged end holds at the support itself; a 4-point stencil
-        in rows 0 and -1 would not fit the pentadiagonal band of the
-        solvers. Mirrored on the right end.
+        each end, rows 1 and -2 the second one (order 4).
+
+        Order 4: ``n`` counts the nodes of the extended grid, a ghost node one
+        step beyond each support, so the supports are nodes 1 and ``n - 2``.
+        The relations are taken at the supports with the centered stencils,
+        ``(u[2] - u[0]) / (2*ds)`` for the slope and ``(u[0] - 2*u[1] + u[2])
+        / ds**2`` for the curvature at the left support, the same three nodes
+        around the right one.
+
+        Order 2: ``n`` counts the span nodes, the supports being nodes 0 and
+        ``n - 1``, and the derivatives are one-sided, ``(y1 - y0) / ds`` for
+        the slope and ``(y0 - 2*y1 + y2) / ds**2`` for the curvature, mirrored
+        on the right end.
 
         Parameters
         ----------
         n : int
-            Matrix size.
+            Matrix size, the extended grid for order 4.
         ds : float
             Space discretization step.
 
@@ -202,11 +216,18 @@ class BoundaryCondition:
         Tuple[sp.sparse.lil_matrix, np.ndarray[float]]
             Matrix and right-hand side for boundary conditions.
         """
-        a1, b1, c1, d1 = self.left[0]
-        a4, b4, c4, d4 = self.right[0]
-
         bc_matrix = sp.sparse.lil_matrix((n, n))
         rhs = np.zeros(n)
+
+        if self.order == 4:
+            for row, (a, b, c, d) in self._relations():
+                columns = slice(0, 3) if row >= 0 else slice(n - 3, n)
+                bc_matrix[row, columns] = self._stencil(a, b, c, ds)
+                rhs[row] = d
+            return bc_matrix, rhs
+
+        a1, b1, c1, d1 = self.left[0]
+        a4, b4, c4, d4 = self.right[0]
 
         bc_matrix[0, 0] = a1 - b1 / ds + c1 / ds**2
         bc_matrix[0, 1] = b1 / ds - 2 * c1 / ds**2
@@ -219,29 +240,83 @@ class BoundaryCondition:
         rhs[0] = d1
         rhs[-1] = d4
 
-        if self.order == 4:
-            a2, b2, c2, d2 = self.left[1]
-            a3, b3, c3, d3 = self.right[1]
-
-            # the curvature of the second relation is taken at the bound node
-            # with the one-sided second-order stencil; the centered one would
-            # put it one node inside, which leaks energy at first order (a
-            # hinged end). Four columns still fit the pentadiagonal band from
-            # these rows, not from rows 0 and -1
-            bc_matrix[1, 0] = a2 - b2 / ds + 2 * c2 / ds**2
-            bc_matrix[1, 1] = b2 / ds - 5 * c2 / ds**2
-            bc_matrix[1, 2] = 4 * c2 / ds**2
-            bc_matrix[1, 3] = -c2 / ds**2
-
-            bc_matrix[-2, -1] = a3 + b3 / ds + 2 * c3 / ds**2
-            bc_matrix[-2, -2] = -b3 / ds - 5 * c3 / ds**2
-            bc_matrix[-2, -3] = 4 * c3 / ds**2
-            bc_matrix[-2, -4] = -c3 / ds**2
-
-            rhs[1] = d2
-            rhs[-2] = d3
-
         return bc_matrix, rhs
+
+    def _relations(self):
+        """Row and coefficients of each relation of an order-4 condition."""
+        return [
+            (0, self.left[0]),
+            (1, self.left[1]),
+            (-2, self.right[1]),
+            (-1, self.right[0]),
+        ]
+
+    @staticmethod
+    def _stencil(a: float, b: float, c: float, ds: float) -> np.ndarray:
+        """Weights of a relation on the three nodes around a support.
+
+        The nodes are in ascending ``x``: the ghost, the support and the first
+        inner node at the left end, the reverse at the right end.
+        """
+        return np.array(
+            [c / ds**2 - b / (2 * ds), a - 2 * c / ds**2, c / ds**2 + b / (2 * ds)]
+        )
+
+    def extend(
+        self, y: np.ndarray, ds: float, rhs: Optional[np.ndarray] = None
+    ) -> np.ndarray:
+        """Extend a nodal field with the ghost nodes of an order-4 condition.
+
+        At each end the ghost is solved from the relation that weighs it most,
+        the slope of a clamped end or the curvature of a hinged one; the other
+        relation does not involve the ghost there and is left to ``y``.
+
+        Parameters
+        ----------
+        y : np.ndarray
+            Field at the ``n`` span nodes.
+        ds : float
+            Space discretization step.
+        rhs : np.ndarray, optional
+            Right-hand side of the relations on the extended grid, as
+            [](`~slenderpy.boundary_condition.BoundaryCondition.compute`) or
+            [](`~slenderpy.boundary_condition.BoundaryCondition.update_rhs`)
+            return it; by default the values ``d`` of the relations.
+
+        Returns
+        -------
+        np.ndarray
+            Field at the ``n + 2`` nodes of the extended grid.
+
+        Raises
+        ------
+        ValueError
+            If the condition is not of order 4, or neither relation of an end
+            involves its ghost node.
+        """
+        if self.order != 4:
+            raise ValueError("ghost nodes are only defined for order-4 conditions")
+
+        res = np.zeros(np.size(y) + 2)
+        res[1:-1] = y
+        relations = self._relations()
+        if rhs is None:
+            values = [d for _, (_, _, _, d) in relations]
+        else:
+            values = [rhs[row] for row, _ in relations]
+        weights = [self._stencil(a, b, c, ds) for _, (a, b, c, _) in relations]
+
+        # left end: ghost first in its stencil, right end: ghost last
+        for ghost, others, pair in ((0, [1, 2], [0, 1]), (-1, [-3, -2], [2, 3])):
+            column = 0 if ghost == 0 else 2
+            k = max(pair, key=lambda i: abs(weights[i][column]))
+            w = weights[k]
+            if w[column] == 0.0:
+                raise ValueError("no relation of an end involves its ghost node")
+            known = np.delete(w, column)
+            res[ghost] = (values[k] - known @ res[others]) / w[column]
+
+        return res
 
     def update_rhs(self, n: int, x: np.ndarray[float], t: float) -> np.ndarray[float]:
         """Evaluate ``dynamic_values`` at time ``t``.

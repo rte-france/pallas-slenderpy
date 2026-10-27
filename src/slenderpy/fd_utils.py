@@ -5,7 +5,8 @@ uniform grid of ``n`` nodes spaced by ``ds``. The rows carrying the boundary
 conditions are left empty: two rows (first and last) for an order-2 scheme,
 four rows (two first and two last) for an order-4 scheme. Those rows are meant
 to be filled by a [](`~slenderpy.boundary_condition.BoundaryCondition`)
-contribution added to the matrix.
+contribution added to the matrix. An order-4 scheme runs on the extended grid
+of the beam solvers, so its four rows are the ghost nodes and the supports.
 
 [](`~slenderpy.fd_utils.clean_matrix`) and [](`~slenderpy.fd_utils.clean_rhs`) empty those same rows in any other
 matrix or right-hand side taking part in the scheme, so that the boundary
