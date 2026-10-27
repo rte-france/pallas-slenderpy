@@ -193,6 +193,9 @@ def test_manufactured_constant_approx_dynamic_bc(plot=False):
     def exact(x, t):
         return np.cosh(x - 2) * np.sin(2 * np.pi * t)
 
+    def exact_space_derivative(x, t):
+        return np.sinh(x - 2) * np.sin(2 * np.pi * t)
+
     def exact_time_space_derivative(x, t):
         return 2 * np.pi * np.sinh(x - 2) * np.cos(2 * np.pi * t)
 
@@ -206,13 +209,15 @@ def test_manufactured_constant_approx_dynamic_bc(plot=False):
             - tension * exact(x, t)
         )
 
+    # the values at t0, which set the ghost nodes of the initial position;
+    # dynamic_values carries their time derivatives
     left = [
-        [1, 0, 0, exact_time_derivative(lmin, 0)],
-        [0, 1, 0, exact_time_space_derivative(lmin, 0)],
+        [1, 0, 0, exact(lmin, 0)],
+        [0, 1, 0, exact_space_derivative(lmin, 0)],
     ]
     right = [
-        [1, 0, 0, exact_time_derivative(lmax, 0)],
-        [0, 1, 0, exact_time_space_derivative(lmax, 0)],
+        [1, 0, 0, exact(lmax, 0)],
+        [0, 1, 0, exact_space_derivative(lmax, 0)],
     ]
     dynamic_values = [
         exact_time_derivative,
@@ -284,19 +289,24 @@ def test_manufactured_constant_exact(plot=False):
     def exact(x, t):
         return np.cosh(x + t)
 
+    def exact_space_derivative(x, t):
+        return np.sinh(x + t)
+
     def exact_time_derivative(x, t):
         return np.sinh(x + t)
 
     def exact_time_space_derivative(x, t):
         return np.cosh(x + t)
 
+    # the values at t0, which set the ghost nodes of the initial position;
+    # dynamic_values carries their time derivatives
     left = [
-        [1, 0, 0, exact_time_derivative(lmin, 0)],
-        [0, 1, 0, exact_time_space_derivative(lmin, 0)],
+        [1, 0, 0, exact(lmin, 0)],
+        [0, 1, 0, exact_space_derivative(lmin, 0)],
     ]
     right = [
-        [1, 0, 0, exact_time_derivative(lmax, 0)],
-        [0, 1, 0, exact_time_space_derivative(lmax, 0)],
+        [1, 0, 0, exact(lmax, 0)],
+        [0, 1, 0, exact_space_derivative(lmax, 0)],
     ]
     dynamic_values = [
         exact_time_derivative,
@@ -369,19 +379,24 @@ def test_manufactured_varying_approx(plot=False):
     def exact(x, t):
         return np.cosh(x + t)
 
+    def exact_space_derivative(x, t):
+        return np.sinh(x + t)
+
     def exact_time_derivative(x, t):
         return np.sinh(x + t)
 
     def exact_time_space_derivative(x, t):
         return np.cosh(x + t)
 
+    # the values at t0, which set the ghost nodes of the initial position;
+    # dynamic_values carries their time derivatives
     left = [
-        [1, 0, 0, exact_time_derivative(lmin, 0)],
-        [0, 1, 0, exact_time_space_derivative(lmin, 0)],
+        [1, 0, 0, exact(lmin, 0)],
+        [0, 1, 0, exact_space_derivative(lmin, 0)],
     ]
     right = [
-        [1, 0, 0, exact_time_derivative(lmax, 0)],
-        [0, 1, 0, exact_time_space_derivative(lmax, 0)],
+        [1, 0, 0, exact(lmax, 0)],
+        [0, 1, 0, exact_space_derivative(lmax, 0)],
     ]
     dynamic_values = [
         exact_time_derivative,
@@ -456,19 +471,24 @@ def test_manufactured_varying_exact(plot=False):
     def exact(x, t):
         return np.cosh(x + t)
 
+    def exact_space_derivative(x, t):
+        return np.sinh(x + t)
+
     def exact_time_derivative(x, t):
         return np.sinh(x + t)
 
     def exact_time_space_derivative(x, t):
         return np.cosh(x + t)
 
+    # the values at t0, which set the ghost nodes of the initial position;
+    # dynamic_values carries their time derivatives
     left = [
-        [1, 0, 0, exact_time_derivative(lmin, 0)],
-        [0, 1, 0, exact_time_space_derivative(lmin, 0)],
+        [1, 0, 0, exact(lmin, 0)],
+        [0, 1, 0, exact_space_derivative(lmin, 0)],
     ]
     right = [
-        [1, 0, 0, exact_time_derivative(lmax, 0)],
-        [0, 1, 0, exact_time_space_derivative(lmax, 0)],
+        [1, 0, 0, exact(lmax, 0)],
+        [0, 1, 0, exact_space_derivative(lmax, 0)],
     ]
     dynamic_values = [
         exact_time_derivative,
@@ -523,7 +543,10 @@ def test_static_state_is_a_fixed_point():
     """Started from the static shape at rest, the solver must not move.
 
     Sharpest check of the whole assembly: it only holds if the dynamic operators
-    are the ones shape.py solves to zero.
+    are the ones shape.py solves to zero. The tolerance is tight: the static
+    solve stops at ``tol`` relative to the load, and with the varying model the
+    saturated supports of the jumper turn that residual into a drift of the
+    same order, 1e-07 at the default 1e-06.
     """
     for model, approx in CASES:
         parameters = simulation.Parameters(ns=101, t0=0.0, tf=0.5, dt=0.005, dr=0.05)
@@ -534,6 +557,7 @@ def test_static_state_is_a_fixed_point():
             model=model,
             force=_gravity(CONDUCTOR),
             approx_curvature=approx,
+            tol=1e-10,
         )
         y = res["z"].values
         v = res["vz"].values
@@ -1081,23 +1105,20 @@ def test_energy_fields_layout():
         assert res[name].values[0] == 0.0, name
 
 
-def test_free_vibration_clamped_conserves_energy():
-    res = _free_vibration(clamped(), 201)
-    scale = _energy_scale(res)
-    assert _drift(res) <= 1e-10 * scale
-    assert np.abs(res["boundary_work"].values).max() <= 1e-13 * scale
+@pytest.mark.parametrize("bc", [clamped, hinged])
+def test_free_vibration_conserves_energy_at_the_supports(bc):
+    """The supports do no work, up to round-off, whatever the grid.
 
-
-def test_hinged_boundary_work_converges_at_third_order():
-    boundary = []
+    Summation by parts of the solved rows leaves no boundary term at a fixed
+    clamped or hinged end: the ghost node moves with the first inner node,
+    alike at a clamped end and opposite at a hinged one.
+    Measured about 2e-15 at 201 and 401 nodes, at both ends.
+    """
     for ns in (201, 401):
-        res = _free_vibration(hinged(), ns)
+        res = _free_vibration(bc(), ns)
         scale = _energy_scale(res)
         assert _drift(res) <= 1e-10 * scale, ns
-        boundary.append(np.abs(res["boundary_work"].values).max() / scale)
-    # measured 3.9e-05 then 4.9e-06: the term is exercised, and falls as ds**3
-    assert boundary[0] > 1e-6
-    assert boundary[0] / boundary[1] > 6.0
+        assert np.abs(res["boundary_work"].values).max() <= 1e-13 * scale, ns
 
 
 def test_curvature_work():
@@ -1173,7 +1194,8 @@ def test_external_work_of_a_constant_force():
     ds = LINE[0] / (ns - 1)
     z = res["z"].values
     weight = -_GRAVITY * CONDUCTOR.mass
-    expected = ds * weight * (z[:, 2:-2] - z[0, 2:-2]).sum(axis=1)
+    # the solved rows: every span node but the supports
+    expected = ds * weight * (z[:, 1:-1] - z[0, 1:-1]).sum(axis=1)
     np.testing.assert_allclose(
         res["external_work"].values,
         expected,

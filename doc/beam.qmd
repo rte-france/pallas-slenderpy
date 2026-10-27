@@ -83,7 +83,9 @@ $$
 
 ### Resolution
 
-The space derivatives are discretized with centered finite differences. The
+The space derivatives are discretized with centered finite differences, on
+the span nodes and a ghost node beyond each support that carries the boundary
+conditions (see [Boundary Conditions](#boundary-conditions)). The
 nonlinear system is solved with a damped Newton iteration, starting from the
 constant-stiffness linear solution. The Jacobian is assembled analytically from
 the tangent of the bending law and the Jacobian of the curvature; each step is
@@ -147,7 +149,9 @@ $y^{n+1}$ leaves the velocity as the only unknown, with the matrix
 $A = m I_d + w c I_d + w h K$ plus the boundary rows, where
 $w = \gamma \Delta t (1 + \alpha)$ and $h = \beta \Delta t / \gamma$ is the
 derivative of $y^{n+1}$ with respect to $v^{n+1}$. The initial acceleration
-comes from the equation of motion at ``t0``.
+comes from the equation of motion at ``t0``; at the ghost nodes it follows the
+boundary relations, like the position and the velocity, so that the Newmark
+updates keep the relations on the position.
 
 The solver uses $\alpha = -0.2$. $\alpha = 0$ is the Crank-Nicolson scheme,
 second order and energy conserving, but it does not damp the modes the time
@@ -206,14 +210,14 @@ elastic; a medium span (50 m, 5 kN), around $\chi_0$; and a jumper (5 m,
 under a point force at its first frequency and under one at 20 Hz. With 20
 steps per period of the loading at the coarsest step, the error against a run
 at $\Delta t / 64$ falls at each refinement to $\Delta t / 4$ and
-$\Delta t / 16$, on the position, the velocity and $\eta$, by 4.6 to 240 times
+$\Delta t / 16$, on the position, the velocity and $\eta$, by 4.4 to 240 times
 overall (``test/test_beam-dynamic-convergence.py``). The order is 2 where the
 hysteresis is inactive and between 1/2 and 1 where it switches, the Bouc-Wen
 law not being smooth at a reversal. These runs use a Newton tolerance of
 $10^{-10}$: at the default $10^{-6}$, the point where Newton stops decides on
 which branch a node leaves a reversal, and the jumper run at $\Delta t / 64$
-moves by up to $10^{-7}$ m with the tolerance, 15 % of the error at
-$\Delta t / 16$.
+moves by up to $1.1 \cdot 10^{-7}$ m (root mean square) with the tolerance,
+11 % of the error at $\Delta t / 16$.
 
 The equivalent damping of a free decay (30 m hinged span, mode 9) is resolved
 at 50 steps per period, against 23 times the hysteretic damping at 25 steps
@@ -224,10 +228,34 @@ for the former scheme (see above):
 | 0.03 | 25 | 3.7e-4 |
 | 0.03 | 50 | 1.6e-4 |
 | 0.03 | 100 | 1.3e-4 |
-| 0.03 | 400 | 1.3e-4 |
+| 0.03 | 400 | 1.2e-4 |
 | 1 | 25 | 2.9e-3 |
 | 1 | 50 | 2.7e-3 |
 | 1 | 400 | 2.7e-3 |
+
+### Space convergence
+
+The same three spans and loadings are run on a coarse grid refined 2 and 4
+times, against a reference refined 8 times, with the same time step on every
+grid (``test/test_beam-space-convergence.py``); the static shape under gravity
+is checked the same way, with both bending models. The coarse grids hold
+440, 320 and 80 cells on the long span, the medium span and the jumper.
+
+The position converges at second order once the grid resolves the bending
+boundary layer $\sqrt{EI / H}$ at the clamped supports, 0.66 m on the medium
+span and 6.6 m on the jumper: its error drops by 12.5 to 21 times over the
+4 times refinement, against 21 for second order and 7 for first order. The
+velocity and $\eta$ converge more irregularly, by 3.6 to 21 times, a grid
+landing unluckily on a Bouc-Wen reversal now and then.
+
+The 0.23 m boundary layer of the long span is not resolved by 1 m cells. Its
+position still converges, by 1.8 to 6.5 times, and the static shape with the
+varying model only reaches second order from about 7000 cells. The error is
+small nevertheless: against a reference on 28160 cells, itself good to about
+0.7 mm, the static shape (9.5 m sag) is off by 1.9 mm (root mean square at the
+span eighths) at 1 m cells with the varying model and by 10 mm with the
+constant one. The former one-sided slope
+of the clamped supports, first order, was off by 75 mm and 62 mm.
 
 ## Energy balance
 
@@ -300,23 +328,28 @@ is constant in time.
 ``numerical_work`` has no continuous counterpart: it measures what the HHT
 scheme removes, and falls quickly as the step resolves the motion. On the
 440 m span below (clamped, initial shape $\sin^3$, half of whose energy lies
-in the third mode), it reaches 36 % of the initial energy after 4 periods at
-20 steps per period of the first mode (under 7 for the third), 6 % at 50 steps
-and 1.5e-4 at 400 steps.
+in the third mode, ``ns = 201``), it reaches 37 % of the initial energy after
+4 periods at 20 steps per period of the first mode (under 7 for the third), 6 %
+at 50 steps and 1.3e-4 at 400 steps.
 
 ### Discrete balance
 
 The balance is computed on the discrete equation the solver solves, not with
 a separate quadrature: the row $i$ of the step multiplied by
-$\delta y_i = y_i^{n+1} - y_i^n$ is the work of each term over the step. Let $I$ be the rows the scheme solves (nodes 2 to $N-3$, the others
-carry the boundary conditions), $J$ the nodes 1 to $N-2$, $D_2$ the centered
-second difference, $\bar{a} = (a^n + a^{n+1})/2$ and
-$\delta a = a^{n+1} - a^n$. The state energies are
+$\delta y_i = y_i^{n+1} - y_i^n$ is the work of each term over the step. The
+nodes are those of the extended grid the solver works on: the span nodes and a
+ghost node beyond each support (see [Boundary Conditions](#boundary-conditions)),
+$N$ in all. Let $I$ be the rows the scheme solves (nodes 2 to $N-3$, the span
+nodes between the supports; the others carry the boundary conditions), $J$ the
+span nodes 1 to $N-2$, $\sum'_J$ a sum over $J$ weighting its end nodes, the
+supports, by 1/2, $D_2$ the centered second difference,
+$\bar{a} = (a^n + a^{n+1})/2$ and $\delta a = a^{n+1} - a^n$. The state
+energies are
 
 $$
 E_k = \frac{m}{2} \Delta x \sum_I v_i^2, \quad
-E_H = \frac{H}{2} \Delta x \sum_{j=0}^{N-2} \left( \frac{y_{j+1} - y_j}{\Delta x} \right)^2, \quad
-E_B = \frac{EI_{lin}}{2} \Delta x \sum_J \chi_j^2
+E_H = \frac{H}{2} \Delta x \sum_{j=1}^{N-3} \left( \frac{y_{j+1} - y_j}{\Delta x} \right)^2, \quad
+E_B = \frac{EI_{lin}}{2} \Delta x \sum\nolimits'_J \chi_j^2
 $$
 
 and the works are increased at each step by
@@ -325,9 +358,9 @@ $$
 \begin{aligned}
 \delta W_F &= \Delta x \sum_I \bar{F}_i \delta y_i, \quad
 \delta W_c = \frac{c}{\Delta t} \Delta x \sum_I \delta y_i^2, \quad
-\delta W_\eta = (EI_{max} - EI_{min}) \chi_0 \Delta x \sum_J \bar{\eta}_j \delta \chi_j \\
-\delta W_\chi &= \Delta x \sum_J \bar{M}_j \left( (D_2 \delta y)_j - \delta \chi_j \right) \\
-\delta W_b &= \Delta x \sum_J \bar{M}_j (D_2 \delta y)_j - \Delta x \sum_I (D_2 \bar{M})_i \delta y_i
+\delta W_\eta = (EI_{max} - EI_{min}) \chi_0 \Delta x \sum\nolimits'_J \bar{\eta}_j \delta \chi_j \\
+\delta W_\chi &= \Delta x \sum\nolimits'_J \bar{M}_j \left( (D_2 \delta y)_j - \delta \chi_j \right) \\
+\delta W_b &= \Delta x \sum\nolimits'_J \bar{M}_j (D_2 \delta y)_j - \Delta x \sum_I (D_2 \bar{M})_i \delta y_i
 + H \Delta x \sum_I (D_2 \bar{y})_i \delta y_i + \delta E_H
 \end{aligned}
 $$
@@ -353,31 +386,34 @@ therefore holds to the residual of each step: to round-off
 for the constant model with the approximate curvature, to the Newton
 tolerance otherwise.
 
-The discrete supports are not exactly inert. On a 440 m span
+Fixed supports are inert in the discrete balance too. On a 440 m span
 ($H$ = 31000 N, initial shape $0.5 \sin^3(\pi x / L)$ m, 400 steps per
 period, 4 periods, constant model, approximate curvature), the drift of the
 balance, ``numerical_work`` included, relative to the initial energy is:
 
 | supports | ns | without ``boundary_work`` | with ``boundary_work`` |
 |----------|----|---------------------------|------------------------|
-| clamped | 201 | 1.5e-13 | 1.5e-13 |
-| clamped | 401 | 4.2e-13 | 4.2e-13 |
-| clamped | 801 | 3.5e-12 | 3.5e-12 |
-| hinged | 201 | 3.9e-05 | 1.5e-13 |
-| hinged | 401 | 5.0e-06 | 5.0e-13 |
-| hinged | 801 | 7.5e-07 | 3.1e-12 |
+| clamped | 201 | 1.4e-13 | 1.4e-13 |
+| clamped | 401 | 4.1e-13 | 4.1e-13 |
+| clamped | 801 | 3.9e-12 | 3.9e-12 |
+| hinged | 201 | 1.5e-13 | 1.5e-13 |
+| hinged | 401 | 4.2e-13 | 4.2e-13 |
+| hinged | 801 | 3.4e-12 | 3.4e-12 |
 
-``boundary_work`` is round-off for clamped supports and falls as
-$\Delta x^3$ for hinged ones, thanks to the curvature stencil of the boundary
-rows (see [Boundary Conditions](#boundary-conditions)). With moving supports
-(``dynamic_values``) it also holds their physical work. The remaining drift is
+``boundary_work`` is round-off at fixed clamped and hinged supports alike:
+summation by parts of the solved rows leaves no term at the ends, the ghost
+node moving with the first inner node (alike at a clamped end, opposite at a
+hinged one) and the supports weighing 1/2 in the sums over $J$. The former
+boundary rows, one-sided and without ghost nodes, left a work falling as
+$\Delta x^3$ at hinged supports (3.9e-05 of the initial energy at
+``ns = 201``). With moving supports (``dynamic_values``) ``boundary_work``
+holds their physical work. The remaining drift is
 the round-off of the $D_4$ operator, which grows like $EI / \Delta x^4$.
 
 Limits:
 
-* $E_k$ is summed on $I$: the velocity of nodes 0, 1, $N-2$ and $N-1$ is set
-  by the boundary rows, zero at a fixed clamped end and of order $\Delta x$ at
-  a fixed hinged one;
+* $E_k$ is summed on $I$: it leaves out the supports, whose velocity is set by
+  the boundary rows, which is exact at fixed supports;
 * on a Bouc-Wen step solved by the fallback (branch lagged, see
   [](`~slenderpy.beam.dynamic.solve_dynamic`)) the balance only holds to first
   order;
@@ -423,37 +459,38 @@ a_4 y(L,t) + b_4 \frac{\partial y}{\partial x}(L,t) + c_4 \frac{\partial^2 y}{\p
 $$
 
 Where $a_i, b_i, c_i \in \mathbb{R} \forall i \in \left\{1,2,3,4\right\}$ and $d_i(t) \forall i \in \left\{1,2,3,4\right\}$ can be function of time for the dynamic case and simply constant in the static case.
-We denote by $y_0$ the displacement at $x=0$ and by $y_N$ the displacement at $x=L$ where $N$ is the number of nodes along the beam.
-Similarly $y_i$ is the displacement at the node $i$.
-To take into account properly these boundary conditions in the finite difference schemes, we discretize them:
+We denote by $y_0$ the displacement at $x=0$ and by $y_N$ the displacement at $x=L$, the span nodes $y_0, \dots, y_N$
+being spaced by $\Delta x$. The relations are taken at the supports with the centered stencils, through a ghost node one
+step beyond each support, $y_{-1}$ and $y_{N+1}$:
 
 $$
 \begin{aligned}
-a_1 y_0 + b_1 \frac{y_1 - y_0}{\Delta x} + c_1 \frac{y_0 - 2y_1 + y_2}{\Delta x^2} = d_1 \\
-a_2 y_0 + b_2 \frac{y_1 - y_0}{\Delta x} + c_2 \frac{2y_0 - 5y_1 + 4y_2 - y_3}{\Delta x^2} = d_2 \\
-a_3 y_N + b_3 \frac{y_N - y_{N-1}}{\Delta x} + c_3 \frac{2y_N - 5y_{N-1} + 4y_{N-2} - y_{N-3}}{\Delta x^2} = d_3 \\
-a_4 y_N + b_4 \frac{y_N - y_{N-1}}{\Delta x} + c_4 \frac{y_N - 2y_{N-1} + y_{N-2}}{\Delta x^2} = d_4
+a_1 y_0 + b_1 \frac{y_1 - y_{-1}}{2 \Delta x} + c_1 \frac{y_{-1} - 2y_0 + y_1}{\Delta x^2} = d_1 \\
+a_2 y_0 + b_2 \frac{y_1 - y_{-1}}{2 \Delta x} + c_2 \frac{y_{-1} - 2y_0 + y_1}{\Delta x^2} = d_2 \\
+a_3 y_N + b_3 \frac{y_{N+1} - y_{N-1}}{2 \Delta x} + c_3 \frac{y_{N-1} - 2y_N + y_{N+1}}{\Delta x^2} = d_3 \\
+a_4 y_N + b_4 \frac{y_{N+1} - y_{N-1}}{2 \Delta x} + c_4 \frac{y_{N-1} - 2y_N + y_{N+1}}{\Delta x^2} = d_4
 \end{aligned}
 $$
 
-The curvature of the second relation of each end uses the one-sided
-second-order stencil, so that a hinged condition holds at the support node
-itself. The centered stencil, which the first relation keeps, would place
-the second relation one node inside and make the support provide or absorb
-energy at first order in $\Delta x$ (see [Energy balance](#energy-balance));
-the first relation keeps it because a four-point stencil there would not fit
-the pentadiagonal band of the solvers.
+The beam equation is then solved at every span node between the supports, $y_1$ to $y_{N-1}$, its fourth difference at
+$y_1$ and $y_{N-1}$ reaching the ghost nodes. These stencils are second order, and at fixed clamped or hinged supports
+they keep the discrete energy exact: the ghost node moves with the first inner node, alike at a clamped end and opposite
+at a hinged one, so the supports do no work (see [Energy balance](#energy-balance)). The former boundary rows, one-sided
+at the supports without ghost nodes, imposed the slope with $(y_1 - y_0) / \Delta x$: first order, with an error that
+spreads to the whole span, 75 mm of the 9.5 m sag of the 440 m span at 1 m cells against 1.9 mm now (see
+[Space convergence](#space-convergence)).
 
-Thus the corresponding matrix and vector of the equation above are:
+The unknowns are the $N + 3$ values $y_{-1}, \dots, y_{N+1}$, and the four relations fill the two first and the two last
+rows of the system:
 
 $$
 \begin{aligned}
 A &= \begin{pmatrix}
-a_1 - \frac{b_1}{\Delta x} + \frac{c_1}{\Delta x^2} & \frac{b_1}{\Delta x} - \frac{2c_1}{\Delta x^2}  & \frac{c_1}{\Delta x^2} & 0 & \cdots & \cdots & 0 \\
-a_2 - \frac{b_2}{\Delta x} + \frac{2c_2}{\Delta x^2} & \frac{b_2}{\Delta x} - \frac{5c_2}{\Delta x^2}  & \frac{4c_2}{\Delta x^2} & - \frac{c_2}{\Delta x^2} & \cdots & \cdots  & 0 \\
-0 &\ddots & \ddots &  \ddots &  \ddots &  \ddots & 0 \\
-0 & \cdots & \cdots & - \frac{c_3}{\Delta x^2} & \frac{4c_3}{\Delta x^2} & - \frac{b_3}{\Delta x} - \frac{5c_3}{\Delta x^2} & a_3 + \frac{b_3}{\Delta x} + \frac{2c_3}{\Delta x^2} \\
-0 & \cdots & \cdots & 0 & \frac{c_4}{\Delta x^2} & - \frac{b_4}{\Delta x} - \frac{2c_4}{\Delta x^2} & a_4 + \frac{b_4}{\Delta x} + \frac{c_4}{\Delta x^2}
+\frac{c_1}{\Delta x^2} - \frac{b_1}{2 \Delta x} & a_1 - \frac{2c_1}{\Delta x^2} & \frac{c_1}{\Delta x^2} + \frac{b_1}{2 \Delta x} & 0 & \cdots & 0 \\
+\frac{c_2}{\Delta x^2} - \frac{b_2}{2 \Delta x} & a_2 - \frac{2c_2}{\Delta x^2} & \frac{c_2}{\Delta x^2} + \frac{b_2}{2 \Delta x} & 0 & \cdots & 0 \\
+0 & \ddots & \ddots & \ddots & \ddots & 0 \\
+0 & \cdots & 0 & \frac{c_3}{\Delta x^2} - \frac{b_3}{2 \Delta x} & a_3 - \frac{2c_3}{\Delta x^2} & \frac{c_3}{\Delta x^2} + \frac{b_3}{2 \Delta x} \\
+0 & \cdots & 0 & \frac{c_4}{\Delta x^2} - \frac{b_4}{2 \Delta x} & a_4 - \frac{2c_4}{\Delta x^2} & \frac{c_4}{\Delta x^2} + \frac{b_4}{2 \Delta x}
 \end{pmatrix} \\
 b &= \begin{pmatrix}
 d_1\\
@@ -474,5 +511,11 @@ $d_i(t) \forall i \in \left\{1,2,3,4\right\}$.
 Thus when using [](`~slenderpy.beam.dynamic.solve_dynamic`) the user should set `dynamic_values` with $\frac{\partial d_i}{\partial t} \forall i \in \left\{1,2,3,4\right\}$
 in the [](`~slenderpy.boundary_condition.BoundaryCondition`) constructor. Each item is a callable `f(x, t)`, evaluated at the
 bound its condition applies to ($x = 0$ for $d_1, d_2$, $x = L$ for $d_3, d_4$), and the tuple follows the rows from the
-first to the last node: $(d_1, d_2, d_3, d_4)$ is `(left[0], left[1], right[1], right[0])`. Without `dynamic_values` the
-constant $d_i$ only enter the static solve, and the dynamic solve keeps the boundary values of the initial state.
+first to the last node: $(d_1, d_2, d_3, d_4)$ is `(left[0], left[1], right[1], right[0])`.
+
+The ghost nodes of the initial state follow from the relations
+([](`~slenderpy.boundary_condition.BoundaryCondition.extend`)): at each end, the relation that involves the ghost node, the
+slope of a clamped end or the curvature of a hinged one, sets it, with the constant $d_i$ for the position and the values
+of `dynamic_values` at `t0` for the velocity (zero without them). The constant $d_i$ are thus the boundary values at `t0`.
+The other relation of each end, such as $y_0 = d_1$, is read from the initial position, and without `dynamic_values` the
+dynamic solve keeps the boundary values of the initial state.

@@ -19,9 +19,15 @@ works, accumulated step by step. With
 constant up to the step residual. The definitions are detailed in the beam
 page of the documentation, section "Energy balance".
 
-Indices: the ``n`` nodes; ``J``, the nodes 1 to n-2, where the centered second
-difference is defined; ``I``, the nodes 2 to n-3, the rows the scheme solves
-(the others carry the order-4 boundary conditions).
+Indices, on the extended grid of the solver (a ghost node beyond each
+support, see [](`slenderpy.boundary_condition`)): the ``n`` nodes; ``J``, the
+nodes 1 to n-2, the span nodes, where the centered second difference is
+defined; ``I``, the nodes 2 to n-3, the rows the scheme solves (the others
+carry the order-4 boundary conditions). The sums over ``J`` take half the
+weight at the supports, its end nodes: summation by parts of the solved rows
+then leaves no boundary term at a fixed clamped end, ``dy`` being zero at the
+support and equal on both sides of it, nor at a fixed hinged end with no
+moment.
 """
 
 from __future__ import annotations
@@ -89,11 +95,16 @@ class EnergyBalance:
         """Centered second difference of ``a`` on ``J``."""
         return (a[:-2] - 2.0 * a[1:-1] + a[2:]) / self.ds**2
 
+    @staticmethod
+    def _over_span(a: np.ndarray) -> float:
+        """Sum of ``a``, given on ``J``, with half the weight at the supports."""
+        return np.sum(a) - 0.5 * (a[0] + a[-1])
+
     def _kinetic_energy(self, v: np.ndarray) -> float:
         return 0.5 * self.mass * self.ds * np.sum(v[2:-2] ** 2)
 
     def _tension_energy(self, y: np.ndarray) -> float:
-        return 0.5 * self.tension * self.ds * np.sum((np.diff(y) / self.ds) ** 2)
+        return 0.5 * self.tension * self.ds * np.sum((np.diff(y[1:-1]) / self.ds) ** 2)
 
     def start(self, y: np.ndarray) -> None:
         """Set the works to zero at the initial position ``y``."""
@@ -152,14 +163,18 @@ class EnergyBalance:
         works["damping_work"] += self.damp / self.dt * ds * np.sum(dy_solved**2)
         if self.plateau:
             works["hysteresis_work"] += (
-                self.plateau * ds * np.sum(0.5 * (eta_old + eta_new)[1:-1] * dchi)
+                self.plateau
+                * ds
+                * self._over_span(0.5 * (eta_old + eta_new)[1:-1] * dchi)
             )
-        works["curvature_work"] += ds * np.sum(moment_d2_dy - moment[1:-1] * dchi)
+        works["curvature_work"] += ds * self._over_span(
+            moment_d2_dy - moment[1:-1] * dchi
+        )
 
         # what summation by parts leaves at the ends, for the bending and the
         # tension terms of the solved rows; the increments of the tension
         # energy that complete the tension part telescope, values() adds them
-        bending = ds * np.sum(moment_d2_dy) - ds * np.sum(
+        bending = ds * self._over_span(moment_d2_dy) - ds * np.sum(
             self._second_difference(moment)[1:-1] * dy_solved
         )
         tension = (
@@ -219,5 +234,5 @@ class EnergyBalance:
         return [
             self._kinetic_energy(v),
             tension,
-            0.5 * self.ei_linear * ds * np.sum(chi[1:-1] ** 2),
+            0.5 * self.ei_linear * ds * self._over_span(chi[1:-1] ** 2),
         ] + [works[name] for name in NAMES[3:]]
