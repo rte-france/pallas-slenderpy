@@ -146,7 +146,8 @@ explicit scheme stays the default.
 ### Time convergence
 
 Crank-Nicolson leaves the modes the time step cannot resolve undamped. The
-beam solver uses an HHT scheme instead (see [the beam page](beam.qmd)),
+beam solver uses a generalized-$\alpha$ scheme instead (see
+[the beam page](beam.qmd)),
 because there those modes switch the branches of the Bouc-Wen law and the
 solution stops converging. The cable has no such switch: its nonlinearity, the
 uniform strain, is smooth, and Crank-Nicolson converges.
@@ -167,6 +168,26 @@ The jumper is loaded out of plane, with a few millimetres of motion. Its 1 m
 sag makes it very stiff in plane: 1 mm of symmetric in-plane motion already
 swings its tension to 50 times the static one, compression included. The
 model has no slack state and returns such negative tensions without warning.
+
+### Space convergence
+
+The same spans and loadings are run on a coarse grid refined 2 and 4 times,
+against a reference refined 8 times, with the same time step on every grid
+and the implicit strain (``test/test_cable-space-convergence.py``); the
+static shape under a lateral load of half the weight is checked the same way.
+The coarse grids hold 440, 160 and 160 cells on the long span, the medium
+span and the jumper, at least 8 cells per wavelength of the 20 Hz load. The
+loads are uniform: a point force is applied at the node nearest its
+horizontal position, and with nodes evenly spaced in arc length it moves by
+up to half a cell from one grid to the next, which makes the convergence
+erratic.
+
+Over the 4 times refinement the error drops by 7.0 to 23 times, against 21
+for second order and 7 for first order. The position converges at second
+order on the static shape, on the jumper and on the medium span in free
+vibration, and closer to first order where the dynamic tension drives it, on
+the long span. The dynamic tension converges at first order: the end rows of
+the first derivative it is computed from are one-sided.
 
 ### Energy balance
 

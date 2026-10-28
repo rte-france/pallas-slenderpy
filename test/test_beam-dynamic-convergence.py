@@ -75,7 +75,7 @@ REFERENCE = 64
 # over the 16x refinement the error has to drop at least 4x, i.e. an observed
 # order of 1/2 or better: the bouc-wen switching is not smooth, so the order of
 # the hysteretic cases stays between 1/2 and 1 at these steps. The tightest
-# cases, medium-slow and jumper-free on eta, reach 4.6 and 5.9
+# case, medium-slow on eta, reaches 4.6
 _MIN_TOTAL_RATIO = 4.0
 
 # newton tolerance of the runs. At the default 1e-06 the dt/64 reference of

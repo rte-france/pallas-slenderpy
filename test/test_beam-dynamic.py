@@ -14,7 +14,11 @@ from slenderpy import simulation
 from slenderpy._constant import _GRAVITY
 from slenderpy.beam import bending
 from slenderpy.beam.bending import BendingModel
-from slenderpy.beam.dynamic import solve_dynamic
+from slenderpy.beam.dynamic import (
+    generalized_alpha,
+    newmark_parameters,
+    solve_dynamic,
+)
 from slenderpy.beam.static import shape
 from slenderpy.boundary_condition import BoundaryCondition, clamped, hinged
 from slenderpy.components import Conductor, Span
@@ -625,7 +629,7 @@ def test_free_vibration_period_matches_theory():
 
 
 def test_undamped_run_conserves_amplitude():
-    """A resolved mode keeps its amplitude: the hht damping is negligible on it."""
+    """A resolved mode keeps its amplitude: the scheme damping is negligible on it."""
     ns = 201
     x = np.linspace(0.0, SPAN.length, ns)
     y0 = 0.5 * np.sin(np.pi * x / SPAN.length)
@@ -1254,3 +1258,99 @@ def test_energy_balance_with_moving_supports():
     scale = _energy_scale(res)
     assert _drift(res) <= 1e-8 * scale
     assert np.abs(res["boundary_work"].values).max() > 1e-6 * scale
+
+
+@pytest.mark.parametrize("model, approx", CASES)
+@pytest.mark.parametrize(
+    "alpha_m, alpha_f", [(0.0, 0.0), (0.0, 0.2), (-0.5, 0.0), (0.5, 0.5)]
+)
+def test_energy_balance_closes_whatever_the_scheme(model, approx, alpha_m, alpha_f):
+    """Trapezoidal, HHT, WBZ and asymptotic annihilation keep the balance."""
+    excitation = PointExcitation(
+        frequency=_line_frequency(), amplitude=100.0, position=0.3 * LINE[0]
+    )
+    res = solve_dynamic(
+        CONDUCTOR,
+        _line_span(hinged()),
+        _line_parameters(101, periods=1.0),
+        model=model,
+        approx_curvature=approx,
+        force=_gravity(CONDUCTOR) + excitation,
+        zeta=0.02,
+        tol=1e-10,
+        energy=True,
+        alpha_m=alpha_m,
+        alpha_f=alpha_f,
+    )
+    assert _drift(res) <= 1e-8 * _energy_scale(res)
+
+
+# --------------------------------------------------------------------------
+# time scheme
+# --------------------------------------------------------------------------
+
+
+def test_generalized_alpha_weights():
+    assert generalized_alpha(1.0) == (0.5, 0.5)
+    np.testing.assert_allclose(generalized_alpha(2.0 / 3.0), (0.2, 0.4))
+    # a spectral radius of 1/2 is the hht scheme with alpha = -1/3
+    np.testing.assert_allclose(generalized_alpha(0.5), (0.0, 1.0 / 3.0))
+    assert generalized_alpha(0.0) == (-1.0, 0.0)
+    with pytest.raises(ValueError, match="rho_inf"):
+        generalized_alpha(1.5)
+
+
+def test_newmark_parameters():
+    # trapezoidal rule and hht with alpha = -0.2
+    assert newmark_parameters(0.0, 0.0) == (0.5, 0.25)
+    np.testing.assert_allclose(newmark_parameters(0.0, 0.2), (0.7, 0.36))
+    for alpha_m, alpha_f in [(0.3, 0.2), (0.0, 0.6), (0.1, -0.1)]:
+        with pytest.raises(ValueError, match="alpha_m <= alpha_f <= 0.5"):
+            newmark_parameters(alpha_m, alpha_f)
+
+
+@pytest.mark.parametrize(
+    "alpha_m, alpha_f, expected",
+    [
+        # default, and hht with alpha = -0.2: the damping ratio the linear
+        # analysis of the scheme gives at 25 steps per period
+        (0.1, 0.37, 1.47e-4),
+        (0.0, 0.2, 2.46e-4),
+        # trapezoidal rule: none
+        (0.0, 0.0, 0.0),
+    ],
+)
+def test_resolved_mode_damping_matches_the_scheme_analysis(alpha_m, alpha_f, expected):
+    """A free mode loses energy at the rate the linear analysis predicts.
+
+    Mode 3 of the hinged line span, an eigenvector of the discrete operators,
+    at 25 steps per period over 20 periods. Measured 1.4 % and 2.6 % above the
+    analysis for the default and for hht, the analysis taking the discrete
+    frequency of the scheme rather than the exact one.
+    """
+    ns, mode, steps, periods = 201, 3, 25, 20
+    length, tension = LINE
+    ds = length / (ns - 1)
+    k = mode * np.pi / length
+    k2 = (2.0 - 2.0 * np.cos(k * ds)) / ds**2
+    omega = np.sqrt((CONDUCTOR.ei_max * k2**2 + tension * k2) / CONDUCTOR.mass)
+    f = omega / (2.0 * np.pi)
+    parameters = simulation.Parameters(
+        ns=ns, tf=periods / f, dt=1.0 / (f * steps), dr=1.0 / (f * steps)
+    )
+    x = np.linspace(0.0, length, ns)
+    res = solve_dynamic(
+        CONDUCTOR,
+        _line_span(hinged()),
+        parameters,
+        initial_position=0.5 * np.sin(k * x),
+        energy=True,
+        alpha_m=alpha_m,
+        alpha_f=alpha_f,
+    )
+    energy = sum(
+        res[name].values
+        for name in ("kinetic_energy", "tension_energy", "bending_energy")
+    )
+    damping = -np.log(energy[-1] / energy[0]) / (2.0 * omega * periods / f)
+    assert damping == pytest.approx(expected, rel=5e-2, abs=1e-8)
