@@ -127,44 +127,198 @@ $$
 
 ### Time discretization
 
-Both models are integrated with the HHT-$\alpha$ scheme (Hilber-Hughes-Taylor),
-with the velocity $v$ and the acceleration $a$ as additional unknowns. With
-$P = c v + K y + G$ the forces of the equation, the step enforces
+Both models are integrated with the generalized-$\alpha$ scheme (Chung and
+Hulbert, 1993), with the velocity $v$ and the acceleration $a$ as additional
+unknowns. With $P = c v + K y + G$ the forces of the equation, the step
+enforces
 
 $$
 \begin{aligned}
-&m a^{n+1} + (1 + \alpha) P^{n+1} - \alpha P^n = (1 + \alpha) F^{n+1} - \alpha F^n \\
+&m \left( (1 - \alpha_m) a^{n+1} + \alpha_m a^n \right) + (1 - \alpha_f) P^{n+1} + \alpha_f P^n = (1 - \alpha_f) F^{n+1} + \alpha_f F^n \\
 &v^{n+1} = v^n + \Delta t \left( (1 - \gamma) a^n + \gamma a^{n+1} \right) \\
 &y^{n+1} = y^n + \Delta t v^n + \Delta t^2 \left( (\tfrac{1}{2} - \beta) a^n + \beta a^{n+1} \right)
 \end{aligned}
 $$
 
-with $\gamma = \frac{1}{2} - \alpha$ and $\beta = \frac{(1 - \alpha)^2}{4}$,
+with $\gamma = \frac{1}{2} - \alpha_m + \alpha_f$ and
+$\beta = \frac{(1 - \alpha_m + \alpha_f)^2}{4}$, which make the scheme second
+order and, for $\alpha_m \le \alpha_f \le \frac{1}{2}$, unconditionally stable
+on linear problems,
 $K = EI_{lin} D_4 - H D_2$ the linear part of the equation,
 $c = 2 m \omega_0 \zeta$ the damping coefficient, and
 $G = D_2 M - EI_{lin} D_4 y$ the nonlinear remainder. $EI_{lin}$ is
 $EI$ for the constant model and $EI_{min}$ for the varying one; the
 split between $K$ and $G$ is purely algebraic. Eliminating $a^{n+1}$ and
 $y^{n+1}$ leaves the velocity as the only unknown, with the matrix
-$A = m I_d + w c I_d + w h K$ plus the boundary rows, where
-$w = \gamma \Delta t (1 + \alpha)$ and $h = \beta \Delta t / \gamma$ is the
+$A = (1 - \alpha_m) m I_d + w c I_d + w h K$ plus the boundary rows, where
+$w = \gamma \Delta t (1 - \alpha_f)$ and $h = \beta \Delta t / \gamma$ is the
 derivative of $y^{n+1}$ with respect to $v^{n+1}$. The initial acceleration
 comes from the equation of motion at ``t0``; at the ghost nodes it follows the
 boundary relations, like the position and the velocity, so that the Newmark
 updates keep the relations on the position.
 
-The solver uses $\alpha = -0.2$. $\alpha = 0$ is the Crank-Nicolson scheme,
-second order and energy conserving, but it does not damp the modes the time
-step cannot resolve: they flip sign from one step to the next. With the
-varying model these oscillations switch the Bouc-Wen branches, and the solution
-stops converging in time on medium spans and jumpers. $\alpha = -0.2$ damps
-them (spectral radius 2/3 at infinite frequency) and stays second order: on a
-resolved mode it adds a damping ratio of about $2.5 \cdot 10^{-4}$ at 25 steps
-per period and $3 \cdot 10^{-5}$ at 50. Weaker values are not enough: with
-$\alpha = -0.05$ or $-0.1$, a jumper (5 m, 50 N) in free vibration with 1 mm of
-motion keeps chattering between branches at its reversals. Its solution then
-turns chaotic, a change of $10^{-12}$ in the initial velocity moving it by up
-to $6 \cdot 10^{-6}$ m, and does not converge in time.
+#### Scheme parameters
+
+$\alpha_m$ and $\alpha_f$ are the ``alpha_m`` and ``alpha_f`` arguments of
+[](`~slenderpy.beam.dynamic.solve_dynamic`) and
+[](`~slenderpy.stockbridge.coupling.beam_coupling.solve_dynamic_with_sb`).
+Particular cases:
+
+| $\alpha_m$ | $\alpha_f$ | scheme |
+|------------|------------|--------|
+| 0 | 0 | trapezoidal rule (Crank-Nicolson), no numerical damping |
+| 0 | $-\alpha \in [0, 1/3]$ | HHT-$\alpha$ (Hilber, Hughes and Taylor, 1977) |
+| $\le 0$ | 0 | WBZ-$\alpha$ (Wood, Bossak and Zienkiewicz, 1980) |
+| $\frac{2 \rho_\infty - 1}{\rho_\infty + 1}$ | $\frac{\rho_\infty}{\rho_\infty + 1}$ | generalized-$\alpha$ with spectral radius $\rho_\infty$ at infinite frequency |
+
+[](`~slenderpy.beam.dynamic.generalized_alpha`) returns the last pair, which
+for a given $\rho_\infty$ damps the resolved modes the least. The defaults,
+$\alpha_m = 0.1$ and $\alpha_f = 0.37$, are that pair for
+$\rho_\infty \approx 0.58$, rounded.
+
+The trapezoidal rule is second order and energy conserving, but it does not
+damp the modes the time step cannot resolve: they flip sign from one step to
+the next. With the varying model these oscillations switch the Bouc-Wen
+branches, and the solution stops converging in time on medium spans and
+jumpers. With too little damping, a saturated jumper (5 m, 50 N) in free
+vibration with 1 mm of motion keeps chattering between branches at its
+reversals; its solution turns chaotic and does not converge in time.
+
+What suppresses the chattering is the damping of the modes at 2 to 10 steps
+per period, not $\rho_\infty$ itself. Every scheme above damps the resolved
+modes with a ratio growing as $(\omega \Delta t)^3$; at equal $\rho_\infty$,
+generalized-$\alpha$ damps them four times less than HHT, but it also damps
+the modes at a few steps per period less. Algorithmic damping ratio of an
+undamped oscillator, from the linear analysis of the scheme:
+
+| scheme | $\rho_\infty$ | 5 steps per period | 10 | 25 | 50 | 100 |
+|--------|---------------|--------------------|----|----|----|-----|
+| HHT, $\alpha = -0.2$ | 2/3 | 1.7e-2 | 3.3e-3 | 2.5e-4 | 3.2e-5 | 4.0e-6 |
+| generalized-$\alpha$ | 2/3 | 5.3e-3 | 8.9e-4 | 6.2e-5 | 7.9e-6 | 9.9e-7 |
+| default (0.1, 0.37) | 0.59 | 1.1e-2 | 2.0e-3 | 1.5e-4 | 1.9e-5 | 2.4e-6 |
+| generalized-$\alpha$ = HHT, $\alpha = -1/3$ | 1/2 | 2.0e-2 | 3.8e-3 | 2.8e-4 | 3.6e-5 | 4.6e-6 |
+
+The default is about the least damping that keeps the jumper converging. It
+damps the resolved modes 40 % less than HHT with $\alpha = -0.2$, the scheme
+the solver used before. The free decay of a single mode checks the table
+(``test_resolved_mode_damping_matches_the_scheme_analysis``), within 3 %.
+
+The time convergence test below (three spans, three loadings, varying model)
+was run over the parameters to find the range that works in each case; a
+case fails when the error does not fall at each refinement or falls by less
+than 4 times overall:
+
+| scheme | $\alpha_m$, $\alpha_f$ | long span | medium span | jumper |
+|--------|------------------------|-----------|-------------|--------|
+| trapezoidal | 0, 0 | all | free, fast | none |
+| HHT $\alpha = -0.05$ | 0, 0.05 | all | all | slow, fast |
+| HHT $\alpha = -0.1$ | 0, 0.1 | all | all | all (free at the limit, 4.0) |
+| HHT $\alpha = -0.2$ | 0, 0.2 | all | all | all |
+| generalized-$\alpha$, $\rho_\infty = 0.8$ | 0.33, 0.44 | all | all | none |
+| generalized-$\alpha$, $\rho_\infty = 2/3$ | 0.2, 0.4 | all | all | slow, fast |
+| generalized-$\alpha$, $\rho_\infty = 0.62$ | 0.15, 0.38 | all | all | all (free at 5.3) |
+| generalized-$\alpha$, $\rho_\infty = 0.6$ | 0.125, 0.375 | all | all | all (free at 5.7) |
+| default | 0.1, 0.37 | all | all | all |
+| generalized-$\alpha$, $\rho_\infty = 0.5$ | 0, 0.33 | all | all | all |
+| generalized-$\alpha$, $\rho_\infty = 0.3$ | -0.31, 0.23 | all | free, fast (slow at 3.7) | all |
+| generalized-$\alpha$, $\rho_\infty = 0$ | -1, 0 | all | free, fast (slow at 3.8) | all |
+
+The long span, nearly elastic, converges whatever the parameters. The jumper
+needs $\rho_\infty \le 0.62$ with generalized-$\alpha$, or $\alpha \le -0.1$
+with HHT: at $\rho_\infty = 2/3$ it fails in free vibration, at 0.8 under
+every loading. The medium span under the slow load is the tightest case on
+$\eta$ for every scheme: the trapezoidal rule fails it by chattering, the
+strongest damping ($\rho_\infty \le 0.3$) only by a total drop just under 4.
+Among the values tested, the range that works in every case is
+$0.5 \le \rho_\infty \le 0.62$ for generalized-$\alpha$ and
+$-1/3 \le \alpha \le -0.1$ for HHT, the latter at its limit. These limits
+hold at 20 steps per period of the loading at the coarsest step.
+
+#### Origin of the scheme
+
+The Newmark updates (Newmark, 1959) with $\gamma = 1/2$, $\beta = 1/4$ and the
+equation enforced at $t^{n+1}$ are the trapezoidal rule. Within that family
+the only way to damp is $\gamma > 1/2$, which drops the scheme to first order
+and damps the low modes as much as the high ones (Hughes, 1987, ch. 9). The
+HHT-$\alpha$ scheme (Hilber, Hughes and Taylor, 1977) keeps the Newmark
+updates but weights the forces between $n$ and $n+1$, and ties $\gamma$ and
+$\beta$ to that weight to stay second order. Its single parameter
+$\alpha \in [-1/3, 0]$ sets the spectral radius at infinite frequency,
+$\rho_\infty = (1 + \alpha) / (1 - \alpha)$, from 1 down to 1/2 only. The
+WBZ-$\alpha$ scheme (Wood, Bossak and Zienkiewicz, 1980) weights the inertia
+instead. Generalized-$\alpha$ (Chung and Hulbert, 1993) weights both and,
+for each $\rho_\infty \in [0, 1]$, picks the pair that damps the resolved modes
+the least; HHT and WBZ are special cases. The behaviour of generalized-$\alpha$
+on nonlinear problems, where some of its linear properties are lost, is
+analysed by Erlicher, Bonaventura and Bursi (2002).
+
+All these schemes also lengthen the period of a mode. At equal
+$\rho_\infty = 2/3$, from the linear analysis, damping ratio $\bar{\xi}$ and
+period elongation $\bar{T}/T - 1$:
+
+| steps per period | HHT $\bar{\xi}$ | WBZ $\bar{\xi}$ | generalized-$\alpha$ $\bar{\xi}$ | HHT $\bar{T}/T - 1$ | generalized-$\alpha$ $\bar{T}/T - 1$ |
+|------------------|-----------------|-----------------|----------------------------------|---------------------|--------------------------------------|
+| 10 | 3.3e-3 | 6.7e-3 | 8.9e-4 | 4.4e-2 | 3.8e-2 |
+| 25 | 2.5e-4 | 5.4e-4 | 6.2e-5 | 7.4e-3 | 6.2e-3 |
+| 50 | 3.2e-5 | 7.1e-5 | 7.9e-6 | 1.9e-3 | 1.6e-3 |
+| 100 | 4.0e-6 | 8.9e-6 | 9.9e-7 | 4.7e-4 | 3.9e-4 |
+
+WBZ damps twice as much as HHT, which is why it is not used. The algorithmic
+damping ratio $\bar{\xi}$ depends on $\omega \Delta t$ only: the steps per
+period that matter are those of the highest mode carrying energy, not of the
+first mode, and since $\zeta$ is usually zero the scheme's damping is to be
+compared with the hysteretic one (see [Time convergence](#time-convergence)).
+The tables of this section are computed with the following script, on an
+undamped oscillator:
+
+```python
+import numpy as np
+
+
+def amplification(am, af, gamma, beta, omega_dt):
+    """Damping ratio and period elongation of the generalized-alpha family
+    on an undamped oscillator, state (y, v, a), dt = 1."""
+    k = omega_dt**2
+    lhs = np.array([[(1 - af) * k, 0.0, 1 - am], [0.0, 1.0, -gamma], [1.0, 0.0, -beta]])
+    rhs = np.array([[-af * k, 0.0, -am], [0.0, 1.0, 1 - gamma], [1.0, 1.0, 0.5 - beta]])
+    eig = np.linalg.eigvals(np.linalg.solve(lhs, rhs))
+    lam = eig[np.argmax(np.abs(eig.imag))]
+    phase = abs(np.angle(lam))
+    return -np.log(abs(lam)) / phase, omega_dt / phase - 1.0
+
+
+def scheme(alpha_m, alpha_f):
+    gamma = 0.5 - alpha_m + alpha_f
+    return alpha_m, alpha_f, gamma, 0.25 * (gamma + 0.5) ** 2
+
+
+for steps in (5, 10, 25, 50, 100):
+    print(steps, amplification(*scheme(0.1, 0.37), 2 * np.pi / steps))
+```
+
+#### Alternatives
+
+Other schemes with controllable high-frequency damping and little
+low-frequency damping, not implemented:
+
+* composite schemes: the Bathe scheme (Bathe and Baig, 2005), a trapezoidal
+  sub-step followed by a three-point backward difference, designed for
+  nonlinear dynamics, and the $\rho_\infty$-Bathe scheme (Noh and Bathe, 2019),
+  whose splitting ratio and $\rho_\infty$ are parameters. They cost two solves
+  per step, two Newton loops in the nonlinear cases;
+* energy-decaying and energy-momentum schemes (Kuhl and Crisfield, 1999;
+  Armero and Romero, 2001), which control the energy by construction in
+  nonlinear elastodynamics. They mainly address nonlinear stability, which the
+  solver does not lack.
+
+No established method was found that adapts $\alpha_m$, $\alpha_f$ during a
+run from the state of the solution: the adaptive methods found adapt the time
+step, with $\rho_\infty$ fixed. Two options remain untested: choosing the
+parameters from $\Delta t$ and the highest frequency of interest, so that
+$\bar{\xi}$ stays below a fraction of the hysteretic damping; or switching to
+strong damping only near the Bouc-Wen reversals, where the chattering
+starts, at the price of a local loss of order at each switch and of an energy
+balance with varying weights.
 
 For the constant model with the approximate curvature $G$ vanishes: the
 problem is linear, $A$ is factorised once and each step is one solve.
@@ -210,7 +364,7 @@ elastic; a medium span (50 m, 5 kN), around $\chi_0$; and a jumper (5 m,
 under a point force at its first frequency and under one at 20 Hz. With 20
 steps per period of the loading at the coarsest step, the error against a run
 at $\Delta t / 64$ falls at each refinement to $\Delta t / 4$ and
-$\Delta t / 16$, on the position, the velocity and $\eta$, by 4.4 to 240 times
+$\Delta t / 16$, on the position, the velocity and $\eta$, by 4.6 to 240 times
 overall (``test/test_beam-dynamic-convergence.py``). The order is 2 where the
 hysteresis is inactive and between 1/2 and 1 where it switches, the Bouc-Wen
 law not being smooth at a reversal. These runs use a Newton tolerance of
@@ -225,13 +379,18 @@ for the former scheme (see above):
 
 | $\chi / \chi_0$ | steps per period | damping ratio |
 |-----------------|------------------|---------------|
-| 0.03 | 25 | 3.7e-4 |
-| 0.03 | 50 | 1.6e-4 |
+| 0.03 | 25 | 2.7e-4 |
+| 0.03 | 50 | 1.4e-4 |
 | 0.03 | 100 | 1.3e-4 |
 | 0.03 | 400 | 1.2e-4 |
-| 1 | 25 | 2.9e-3 |
+| 1 | 25 | 2.8e-3 |
 | 1 | 50 | 2.7e-3 |
 | 1 | 400 | 2.7e-3 |
+
+At $\chi / \chi_0 = 0.03$ the hysteretic damping (1.2e-4) is of the order of
+the scheme's own (1.5e-4 at 25 steps per period, see above): there the step
+has to resolve the mode for the decay to be the physical one. At
+$\chi / \chi_0 = 1$ the scheme's damping is negligible.
 
 ### Space convergence
 
@@ -245,11 +404,11 @@ The position converges at second order once the grid resolves the bending
 boundary layer $\sqrt{EI / H}$ at the clamped supports, 0.66 m on the medium
 span and 6.6 m on the jumper: its error drops by 12.5 to 21 times over the
 4 times refinement, against 21 for second order and 7 for first order. The
-velocity and $\eta$ converge more irregularly, by 3.6 to 21 times, a grid
+velocity and $\eta$ converge more irregularly, by 4.0 to 21 times, a grid
 landing unluckily on a Bouc-Wen reversal now and then.
 
 The 0.23 m boundary layer of the long span is not resolved by 1 m cells. Its
-position still converges, by 1.8 to 6.5 times, and the static shape with the
+position still converges, by 1.9 to 3.9 times, and the static shape with the
 varying model only reaches second order from about 7000 cells. The error is
 small nevertheless: against a reference on 28160 cells, itself good to about
 0.7 mm, the static shape (9.5 m sag) is off by 1.9 mm (root mean square at the
@@ -325,12 +484,12 @@ The works are cumulated from ``t0``, where they are zero, and
 
 is constant in time.
 
-``numerical_work`` has no continuous counterpart: it measures what the HHT
+``numerical_work`` has no continuous counterpart: it measures what the time
 scheme removes, and falls quickly as the step resolves the motion. On the
 440 m span below (clamped, initial shape $\sin^3$, half of whose energy lies
-in the third mode, ``ns = 201``), it reaches 37 % of the initial energy after
-4 periods at 20 steps per period of the first mode (under 7 for the third), 6 %
-at 50 steps and 1.3e-4 at 400 steps.
+in the third mode, ``ns = 201``), it reaches 28 % of the initial energy after
+4 periods at 20 steps per period of the first mode (under 7 for the third),
+3.6 % at 50 steps and 7.6e-5 at 400 steps, with the default parameters.
 
 ### Discrete balance
 
@@ -368,19 +527,20 @@ $$
 $\bar{M} \delta \chi$ is exactly $\delta (EI_{lin} \chi^2 / 2)$ plus the
 Bouc-Wen term, and $\delta W_b$ collects what summation by parts leaves at the
 ends. These works take the forces at the middle of the step, which is what a
-Crank-Nicolson step does. The HHT step differs in three ways: its inertia
-term is not the increment of $E_k$, it weights the forces at $n+1$ and $n$ by
-$1 + \alpha$ and $-\alpha$ instead of $1/2$, and its damping force uses
-$(1 + \alpha) v^{n+1} - \alpha v^n$ instead of $\delta y / \Delta t$. The work
-of these differences is
+Crank-Nicolson step does. The generalized-$\alpha$ step differs in three
+ways: its inertia term, weighted by $1 - \alpha_m$ and $\alpha_m$, is not the
+increment of $E_k$, it weights the forces at $n+1$ and $n$ by $1 - \alpha_f$
+and $\alpha_f$ instead of $1/2$, and its damping force uses
+$(1 - \alpha_f) v^{n+1} + \alpha_f v^n$ instead of $\delta y / \Delta t$. The
+work of these differences is
 
 $$
-\delta W_{num} = m \Delta x \sum_I a_i^{n+1} \delta y_i - \delta E_k
-+ \Delta x \sum_I \left( (\tfrac{1}{2} + \alpha) \left( (D_2 \delta M)_i - H (D_2 \delta y)_i - \delta F_i \right)
-+ c \left( (1 + \alpha) v_i^{n+1} - \alpha v_i^n - \frac{\delta y_i}{\Delta t} \right) \right) \delta y_i
+\delta W_{num} = m \Delta x \sum_I \left( (1 - \alpha_m) a_i^{n+1} + \alpha_m a_i^n \right) \delta y_i - \delta E_k
++ \Delta x \sum_I \left( (\tfrac{1}{2} - \alpha_f) \left( (D_2 \delta M)_i - H (D_2 \delta y)_i - \delta F_i \right)
++ c \left( (1 - \alpha_f) v_i^{n+1} + \alpha_f v_i^n - \frac{\delta y_i}{\Delta t} \right) \right) \delta y_i
 $$
 
-zero up to the step residual for $\alpha = 0$, where it is half the
+zero up to the step residual for $\alpha_m = \alpha_f = 0$, where it is half the
 difference of the equations at $n+1$ and $n$ times $\delta y$. The balance
 therefore holds to the residual of each step: to round-off
 for the constant model with the approximate curvature, to the Newton
@@ -519,3 +679,36 @@ slope of a clamped end or the curvature of a hinged one, sets it, with the const
 of `dynamic_values` at `t0` for the velocity (zero without them). The constant $d_i$ are thus the boundary values at `t0`.
 The other relation of each end, such as $y_0 = d_1$, is read from the initial position, and without `dynamic_values` the
 dynamic solve keeps the boundary values of the initial state.
+
+## References
+
+* Armero, F., Romero, I. (2001). On the formulation of high-frequency
+  dissipative time-stepping algorithms for nonlinear dynamics. Part I:
+  low-order methods for two model problems and nonlinear elastodynamics.
+  *Computer Methods in Applied Mechanics and Engineering*, 190, 2603-2649.
+* Bathe, K. J., Baig, M. M. I. (2005). On a composite implicit time
+  integration procedure for nonlinear dynamics. *Computers & Structures*, 83,
+  2513-2524.
+* Chung, J., Hulbert, G. M. (1993). A time integration algorithm for
+  structural dynamics with improved numerical dissipation: the
+  generalized-$\alpha$ method. *Journal of Applied Mechanics*, 60(2), 371-375.
+  <https://doi.org/10.1115/1.2900803>
+* Erlicher, S., Bonaventura, L., Bursi, O. S. (2002). The analysis of the
+  generalized-$\alpha$ method for non-linear dynamic problems. *Computational
+  Mechanics*, 28(2), 83-104. <https://doi.org/10.1007/s00466-001-0273-z>
+* Hilber, H. M., Hughes, T. J. R., Taylor, R. L. (1977). Improved numerical
+  dissipation for time integration algorithms in structural dynamics.
+  *Earthquake Engineering & Structural Dynamics*, 5, 283-292.
+* Hughes, T. J. R. (1987). *The Finite Element Method: Linear Static and
+  Dynamic Finite Element Analysis*. Prentice-Hall.
+* Kuhl, D., Crisfield, M. A. (1999). Energy-conserving and decaying
+  algorithms in non-linear structural dynamics. *International Journal for
+  Numerical Methods in Engineering*, 45, 569-599.
+* Newmark, N. M. (1959). A method of computation for structural dynamics.
+  *Journal of the Engineering Mechanics Division, ASCE*, 85(EM3), 67-94.
+* Noh, G., Bathe, K. J. (2019). The Bathe time integration method with
+  controllable spectral radius: the $\rho_\infty$-Bathe method. *Computers &
+  Structures*, 212, 299-310.
+* Wood, W. L., Bossak, M., Zienkiewicz, O. C. (1980). An alpha modification
+  of Newmark's method. *International Journal for Numerical Methods in
+  Engineering*, 15(10), 1562-1566. <https://doi.org/10.1002/nme.1620151011>
