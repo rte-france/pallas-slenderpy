@@ -403,10 +403,10 @@ class Bundle:
                     C_nd_n = e.c_n / (4 * m * g * ds_dim * tAd) * L
                     K_nd_b = e.k_b / (4 * m * g * ds_dim) * L
                     C_nd_b = e.c_b / (4 * m * g * ds_dim * tAd) * L
-                    J_b_nd = (e.j_b * ds_local / (e.l0**3)) * (L / (m * g))
-                    print("jb = ", e.j_b)
+                    J_b_nd = (e.j_b*ds_local/(e.l0**3))*(0)
+                    print("K_nd_b = ",K_nd_b)
                     print("J_b_nd = ", J_b_nd)
-                    J_t_nd = (e.j_t * ds_local / (e.l0**3)) * (L / (m * g))
+                    J_t_nd = (e.j_t*ds_local/(e.l0**3))*(0)
                     
                     edges_nd.append(
                         {
@@ -479,7 +479,7 @@ class Bundle:
                             new_ds = ds[:ns-1]
                             ds = new_ds
 
-                        plot_mesh_adaptation(ds_old_copy, new_ds, x_center, w_nd, "Réutilisation de noeuds (idx_left != idx_right)")
+                        # plot_mesh_adaptation(ds_old_copy, new_ds, x_center, w_nd, "Réutilisation de noeuds (idx_left != idx_right)")
 
                     else: # Adding a node
                         new_ds = np.zeros(ns)
@@ -490,7 +490,7 @@ class Bundle:
                         new_ds[idx_left + 2] = coord_nodes[idx_right + 1] - x_right
                         new_ds[idx_left + 3:] = ds[idx_left+2:]
                     
-                        plot_mesh_adaptation(ds_old_copy, new_ds, x_center, w_nd, "Ajout d'un noeud (idx_left == idx_right)")
+                        # plot_mesh_adaptation(ds_old_copy, new_ds, x_center, w_nd, "Ajout d'un noeud (idx_left == idx_right)")
 
                         ds = new_ds
 
@@ -519,10 +519,10 @@ class Bundle:
                     C_nd_n = e.c_n / (4 * m * g * ds_dim * tAd) * L
                     K_nd_b = e.k_b / (4 * m * g * ds_dim) * L
                     C_nd_b = e.c_b / (4 * m * g * ds_dim * tAd) * L
-                    J_b_nd = (e.j_b * ds_local / (e.l0**3)) * (L / (m * g))
-                    print("jb = ", e.j_b)
+                    J_b_nd = (e.j_b * ds_dim / (e.l0**3))
+                    print("K_nd_b = ",K_nd_b)
                     print("J_b_nd = ", J_b_nd)
-                    J_t_nd = (e.j_t * ds_local / (e.l0**3)) * (L / (m * g))
+                    J_t_nd = (e.j_t * ds_dim / (e.l0**3)) 
                     
                     edges_nd.append(
                         {
@@ -706,6 +706,8 @@ def _assemble_with_spacers(
     for sp_d in spacer_data:
         idx_L = sp_d["interior_idx_left"]
         idx_R = sp_d.get("interior_idx_right")
+        if idx_R is None:
+            idx_R = idx_L
   
         full_L = idx_L + 1
         full_R = idx_R + 1
@@ -809,6 +811,7 @@ def _assemble_with_spacers(
             coup_J_n = dt * 0.5 * (Jb * ht)
             coup_J_b = dt * 0.5 * (Jt * ht)
 
+
             base_i_vn =  (2 * i) * n
             base_j_vn = (2 * j) * n
             base_i_vb = (2 * i + 1) * n
@@ -819,6 +822,7 @@ def _assemble_with_spacers(
             M_block[base_i_vn + idx_L, base_j_vn + idx_R] -= (coup_K_n - coup_J_n)
             M_block[base_i_vn + idx_R, base_j_vn + idx_L] -= (coup_K_n - coup_J_n)
             M_block[base_i_vn + idx_R, base_j_vn + idx_R] -= (coup_K_n + coup_J_n)
+
 
             M_block[base_j_vn + idx_L, base_i_vn + idx_L] -= (coup_K_n + coup_J_n)
             M_block[base_j_vn + idx_L, base_i_vn + idx_R] -= (coup_K_n - coup_J_n)
@@ -835,7 +839,33 @@ def _assemble_with_spacers(
             M_block[base_j_vb + idx_L, base_i_vb + idx_R] -= (coup_K_b - coup_J_b)
             M_block[base_j_vb + idx_R, base_i_vb + idx_L] -= (coup_K_b - coup_J_b)
             M_block[base_j_vb + idx_R, base_i_vb + idx_R] -= (coup_K_b + coup_J_b)
-
             
+            diff = (M_block - M_block.T).tocsr()
+
+            diff.eliminate_zeros()
+
+            diff_max = abs(diff).max()
+            tolerance = 1e-10
+
+            rows, cols = diff.nonzero()
+
+            for r, c in zip(rows, cols):
+                if r < c and abs(diff[r, c]) > tolerance:
+
+                    if r >= c:
+                        continue
+
+                    block_r = r // n
+                    block_c = c // n
+
+                    local_r = r % n
+                    local_c = c % n
+
+                    print(
+                        f"Global ({r},{c}) | "
+                        f"Bloc ({block_r},{block_c}) | "
+                        f"Local ({local_r},{local_c}) | "
+                        f"Écart = {diff[r,c]:.6e}"
+                    )
 
     return M_block.tocsr(), Rvn, Rvb

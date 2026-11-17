@@ -55,15 +55,15 @@ def run() -> None:
     cable0 = _cable_0()
     cable1 = _cable_1()
 
-    k_n = 1e9
-    c_n = 0.0
-    k_b = 1e9
-    c_b = 0.0
+    k_n = 1e6
+    c_n = 200.0
+    k_b = 1e6
+    c_b = 200.0
     is_2d = True
     delta_n = 0.0
     delta_b = 0.0
-    j_b = 0.0
-    j_t = 0.0
+    j_b = 200.0
+    j_t = 200.0
     width = 0.065
     l0 = 15*2.54e-2
 
@@ -106,18 +106,6 @@ def run() -> None:
     # coefficients per edge.
     spacer_data, ds, ns = bundle._prepare_spacers(ds, L, m, g, tAd, is_uniform)
     
-    los = np.linspace(0.0, 1.0, ns)[1:-1].tolist()
-
-    params = simulation.Parameters(
-        ns=ns,
-        t0=0.0,
-        tf=300.0,
-        dt=0.01,
-        dr=0.01,
-        los=los,
-        pp=False,
-    )
-
     my_wind = ConstantWind(speed=10.0)
 
     force_callback = aero_force_bundle(
@@ -125,12 +113,79 @@ def run() -> None:
     diameter=0.0254, 
     wind=my_wind,         
     aero_model="price",     
-    air_density=1.22
+    air_density=1.204
 )
+    s_adapted = np.concatenate(([0.0], np.cumsum(ds)))
 
-    ic = InitialConditions(un=[np.zeros(ns), np.zeros(ns)])
+    # =======================================================
+    # 1. PHASE DE RELAXATION
+    # =======================================================
+    params_relax = simulation.Parameters(
+        ns=ns, t0=0.0, tf=20.0, 
+        dt=0.01, dr=1.0,  # dr=1.0 pour ne pas saturer la mémoire (1 point par sec suffit)
+        los=s_adapted.tolist(), # <-- CLÉ N°1 : on sauvegarde TOUTE la vraie grille !
+        pp=False
+    )
+    
+    res_relax, _ = bundle.solve(
+        is_uniform, spacer_data, ds, ns, params_relax, 
+        force=force_callback, zt=2.0, initial_conditions=None
+    )
+    
 
-    res, _ = bundle.solve(is_uniform, spacer_data, ds, ns, params, force=force_callback, zt=0.0, initial_conditions=ic)
+
+
+    # #########SYM
+    # Extraction pure : les tableaux font déjà 323 points, plus besoin de np.pad !
+    un_eq = [res_relax.data[f"un_{i}"].values[-1, :] for i in range(2)]
+    ub_eq = [res_relax.data[f"ub_{i}"].values[-1, :] for i in range(2)]
+    ic_eq = InitialConditions(un=un_eq, ub=ub_eq)
+
+    # # =======================================================
+    # # 2. VRAIE SIMULATION WIO
+    # # =======================================================
+    params_wio = simulation.Parameters(
+        ns=ns, t0=20.0, tf=300.0, 
+        dt=0.002,  # <-- CLÉ N°2 : on réduit dt pour stabiliser les micro-segments du maillage
+        dr=0.02,   # On augmente un peu l'intervalle de sauvegarde pour compenser dt
+        los=s_adapted[1:-1].tolist(), # Ici on peut reprendre votre los tronqué classique
+        pp=True
+    )
+
+    res, _ = bundle.solve(
+        is_uniform, spacer_data, ds, ns, params_wio, 
+        force=force_callback, zt=0.0, initial_conditions=ic_eq
+    )
+
+
+
+    # un_eq = [res_relax.data[f"un_{i}"].values[-1, :].copy() for i in range(2)]
+    # ub_eq = [res_relax.data[f"ub_{i}"].values[-1, :].copy() for i in range(2)]
+    
+    # # 2. Ajout de micro-turbulences naturelles (Bruit blanc sur les vitesses)
+    # np.random.seed(42) # Fixe l'aléatoire pour que vos tests soient comparables
+    
+    # # On génère un bruit d'un dixième de millimètre par seconde
+    # bruit_vn = np.random.normal(0, 1e-4, ns)
+    # bruit_vb = np.random.normal(0, 1e-4, ns)
+    
+    # # On applique ce bruit uniquement au câble 1 (le câble sous le vent, moteur du WIO)
+    # vn_eq = [np.zeros(ns), bruit_vn]
+    # vb_eq = [np.zeros(ns), bruit_vb]
+    
+    # # 3. Injection dans les conditions initiales
+    # ic_eq = InitialConditions(un=un_eq, ub=ub_eq, vn=vn_eq, vb=vb_eq)
+
+    # # =======================================================
+    # # VRAIE SIMULATION WIO
+    # # =======================================================
+    # # (Assurez-vous d'avoir tf=300 ou plus, car la transition peut prendre du temps)
+    # res, _ = bundle.solve(
+    #     is_uniform, spacer_data, ds, ns, params_wio, 
+    #     force=force_callback, zt=0.0, initial_conditions=ic_eq
+    # )
+
+
 
     t_axis = np.asarray(res.lot())
     
@@ -139,7 +194,7 @@ def run() -> None:
     y_leeward = res.data["ub_1"].values  # shape (nt, n_los)
 
     # Création des indices des sous-portées (milieux)
-    los_arr = np.array(los)
+    los_arr = np.array(s_adapted[1:-1].tolist())
     subspan_targets = [1/6.0, 3/6.0, 5/6.0]  # milieux des 3 sous-portées de 80m
     subspans = [np.abs(los_arr - target).argmin() for target in subspan_targets]
 
@@ -160,6 +215,11 @@ def run() -> None:
     ax.grid(True)
     ax.legend()
     fig1.tight_layout()
+    
+    # --- SAUVEGARDE DE LA FIGURE ---
+    # Vous pouvez changer l'extension (.png, .pdf, .svg, etc.) et le dossier de destination
+    fig1.savefig("mouvements_sous_portees_asym.png", dpi=300, bbox_inches='tight')
+    
     plt.show()
 
 if __name__ == "__main__":

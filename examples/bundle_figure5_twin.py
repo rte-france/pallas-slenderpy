@@ -28,7 +28,7 @@ def _aster570():
         mass=1.57,
         diameter=0.031,
         EA=3.76e07,
-        length=20.0,
+        length=200.0,
         tension=3.7e04,
         h=0.0,
     )
@@ -55,7 +55,7 @@ def run() -> None:
     bundle = Bundle(
         cables=[cable, cable],
         spacers=[twin_spacer(s=0.5, k_n=5.0e4, c_n=200.0, k_b=5.0e4, c_b=200.0,
-                             is_2d = True, delta_n=0.0, delta_b=0.0, j_b=200, j_t=200, width=0.050, l0 = 0.4)],
+                             is_2d = True, delta_n=0.0, delta_b=0.0, j_b=2000, j_t=2000, width=0.050, l0 = 0.4)],
     )
 
     ns = 321
@@ -141,8 +141,8 @@ def run() -> None:
     plt.show()
 
 
-if __name__ == "__main__":
-    run()
+# if __name__ == "__main__":
+#     run()
 
 
 
@@ -153,10 +153,10 @@ if __name__ == "__main__":
 
 
 ###########
-# COMPARAISON MODELES ENTRETOISE 
+# COMPARAISON MODELES ENTRETOISE WIDTH
 ###########
 
-def run_simulation(mode="1D", width=0.035):
+def run_simulation(j, mode="1D", width=0.035):
     """
     Simulation for a spacer model ('None', '1D', ou '2D')
 
@@ -171,11 +171,11 @@ def run_simulation(mode="1D", width=0.035):
     elif mode == "2D":
         spacers = [twin_spacer(s=0.5, k_n=5.0e4, c_n=200.0, k_b=5.0e4, c_b=200.0,
                                is_2d=True, delta_n=0.0, delta_b=0.0, 
-                               j_b=200, j_t=200, width=width, l0=0.4)]
+                               j_b=j, j_t=j, width=width, l0=0.4)]
     
     bundle = Bundle(cables=[cable, cable], spacers=spacers)
 
-    ns = 81
+    ns = 251
     s = np.linspace(0.0, 1.0, ns)
     ds = np.diff(s)
 
@@ -187,7 +187,7 @@ def run_simulation(mode="1D", width=0.035):
     tAd = float(np.sqrt(L / g))
     uAd = L / tAd
 
-    is_uniform = False if mode == "2D" else True 
+    is_uniform = True if mode == "2D" else True 
 
     # Spacer pre-processing: precompute interior-node index and non-dim
     # coefficients per edge.
@@ -200,8 +200,8 @@ def run_simulation(mode="1D", width=0.035):
     )
 
     s_centre = 0.30
-    sigma = 0.05
-    bump = 0.01 * np.exp(-((np.concatenate((np.array([0.0]), np.cumsum(ds))) - s_centre) ** 2) / (2.0 * sigma**2))
+    sigma = 0.005
+    bump = 0.001 * np.exp(-((np.concatenate((np.array([0.0]), np.cumsum(ds))) - s_centre) ** 2) / (2.0 * sigma**2))
     bump[0] = 0.0
     bump[-1] = 0.0
     
@@ -223,13 +223,13 @@ def comparative_study():
     
     # No spacer
     print("Simulation: no spacer...")
-    t, r0_none, r1_none = run_simulation(mode="None")
+    t, r0_none, r1_none = run_simulation(200, mode="None")
     #plt.plot(t, r0_none, color='grey', linestyle=':', linewidth=2, label="Cable 0 (No spacer)")
     plt.plot(t, r1_none, color='black', linestyle='--', linewidth=2, label="Cable 1 (No spacer)")
     
     # 1D spacer
     print("Simulation: 1D...")
-    t, r0_1d, r1_1d = run_simulation(mode="1D")
+    t, r0_1d, r1_1d = run_simulation(200, mode="1D")
     #plt.plot(t, r0_1d, color='blue', linestyle='--', alpha=0.7, label="Cable 0 (1D)")
     plt.plot(t, r1_1d, color='blue', linestyle='-', alpha=0.7, label="Cable 1 (1D)")
     
@@ -239,7 +239,7 @@ def comparative_study():
     
     for w, col in zip(widths_to_test, colors):
         print(f"Simulation: 2D width = {w}m ...")
-        t, r0_2d, r1_2d = run_simulation(mode="2D", width=w)
+        t, r0_2d, r1_2d = run_simulation(200, mode="2D", width=w)
         # Cable 0
         #lt.plot(t, r0_2d, color=col, linestyle='--', alpha=0.7, label=f"Cable 0 (2D, width={w}m)")
         # Cable 1 
@@ -258,6 +258,48 @@ def comparative_study():
 # if __name__ == "__main__":
 #     comparative_study()
 
+
+
+def comparative_study_j():
+  
+    plt.figure(figsize=(12, 6))
+    
+    # No spacer
+    print("Simulation: no spacer...")
+    t, r0_none, r1_none = run_simulation(0, mode="None")
+    #plt.plot(t, r0_none, color='grey', linestyle=':', linewidth=2, label="Cable 0 (No spacer)")
+    plt.plot(t, r1_none, color='black', linestyle='--', linewidth=2, label="Cable 1 (No spacer)")
+    
+    # 1D spacer
+    print("Simulation: 1D...")
+    t, r0_1d, r1_1d = run_simulation(0, mode="1D")
+    #plt.plot(t, r0_1d, color='blue', linestyle='--', alpha=0.7, label="Cable 0 (1D)")
+    plt.plot(t, r1_1d, color='blue', linestyle='-', alpha=0.7, label="Cable 1 (1D)")
+    
+    # 2D spacer
+    widths_to_test = [0, 200, 2000000] # 1cm, 5cm, 20cm
+    colors = ['r', 'g', 'm']
+    
+    for w, col in zip(widths_to_test, colors):
+        print(f"Simulation: 2D width = {w}m ...")
+        t, r0_2d, r1_2d = run_simulation(w, mode="2D")
+        # Cable 0
+        #lt.plot(t, r0_2d, color=col, linestyle='--', alpha=0.7, label=f"Cable 0 (2D, width={w}m)")
+        # Cable 1 
+        plt.plot(t, r1_2d, color=col, linestyle='-', label=f"Cable 1 (2D, width={w}m)")
+
+    plt.xlabel("Time [s]")
+    plt.ylabel("RMS normal displacement [mm]")
+    plt.title("Energy transfer: cable 1 (passive) through cable 0 (excited)")
+
+    plt.grid(True, alpha=0.3)
+ 
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+if __name__ == "__main__":
+    comparative_study_j()
 
 
 
