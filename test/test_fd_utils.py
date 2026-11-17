@@ -151,11 +151,14 @@ def test_fourth_derivative(plot=False):
     A = fdu.fourth_derivative(n, ds)
     sol = sp.sparse.linalg.spsolve(A + bc_matrix, rhs)
 
+    # the boundary condition runs on the extended grid, a ghost node beyond
+    # each support; its centered stencils are exact on a cubic
     left = [[1, 0, 0, 0], [0, 1, 0, 1]]
     right = [[1, 0, 0, 1], [0, 1, 0, 2]]
     bc = BoundaryCondition(order=4, left=left, right=right)
-    BC, rhs = bc.compute(n, ds)
-    sol_bc = sp.sparse.linalg.spsolve(A + BC, rhs)
+    BC, rhs = bc.compute(n + 2, ds)
+    sol_bc = sp.sparse.linalg.spsolve(fdu.fourth_derivative(n + 2, ds) + BC, rhs)
+    sol_bc = sol_bc[1:-1]
 
     def exact(x):
         return x**3 - x**2 + x

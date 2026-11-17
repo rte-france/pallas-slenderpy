@@ -69,7 +69,8 @@ def solve_dynamic_with_sb(
         exact one.
     initial_position : numpy.ndarray, optional
         Initial vertical position of the beam nodes. Default the static shape
-        under ``force`` at ``t0``.
+        under ``force`` at ``t0``. Its ghost nodes are set by the boundary
+        relations, as for [](`~slenderpy.beam.dynamic.solve_dynamic`).
     initial_velocity : numpy.ndarray, optional
         Initial vertical velocity of the beam nodes. Default at rest.
     initial_bending_moment : numpy.ndarray, optional
@@ -103,6 +104,10 @@ def solve_dynamic_with_sb(
     ds = span.length / (ns - 1)
     dt = parameters.dt
     x = np.linspace(0.0, span.length, ns)
+    # the scheme runs on the extended grid, a ghost node beyond each support
+    # carrying the boundary conditions (see slenderpy.boundary_condition); the
+    # span nodes are nodes 1 to ne - 2
+    ne = ns + 2
 
     # hht weights, as in beam.dynamic.solve_dynamic: y(n+1) = y_base +
     # dy_dv * v(n+1), and the step equation, multiplied by gamma*dt, weights
@@ -117,11 +122,11 @@ def solve_dynamic_with_sb(
     order = bc.order
 
     # operators; fourth_derivative already zeroes its border rows
-    D2 = fdu.clean_matrix(order, fdu.second_derivative(ns, ds))
-    D4 = fdu.fourth_derivative(ns, ds)
-    BC, _ = bc.compute(ns, ds)
-    identity = fdu.clean_matrix(order, sp.sparse.identity(ns))
-    chi_operator = curvature.create(ns, ds, approx_curvature)
+    D2 = fdu.clean_matrix(order, fdu.second_derivative(ne, ds))
+    D4 = fdu.fourth_derivative(ne, ds)
+    BC, _ = bc.compute(ne, ds)
+    identity = fdu.clean_matrix(order, sp.sparse.identity(ne))
+    chi_operator = curvature.create(ne, ds, approx_curvature)
 
     # hht matrices; A is state-independent, factorise it once
     f0 = 0.5 / span.length * np.sqrt(span.tension / conductor.mass)
@@ -150,7 +155,7 @@ def solve_dynamic_with_sb(
     jacobian_base = fdu.banded(A - tangent_weight * ei_D4)
     left_rows = fdu.tridiagonal(D2)
     if approx_curvature:
-        constant_rows = fdu.tridiagonal(chi_operator.jacobian(np.zeros(ns)))
+        constant_rows = fdu.tridiagonal(chi_operator.jacobian(np.zeros(ne)))
 
         def right_rows(y):
             return constant_rows
@@ -169,11 +174,16 @@ def solve_dynamic_with_sb(
         def force(x, t, y, z, vy, vz):
             return 0.0, 0.0
 
-    # the beam is planar: y and vy are zero, only fz is used
+    # the beam is planar: y and vy are zero, only fz is used. It is evaluated
+    # on the span nodes, the ghost nodes carry none
     zeros = np.zeros(ns)
 
     def vertical_force(t, z, vz):
-        return zeros + force(x, t, zeros, z, zeros, vz)[1]
+        return np.pad(zeros + force(x, t, zeros, z[1:-1], zeros, vz[1:-1])[1], 1)
+
+    def boundary_rhs(t):
+        """Right-hand side of the boundary rows, on the velocity."""
+        return np.zeros(ne) if bc.dynamic_values is None else bc.update_rhs(ne, x, t)
 
     # initial state
     if initial_velocity is None:
@@ -182,7 +192,7 @@ def solve_dynamic_with_sb(
         initial_position = shape.solve(
             conductor,
             span,
-            vertical_force(parameters.t0, zeros, zeros),
+            vertical_force(parameters.t0, np.zeros(ne), np.zeros(ne))[1:-1],
             ns,
             model=model,
             ei=ei,
@@ -195,10 +205,15 @@ def solve_dynamic_with_sb(
     v_old = np.asarray(initial_velocity, dtype=float)
     if y_old.shape != (ns,) or v_old.shape != (ns,):
         raise ValueError(f"initial position and velocity must have length {ns}")
+    y_old = bc.extend(y_old, ds)
+    v_old = bc.extend(v_old, ds, boundary_rhs(parameters.t0))
 
     chi_old = chi_operator.value(y_old)
     if initial_bending_moment is None:
         initial_bending_moment = law.moment(chi_old)
+    else:
+        # the ghost values only set an eta that nothing reads
+        initial_bending_moment = np.pad(initial_bending_moment, 1, mode="edge")
     eta_old = law.initial_eta(initial_bending_moment, chi_old)
 
     # output
@@ -216,11 +231,11 @@ def solve_dynamic_with_sb(
         x / span.length,
         lov,
         [
-            y_old,
-            v_old,
-            chi_old,
-            law.dynamic_moment(chi_old, eta_old),
-            eta_old,
+            y_old[1:-1],
+            v_old[1:-1],
+            chi_old[1:-1],
+            law.dynamic_moment(chi_old, eta_old)[1:-1],
+            eta_old[1:-1],
             0,
         ],
     )
@@ -259,19 +274,24 @@ def solve_dynamic_with_sb(
         1, np.minimum(ns - 2, np.round(all_pos / span.length * (ns - 1)))
     ).astype(int)
     d = x[id_pos_stockbridge + 1] - x[id_pos_stockbridge - 1]
+    # the same nodes on the extended grid of the scheme
+    id_pos_extended = id_pos_stockbridge + 1
 
     # time loop
     pb = spb.generate(parameters.pp, parameters.nt, desc=__name__)
     t_old = parameters.t0
     converged = True
     # curvature increment of the previous step, for the lagged branch
-    dchi_old = np.zeros(ns)
+    dchi_old = np.zeros(ne)
     # velocity of the step before, for the newton initial guess
     v_prev = v_old
 
-    force_sb_old = np.zeros(ns)
+    force_sb_old = np.zeros(ne)
     # initial acceleration, from the equation of motion on the solved rows; the
-    # boundary rows prescribe the velocity, their acceleration starts at zero
+    # boundary rows prescribe the velocity, their acceleration starts at zero at
+    # the supports. The ghosts take theirs from the relations, as the position
+    # does: the newmark updates then keep the relations on the position, where a
+    # ghost starting from zero would drift from the node it mirrors
     a_old = (
         fdu.clean_rhs(
             order,
@@ -283,25 +303,24 @@ def solve_dynamic_with_sb(
         )
         / conductor.mass
     )
+    a_old = bc.extend(a_old[1:-1], ds, np.zeros(ne))
     # time iteration
     for step in range(parameters.nt):
         t_new = t_old + dt
 
         # Apply previous stockbridge forces to the beam as distributed loads.
         # The stencil weights approximate the clamp force on adjacent beam nodes.
-        force_sb_new = np.zeros(ns)
-        force_sb_new[id_pos_stockbridge] += (
+        force_sb_new = np.zeros(ne)
+        force_sb_new[id_pos_extended] += (
             -0.5 * 2 * force_clamp / d
         )  # TODO tester sans distriuer sur 3 points
-        force_sb_new[id_pos_stockbridge + 1] += -0.25 * 2 * force_clamp / d
-        force_sb_new[id_pos_stockbridge - 1] += -0.25 * 2 * force_clamp / d
+        force_sb_new[id_pos_extended + 1] += -0.25 * 2 * force_clamp / d
+        force_sb_new[id_pos_extended - 1] += -0.25 * 2 * force_clamp / d
 
         # the force is evaluated at the state of the previous step
         load_old = vertical_force(t_old, y_old, v_old) + force_sb_old
         load_new = vertical_force(t_new, y_old, v_old) + force_sb_new
-        rhs_bc = (
-            np.zeros(ns) if bc.dynamic_values is None else bc.update_rhs(ns, x, t_new)
-        )
+        rhs_bc = boundary_rhs(t_new)
         # newmark predictors: v(n+1) = v_star + gamma*dt*a(n+1) and
         # y(n+1) = y_base + dy_dv * v(n+1)
         v_star = v_old + dt * (1.0 - gamma) * a_old
@@ -435,7 +454,7 @@ def solve_dynamic_with_sb(
         # acceleration of the beam at the end of the step, from the newmark
         # update; its value at the clamps is passed back to the stockbridges
         a_new = (v_new - v_star) / (gamma * dt)
-        acc_clamp_new = a_new[id_pos_stockbridge]
+        acc_clamp_new = a_new[id_pos_extended]
         acc_ang_clamp_new = 0 * acc_clamp_new
 
         # loop for all stockbridges
@@ -498,11 +517,11 @@ def solve_dynamic_with_sb(
                 x / span.length,
                 lov,
                 [
-                    y_new,
-                    v_new,
-                    chi_new,
-                    law.dynamic_moment(chi_new, eta_new),
-                    eta_new,
+                    y_new[1:-1],
+                    v_new[1:-1],
+                    chi_new[1:-1],
+                    law.dynamic_moment(chi_new, eta_new)[1:-1],
+                    eta_new[1:-1],
                     n_iter,
                 ],
             )
@@ -531,11 +550,11 @@ def solve_dynamic_with_sb(
     if converged:
         res_cable.set_state(
             {
-                "z": y_old,
-                "vz": v_old,
-                "curvature": chi_old,
-                "moment": law.dynamic_moment(chi_old, eta_old),
-                "eta": eta_old,
+                "z": y_old[1:-1],
+                "vz": v_old[1:-1],
+                "curvature": chi_old[1:-1],
+                "moment": law.dynamic_moment(chi_old, eta_old)[1:-1],
+                "eta": eta_old[1:-1],
             }
         )
 

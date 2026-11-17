@@ -41,11 +41,12 @@ def test_invalid_inputs_raise(order, left, right, error):
 
 
 def test_compute_fills_the_boundary_rows():
+    # order 4: extended grid, the supports are nodes 1 and n - 2
     n, ds = 6, 0.5
     matrix, rhs = hinged(1.0, 2.0).compute(n, ds)
-    assert matrix[0, 0] == 1.0
-    assert matrix[1, :4].toarray().ravel() == pytest.approx([8.0, -20.0, 16.0, -4.0])
-    assert matrix[-1, -1] == 1.0
+    assert matrix[0, :3].toarray().ravel() == pytest.approx([0.0, 1.0, 0.0])
+    assert matrix[1, :3].toarray().ravel() == pytest.approx([4.0, -8.0, 4.0])
+    assert matrix[-1, -3:].toarray().ravel() == pytest.approx([0.0, 1.0, 0.0])
     assert rhs == pytest.approx([1.0, 0.0, 0.0, 0.0, 0.0, 2.0])
 
 
@@ -69,15 +70,23 @@ def test_update_rhs_order_2_uses_first_and_last():
     assert rhs == pytest.approx([1.0, 0.0, 0.0, 2.0])
 
 
-def test_hinged_curvature_rows_use_the_one_sided_stencil():
-    # the curvature of the second relation is taken at the bound node, not
-    # one node inside
+def test_order_4_relations_use_centered_stencils_at_the_supports():
+    # the supports are nodes 1 and n - 2 of the extended grid; the curvature
+    # there reaches the ghost nodes 0 and n - 1
     ds = 0.5
     dense = hinged().compute(7, ds)[0].toarray()
-    np.testing.assert_allclose(dense[1], np.array([2, -5, 4, -1, 0, 0, 0]) / ds**2)
-    np.testing.assert_allclose(dense[-2], np.array([0, 0, 0, -1, 4, -5, 2]) / ds**2)
-    np.testing.assert_allclose(dense[0], [1, 0, 0, 0, 0, 0, 0])
-    np.testing.assert_allclose(dense[-1], [0, 0, 0, 0, 0, 0, 1])
+    np.testing.assert_allclose(dense[1], np.array([1, -2, 1, 0, 0, 0, 0]) / ds**2)
+    np.testing.assert_allclose(dense[-2], np.array([0, 0, 0, 0, 1, -2, 1]) / ds**2)
+    np.testing.assert_allclose(dense[0], [0, 1, 0, 0, 0, 0, 0])
+    np.testing.assert_allclose(dense[-1], [0, 0, 0, 0, 0, 1, 0])
+
+
+def test_order_2_relations_stay_one_sided():
+    ds = 0.5
+    bc = BoundaryCondition(2, left=((0, 1, 0, 0),), right=((0, 1, 0, 0),))
+    dense = bc.compute(5, ds)[0].toarray()
+    np.testing.assert_allclose(dense[0], np.array([-1, 1, 0, 0, 0]) / ds)
+    np.testing.assert_allclose(dense[-1], np.array([0, 0, 0, -1, 1]) / ds)
 
 
 def test_mixed_second_relation_keeps_its_slope_term():
@@ -90,11 +99,41 @@ def test_mixed_second_relation_keeps_its_slope_term():
     dense = bc.compute(7, ds)[0].toarray()
     np.testing.assert_allclose(
         dense[1],
-        np.array([-1, 1, 0, 0, 0, 0, 0]) / ds
-        + np.array([2, -5, 4, -1, 0, 0, 0]) / ds**2,
+        np.array([-1, 0, 1, 0, 0, 0, 0]) / (2 * ds)
+        + np.array([1, -2, 1, 0, 0, 0, 0]) / ds**2,
     )
     np.testing.assert_allclose(
         dense[-2],
-        np.array([0, 0, 0, 0, 0, -1, 1]) / ds
-        + np.array([0, 0, 0, -1, 4, -5, 2]) / ds**2,
+        np.array([0, 0, 0, 0, -1, 0, 1]) / (2 * ds)
+        + np.array([0, 0, 0, 0, 1, -2, 1]) / ds**2,
     )
+
+
+def test_extend_mirrors_the_inner_node_at_a_clamped_end():
+    y = np.array([0.0, 1.0, 3.0, 2.0, 0.0])
+    u = clamped().extend(y, 0.5)
+    np.testing.assert_allclose(u, [1.0, 0.0, 1.0, 3.0, 2.0, 0.0, 2.0])
+
+
+def test_extend_satisfies_the_relations():
+    """The ghost holds the relation that involves it, with the given values."""
+    ds = 0.5
+    y = np.array([1.0, 1.5, 3.0, 2.0, 2.0])
+    bc = BoundaryCondition(
+        4,
+        left=((1, 0, 0, 1.0), (0, 1, 0, 0.3)),
+        right=((1, 0, 0, 2.0), (0, 0, 1, -4.0)),
+    )
+    u = bc.extend(y, ds)
+    assert (u[2] - u[0]) / (2 * ds) == pytest.approx(0.3)
+    assert (u[-3] - 2 * u[-2] + u[-1]) / ds**2 == pytest.approx(-4.0)
+    rhs = np.zeros(7)
+    rhs[1], rhs[-2] = -0.6, 8.0
+    u = bc.extend(y, ds, rhs)
+    assert (u[2] - u[0]) / (2 * ds) == pytest.approx(-0.6)
+    assert (u[-3] - 2 * u[-2] + u[-1]) / ds**2 == pytest.approx(8.0)
+
+
+def test_extend_needs_order_4():
+    with pytest.raises(ValueError):
+        BoundaryCondition(2).extend(np.zeros(5), 0.5)

@@ -322,11 +322,20 @@ def test_non_convergence_returns_nan():
 
 
 def test_hinged_static_curvature_vanishes_at_the_supports():
-    """The hinged condition holds at the support node itself."""
+    """The hinged condition holds at the support node itself.
+
+    The curvature there, estimated from the span nodes alone with a one-sided
+    stencil, vanishes at second order. A jumper resolves its bending boundary
+    layer ``sqrt(EI / T)``; a tension-dominated span would need far finer grids
+    to show the order.
+    """
     conductor = Conductor(mass=1.57, ei_max=2155.07)
-    span = Span(length=50.0, tension=2.0e04, boundary_conditions=hinged())
-    n = 101
-    y = solve(conductor, span, np.full(n, -9.81 * conductor.mass), n)
-    chi = curvature.create(n, span.length / (n - 1), True).value(y)
-    assert abs(chi[0]) <= 1e-10 * np.abs(chi).max()
-    assert abs(chi[-1]) <= 1e-10 * np.abs(chi).max()
+    span = Span(length=5.0, tension=50.0, boundary_conditions=hinged())
+    ratios = []
+    for n in (51, 101):
+        y = solve(conductor, span, np.full(n, -9.81 * conductor.mass), n)
+        chi = curvature.create(n, span.length / (n - 1), True).value(y)
+        ratios.append(max(abs(chi[0]), abs(chi[-1])) / np.abs(chi).max())
+    # measured 3.4e-03 then 8.5e-04
+    assert ratios[0] < 1e-2
+    assert ratios[0] / ratios[1] > 3.5
