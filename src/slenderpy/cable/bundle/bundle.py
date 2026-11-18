@@ -404,8 +404,6 @@ class Bundle:
                     K_nd_b = e.k_b / (4 * m * g * ds_dim) * L
                     C_nd_b = e.c_b / (4 * m * g * ds_dim * tAd) * L
                     J_b_nd = (e.j_b*ds_local/(e.l0**3))*(0)
-                    print("K_nd_b = ",K_nd_b)
-                    print("J_b_nd = ", J_b_nd)
                     J_t_nd = (e.j_t*ds_local/(e.l0**3))*(0)
                     
                     edges_nd.append(
@@ -520,8 +518,6 @@ class Bundle:
                     K_nd_b = e.k_b / (4 * m * g * ds_dim) * L
                     C_nd_b = e.c_b / (4 * m * g * ds_dim * tAd) * L
                     J_b_nd = (e.j_b * ds_dim / (e.l0**3))
-                    print("K_nd_b = ",K_nd_b)
-                    print("J_b_nd = ", J_b_nd)
                     J_t_nd = (e.j_t * ds_dim / (e.l0**3)) 
                     
                     edges_nd.append(
@@ -839,33 +835,5 @@ def _assemble_with_spacers(
             M_block[base_j_vb + idx_L, base_i_vb + idx_R] -= (coup_K_b - coup_J_b)
             M_block[base_j_vb + idx_R, base_i_vb + idx_L] -= (coup_K_b - coup_J_b)
             M_block[base_j_vb + idx_R, base_i_vb + idx_R] -= (coup_K_b + coup_J_b)
-            
-            diff = (M_block - M_block.T).tocsr()
-
-            diff.eliminate_zeros()
-
-            diff_max = abs(diff).max()
-            tolerance = 1e-10
-
-            rows, cols = diff.nonzero()
-
-            for r, c in zip(rows, cols):
-                if r < c and abs(diff[r, c]) > tolerance:
-
-                    if r >= c:
-                        continue
-
-                    block_r = r // n
-                    block_c = c // n
-
-                    local_r = r % n
-                    local_c = c % n
-
-                    print(
-                        f"Global ({r},{c}) | "
-                        f"Bloc ({block_r},{block_c}) | "
-                        f"Local ({local_r},{local_c}) | "
-                        f"Écart = {diff[r,c]:.6e}"
-                    )
-
+        
     return M_block.tocsr(), Rvn, Rvb
