@@ -71,8 +71,7 @@ def run() -> None:
     tAd = float(np.sqrt(L / g))
     uAd = L / tAd
 
-    # Spacer pre-processing: precompute interior-node index and non-dim
-    # coefficients per edge.
+    # Spacer pre-processing: precompute interior-node index and non-dim coefficients per edge
     spacer_data, ds, ns = bundle._prepare_spacers(ds, L, m, g, tAd, is_uniform)
     
     los = np.linspace(0.0, 1.0, ns)[1:-1].tolist()
@@ -87,13 +86,12 @@ def run() -> None:
         pp=False,
     )
 
-    # Gaussian bump on cable 0, centred at s = 0.30 * L, amplitude 1 cm,
-    # standard deviation 5 % of L. Zero on cable 1.
+    # Gaussian bump on cable 0
     s_centre = 0.30
     sigma = 0.05
     bump = 0.01 * np.exp(-((np.concatenate((np.array([0.0]), np.cumsum(ds))) - s_centre) ** 2) / (2.0 * sigma**2))
-    # Force the boundary nodes to zero so the IC is compatible with the
-    # Dirichlet boundary condition of the solver.
+
+    # Force the boundary nodes to zero so the IC is compatible with the Dirichlet boundary condition of the solver
     bump[0] = 0.0
     bump[-1] = 0.0
     ic = InitialConditions(un=[bump, np.zeros(ns)])
@@ -101,7 +99,7 @@ def run() -> None:
     res, _ = bundle.solve(is_uniform, spacer_data, ds, ns, params, force=None, zt=0.0, initial_conditions=ic)
 
     t_axis = np.asarray(res.lot())
-    un0 = res.data["un_0"].values  # shape (nt, n_los)
+    un0 = res.data["un_0"].values 
     un1 = res.data["un_1"].values
 
     rms0 = np.sqrt(np.mean(un0**2, axis=1))
@@ -110,7 +108,7 @@ def run() -> None:
     fig, (ax_map, ax_rms) = plt.subplots(1, 2, figsize=(12, 5))
 
     s_phys = np.array(los) * cable.length
-    #extent = (s_phys[0], s_phys[-1], t_axis[-1], t_axis[0])
+  
     vmax = max(np.max(np.abs(un0)), np.max(np.abs(un1)))
     ax_map.imshow(
         np.concatenate([un0, un1], axis=1),
@@ -134,8 +132,8 @@ def run() -> None:
     ax_rms.grid(True, alpha=0.3)
 
     fig.suptitle(
-        "Twin bundle, mid-span spacer, Gaussian IC on cable 0 - "
-        "Figure 5 (left) of the note"
+        "Twin bundle, mid-span spacer, Gaussian IC on cable 0 "
+
     )
     fig.tight_layout()
     plt.show()

@@ -18,7 +18,7 @@ def _aster570():
     )
 
 #########
-# ETUDE DE CONVERGENCE EN MAILLAGE
+# SPATIAL CONVERGENCE STUDY
 #########
 
 # Uniform mesh, 2D spacer: width forced to width = ds
@@ -44,9 +44,7 @@ def run_convergence_sim_uni(ns, tf=1.0, dt=5.0e-4):
     s = np.linspace(0.0, 1.0, ns)
     ds = np.diff(s)
 
-    # Per-cable non-dimensionalisation. All cables share L, m, g (enforced
-    # at construction), so tAd, uAd are identical
-    # tensions or EA differ.
+    # Per-cable non-dimensionalisation. All cables share L, m, g (enforced at construction), so tAd, uAd are identical
     L = bundle.cables[0].length
     m = bundle.cables[0].mass
     g = bundle.cables[0].g
@@ -55,8 +53,7 @@ def run_convergence_sim_uni(ns, tf=1.0, dt=5.0e-4):
 
     is_uniform = True 
 
-    # Spacer pre-processing: precompute interior-node index and non-dim
-    # coefficients per edge.
+    # Spacer pre-processing: precompute interior-node index and non-dim coefficients per edge
     spacer_data, ds, ns = bundle._prepare_spacers(ds, L, m, g, tAd, is_uniform)
 
     los = np.linspace(0.0, 1.0, ns)[1:-1].tolist()
@@ -101,7 +98,6 @@ def spatial_convergence_study():
         ds = L / (ns - 1)
         ds_values.append(ds)
         
-        # LRatio computation
         step = (ns_ref - 1) // (ns - 1)
         
         u_ref_downsampled = u_ref[::step]
@@ -172,8 +168,7 @@ def run_convergence_sim(mode, ns, tf=1.0, dt=5.0e-4, fixed_width=0.05):
     tAd = float(np.sqrt(L / g))
     uAd = L / tAd
 
-    # Spacer pre-processing: precompute interior-node index and non-dim
-    # coefficients per edge.
+    # Spacer pre-processing: precompute interior-node index and non-dim coefficients per edge
     spacer_data, ds, ns = bundle._prepare_spacers(ds, L, m, g, tAd, is_uniform)
 
     los = np.linspace(0.0, 1.0, ns)[1:-1].tolist()
@@ -224,7 +219,6 @@ def order_of_convergence_study():
         x_coarse_2d = np.concatenate(([0.0], np.cumsum(ds_coarse)))
         x_ref_2d = np.concatenate(([0.0], np.cumsum(ds_ref)))
 
-        # Interpolation propre sur les vraies coordonnées
         u_ref_2d_interp = np.interp(x_coarse_2d, x_ref_2d, u_ref_2d)
                 
         # Error norm L2
@@ -245,7 +239,6 @@ def order_of_convergence_study():
                label=f'2D model (modified mesh) - Slope : {pente_2d:.2f}', 
                markersize=6)
 
-    # Trace des pentes théoriques (Ordre 1 et Ordre 2) calées sur le dernier point
     slope_O2 = (ds_arr / ds_arr[-1])**2 * err_1d[-1]
     slope_O1 = (ds_arr / ds_arr[-1])**1 * err_2d[-1]
     
