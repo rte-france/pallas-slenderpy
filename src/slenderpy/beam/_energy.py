@@ -5,10 +5,11 @@ over the span and over time, taken on the discrete equation the solver solves:
 each row of the step multiplied by ``dy = y_new - y_old`` and summed over the
 rows the scheme solves is the work of that term over the step. The physical
 works take the forces at the middle of the step; ``numerical_work`` is the work
-of what the HHT step adds to them, the inertia not being the kinetic energy
-increment and the forces at n+1 and n being weighted by ``1 + alpha`` and
-``-alpha`` rather than 1/2. It is the energy the scheme dissipates, and is zero
-up to the step residual for ``alpha = 0`` (Crank-Nicolson). The kinetic,
+of what the generalized-alpha step adds to them, the inertia not being the
+kinetic energy increment and the forces at n+1 and n being weighted by
+``1 - alpha_f`` and ``alpha_f`` rather than 1/2. It is the energy the scheme
+dissipates, and is zero up to the step residual for ``alpha_m = alpha_f = 0``
+(Crank-Nicolson). The kinetic,
 tension and bending energies are functions of the state; the other terms are
 works, accumulated step by step. With
 
@@ -66,8 +67,12 @@ class EnergyBalance:
         Space step (m).
     dt : float
         Time step (s).
-    alpha : float
-        Alpha of the HHT scheme of the solve.
+    alpha_m : float
+        Weight of the inertia at the start of the step in the scheme of the
+        solve.
+    alpha_f : float
+        Weight of the forces at the start of the step in the scheme of the
+        solve.
     """
 
     def __init__(
@@ -78,7 +83,8 @@ class EnergyBalance:
         law: Bending,
         ds: float,
         dt: float,
-        alpha: float,
+        alpha_m: float,
+        alpha_f: float,
     ) -> None:
         self.mass = mass
         self.tension = tension
@@ -87,7 +93,8 @@ class EnergyBalance:
         self.plateau = law.plateau if law.hysteretic else 0.0
         self.ds = ds
         self.dt = dt
-        self.alpha = alpha
+        self.alpha_m = alpha_m
+        self.alpha_f = alpha_f
         self.works = dict.fromkeys(NAMES[3:], 0.0)
         self.tension_start = 0.0
 
@@ -117,6 +124,7 @@ class EnergyBalance:
         y_new: np.ndarray,
         v_old: np.ndarray,
         v_new: np.ndarray,
+        a_old: np.ndarray,
         a_new: np.ndarray,
         chi_old: np.ndarray,
         chi_new: np.ndarray,
@@ -138,8 +146,8 @@ class EnergyBalance:
             Position at the start and at the end of the step.
         v_old, v_new : np.ndarray
             Velocity at the start and at the end of the step.
-        a_new : np.ndarray
-            Acceleration at the end of the step.
+        a_old, a_new : np.ndarray
+            Acceleration at the start and at the end of the step.
         chi_old, chi_new : np.ndarray
             Curvature at the start and at the end of the step.
         moment_old, moment_new : np.ndarray
@@ -184,21 +192,22 @@ class EnergyBalance:
         )
         works["boundary_work"] += bending + tension
 
-        # what the hht step adds to the works above: the inertia work beyond the
-        # kinetic energy increment, the forces at n+1 and n weighted by
-        # 1 + alpha and -alpha instead of 1/2, and the damping force at those
-        # weights instead of at the mean velocity dy/dt
-        alpha = self.alpha
-        weight = 0.5 + alpha
+        # what the generalized-alpha step adds to the works above: the inertia
+        # work beyond the kinetic energy increment, the forces at n+1 and n
+        # weighted by 1 - alpha_f and alpha_f instead of 1/2, and the damping
+        # force at those weights instead of at the mean velocity dy/dt
+        alpha_m, alpha_f = self.alpha_m, self.alpha_f
+        weight = 0.5 - alpha_f
+        inertia = self.mass * ((1.0 - alpha_m) * a_new + alpha_m * a_old)
         force_change = (
             self._second_difference(moment_new - moment_old)[1:-1]
             - self.tension * self._second_difference(dy)[1:-1]
         )
         damping_excess = self.damp * (
-            (1.0 + alpha) * v_new - alpha * v_old - dy / self.dt
+            (1.0 - alpha_f) * v_new + alpha_f * v_old - dy / self.dt
         )
         works["numerical_work"] += (
-            self.mass * ds * np.sum(a_new[2:-2] * dy_solved)
+            ds * np.sum(inertia[2:-2] * dy_solved)
             - (self._kinetic_energy(v_new) - self._kinetic_energy(v_old))
             + ds
             * np.sum(

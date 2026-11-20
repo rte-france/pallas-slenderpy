@@ -11,7 +11,7 @@ import slenderpy.fd_utils as fdu
 from slenderpy import _progress_bar as spb
 from slenderpy import simulation
 from slenderpy.beam.bending import BendingModel
-from slenderpy.beam.dynamic import _HHT_ALPHA
+from slenderpy.beam.dynamic import newmark_parameters
 from slenderpy.beam.static import shape
 from slenderpy.components import Conductor, Span
 from slenderpy.stockbridge.core.stockbridge import Result
@@ -35,6 +35,8 @@ def solve_dynamic_with_sb(
     zeta: Optional[float] = 0,
     tol: float = 1.0e-06,
     max_iter: int = 64,
+    alpha_m: float = 0.1,
+    alpha_f: float = 0.37,
 ) -> tuple[simulation.Results, dict[str, Result]]:
     """Solver for the dynamic coupling of a beam with stockbridge dampers.
 
@@ -83,6 +85,11 @@ def solve_dynamic_with_sb(
         residual. Default 1e-06.
     max_iter : int, optional
         Maximum number of Newton iterations per step. Default 64.
+    alpha_m : float, optional
+        Weight of the inertia at the start of the step in the generalized-alpha
+        scheme, as for [](`~slenderpy.beam.dynamic.solve_dynamic`). Default 0.1.
+    alpha_f : float, optional
+        Weight of the forces at the start of the step. Default 0.37.
 
     Returns
     -------
@@ -109,15 +116,13 @@ def solve_dynamic_with_sb(
     # span nodes are nodes 1 to ne - 2
     ne = ns + 2
 
-    # hht weights, as in beam.dynamic.solve_dynamic: y(n+1) = y_base +
-    # dy_dv * v(n+1), and the step equation, multiplied by gamma*dt, weights
-    # the forces at n+1 by weight_new and the forces at n by weight_old
-    alpha = _HHT_ALPHA
-    gamma = 0.5 - alpha
-    beta = 0.25 * (1.0 - alpha) ** 2
+    # generalized-alpha weights, as in beam.dynamic.solve_dynamic: y(n+1) =
+    # y_base + dy_dv * v(n+1), and the step equation, multiplied by gamma*dt,
+    # weights the forces at n+1 by weight_new and the forces at n by weight_old
+    gamma, beta = newmark_parameters(alpha_m, alpha_f)
     dy_dv = beta * dt / gamma
-    weight_new = gamma * dt * (1.0 + alpha)
-    weight_old = -gamma * dt * alpha
+    weight_new = gamma * dt * (1.0 - alpha_f)
+    weight_old = gamma * dt * alpha_f
     bc = span.boundary_conditions
     order = bc.order
 
@@ -128,14 +133,14 @@ def solve_dynamic_with_sb(
     identity = fdu.clean_matrix(order, sp.sparse.identity(ne))
     chi_operator = curvature.create(ne, ds, approx_curvature)
 
-    # hht matrices; A is state-independent, factorise it once
+    # scheme matrices; A is state-independent, factorise it once
     f0 = 0.5 / span.length * np.sqrt(span.tension / conductor.mass)
     damp = 2.0 * conductor.mass * 2.0 * np.pi * f0 * zeta
     ei_D4 = law.ei_linear * D4
     stiffness = ei_D4 - span.tension * D2
     mass_matrix = conductor.mass * identity
     damping_matrix = damp * identity
-    damped_mass = mass_matrix + weight_new * damping_matrix
+    damped_mass = (1.0 - alpha_m) * mass_matrix + weight_new * damping_matrix
     A = damped_mass + weight_new * dy_dv * stiffness + BC
     lu = sp.sparse.linalg.splu(sp.sparse.csc_matrix(A))
 
@@ -325,15 +330,13 @@ def solve_dynamic_with_sb(
         # y(n+1) = y_base + dy_dv * v(n+1)
         v_star = v_old + dt * (1.0 - gamma) * a_old
         y_base = y_old + dt * v_old + dt**2 * (0.5 - beta) * a_old - dy_dv * v_star
-        inertia = mass_matrix @ v_star
+        inertia = mass_matrix @ (
+            (1.0 - alpha_m) * v_star - gamma * dt * alpha_m * a_old
+        )
         elastic = stiffness @ (
             weight_new * y_base + weight_old * y_old
         ) + weight_old * (damping_matrix @ v_old)
-        external = (
-            gamma
-            * dt
-            * fdu.clean_rhs(order, (1.0 + alpha) * load_new - alpha * load_old)
-        )
+        external = fdu.clean_rhs(order, weight_new * load_new + weight_old * load_old)
         rhs = inertia - elastic + external + rhs_bc
         threshold = max(
             tol * fdu.residual_scale((inertia, elastic, external, rhs_bc)),

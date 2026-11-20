@@ -29,11 +29,55 @@ from slenderpy.components import Conductor, Span
 # smallest newton relaxation factor tried before declaring the step useless
 _MIN_RELAXATION = 1.0e-06
 
-# alpha of the hht scheme: 0 is crank-nicolson, which does not damp the
-# unresolved high-frequency modes. -0.2 damps them (spectral radius 2/3 at
-# infinite frequency) enough to keep a saturated jumper, whose bouc-wen
-# branches switch at every reversal, from chattering; -0.05 and -0.1 do not
-_HHT_ALPHA = -0.2
+
+def generalized_alpha(rho_inf: float) -> tuple[float, float]:
+    """Weights of the generalized-alpha scheme for a given spectral radius.
+
+    The pair of Chung and Hulbert (1993), which damps the resolved modes the
+    least for the spectral radius ``rho_inf`` at infinite frequency.
+
+    Parameters
+    ----------
+    rho_inf : float
+        Spectral radius at infinite frequency, in [0, 1]. 1 is the
+        trapezoidal rule (no numerical damping), 0 annihilates the highest
+        frequencies in one step.
+
+    Returns
+    -------
+    tuple[float, float]
+        ``(alpha_m, alpha_f)``, the weights of the inertia and of the forces at
+        the start of the step.
+    """
+    if not 0.0 <= rho_inf <= 1.0:
+        raise ValueError(f"rho_inf must be in [0, 1], got {rho_inf}")
+    return (2.0 * rho_inf - 1.0) / (rho_inf + 1.0), rho_inf / (rho_inf + 1.0)
+
+
+def newmark_parameters(alpha_m: float, alpha_f: float) -> tuple[float, float]:
+    """Newmark ``gamma`` and ``beta`` of a generalized-alpha scheme.
+
+    The values that make the scheme second order and, for
+    ``alpha_m <= alpha_f <= 1/2``, unconditionally stable on linear problems.
+
+    Parameters
+    ----------
+    alpha_m : float
+        Weight of the inertia at the start of the step.
+    alpha_f : float
+        Weight of the forces at the start of the step.
+
+    Returns
+    -------
+    tuple[float, float]
+        ``(gamma, beta)``.
+    """
+    if not alpha_m <= alpha_f <= 0.5:
+        raise ValueError(
+            f"the scheme needs alpha_m <= alpha_f <= 0.5, got {alpha_m} and {alpha_f}"
+        )
+    gamma = 0.5 - alpha_m + alpha_f
+    return gamma, 0.25 * (gamma + 0.5) ** 2
 
 
 def solve_dynamic(
@@ -51,6 +95,8 @@ def solve_dynamic(
     tol: float = 1.0e-06,
     max_iter: int = 64,
     energy: bool = False,
+    alpha_m: float = 0.1,
+    alpha_f: float = 0.37,
 ) -> simulation.Results:
     """Dynamic solver for beam equations (either 1-2-3 or 1-2-3bis-4) :
     (1) mass*(d^2/dt^2)*y + 2*mass*w0*zeta*(d/dt)*y + (d^2/dx^2)*M - tension*(d^2/dx^2)*y = force
@@ -61,14 +107,15 @@ def solve_dynamic(
     (3bis) M = ei_min*chi + (ei_max-ei_min)*chi0*eta
     (4) chi0 * (d/dt)*eta = (d/dt)*chi - 1/2 * ((d/dt)*chi * abs(eta) + abs((d/dt)*chi) * eta)
 
-    Time integration is the HHT-alpha scheme (Hilber-Hughes-Taylor), solved for
-    the velocity. With ``p = C @ v + K @ y + G`` the forces of the equation, the
-    step enforces
+    Time integration is the generalized-alpha scheme (Chung-Hulbert), solved
+    for the velocity. With ``p = C @ v + K @ y + G`` the forces of the
+    equation, the step enforces
 
-        mass*a(n+1) + (1 + alpha)*p(n+1) - alpha*p(n) = (1 + alpha)*f(n+1) - alpha*f(n)
+        mass*((1 - alpha_m)*a(n+1) + alpha_m*a(n)) + (1 - alpha_f)*p(n+1) + alpha_f*p(n)
+            = (1 - alpha_f)*f(n+1) + alpha_f*f(n)
 
-    with the Newmark updates, ``gamma = 1/2 - alpha`` and
-    ``beta = (1 - alpha)**2/4``,
+    with the Newmark updates, ``gamma = 1/2 - alpha_m + alpha_f`` and
+    ``beta = (1 - alpha_m + alpha_f)**2/4``,
 
         v(n+1) = v(n) + dt*((1 - gamma)*a(n) + gamma*a(n+1))
         y(n+1) = y(n) + dt*v(n) + dt**2*((1/2 - beta)*a(n) + beta*a(n+1))
@@ -78,19 +125,27 @@ def solve_dynamic(
     nonlinear remainder (hysteresis and, for the exact curvature, geometry).
     The split between ``K`` and ``G`` is purely algebraic: the step residual is
     independent of ``ei_linear``. Eliminating ``a(n+1)`` and ``y(n+1)`` leaves
-    ``A @ v(n+1)`` with ``A = mass*I + w*C + w*h*K + BC``, ``w = gamma*dt*(1 + alpha)``
-    and ``h = beta*dt/gamma`` the derivative of ``y(n+1)`` in ``v(n+1)``.
+    ``A @ v(n+1)`` with ``A = (1 - alpha_m)*mass*I + w*C + w*h*K + BC``,
+    ``w = gamma*dt*(1 - alpha_f)`` and ``h = beta*dt/gamma`` the derivative of
+    ``y(n+1)`` in ``v(n+1)``.
 
-    ``alpha = 0`` is Crank-Nicolson, second order but undamped: its unresolved
-    high-frequency modes ring from one step to the next, and with the
-    hysteresis active they switch the Bouc-Wen branches and the solution stops
-    converging in time. ``alpha = -0.2`` damps them (spectral radius 2/3 at
-    infinite frequency) and stays second order: on a resolved mode it adds a
-    damping ratio of about 2.5e-4 at 25 steps per period and 3e-5 at 50.
-    Weaker values (-0.05, -0.1) leave a saturated jumper chattering between
-    branches at its reversals, a chaotic solution that does not converge in
-    time. The ``eta`` of (4) is advanced with the curvature increment of the
-    step, ``chi(n+1) - chi(n)``.
+    ``alpha_m = alpha_f = 0`` is Crank-Nicolson (the trapezoidal rule), second
+    order but undamped: its unresolved high-frequency modes ring from one step
+    to the next, and with the hysteresis active they switch the Bouc-Wen
+    branches and the solution stops converging in time. The default
+    ``alpha_m = 0.1``, ``alpha_f = 0.37``, close to
+    [](`~slenderpy.beam.dynamic.generalized_alpha`) at a spectral radius of
+    0.58 at infinite frequency, damps them and stays second order: on a
+    resolved mode it adds a damping ratio of about 1.5e-4 at 25 steps per
+    period and 1.9e-5 at 50, 40 % less than the HHT scheme with
+    ``alpha = -0.2`` (``alpha_m = 0``, ``alpha_f = 0.2``) used before. It is
+    about the least damping that keeps a saturated jumper from chattering
+    between Bouc-Wen branches at its reversals: a spectral radius of 2/3
+    (``alpha_m = 0.2``, ``alpha_f = 0.4``) damps the modes at 2 to 10 steps per
+    period too little, and the jumper solution turns chaotic. ``alpha_m = 0``
+    gives the HHT-alpha scheme, with ``alpha_f`` the opposite of its
+    ``alpha``. The ``eta`` of (4) is advanced with the curvature increment of
+    the step, ``chi(n+1) - chi(n)``.
 
     ``G`` vanishes identically for a constant model with the approximate
     curvature. That case is linear, and since ``A`` does not depend on the state
@@ -188,6 +243,13 @@ def solve_dynamic(
     energy : bool, optional
         If True, adds the energy balance of the solve to the results, see
         Returns. Default False.
+    alpha_m : float, optional
+        Weight of the inertia at the start of the step. Default 0.1.
+    alpha_f : float, optional
+        Weight of the forces at the start of the step. Default 0.37. The
+        scheme needs ``alpha_m <= alpha_f <= 0.5``;
+        [](`~slenderpy.beam.dynamic.generalized_alpha`) gives the pair for a
+        spectral radius at infinite frequency.
 
     Returns
     -------
@@ -210,7 +272,7 @@ def solve_dynamic(
         constant model), ``curvature_work`` (the part of the bending work
         the exact curvature does not store in ``bending_energy``, zero for
         the approximate curvature), ``numerical_work`` (dissipated by the
-        HHT scheme, mostly in the unresolved modes) and ``boundary_work``
+        time scheme, mostly in the unresolved modes) and ``boundary_work``
         (done on the beam by the supports). ``kinetic_energy +
         tension_energy + bending_energy + damping_work + hysteresis_work +
         curvature_work + numerical_work - external_work - boundary_work``
@@ -237,15 +299,13 @@ def solve_dynamic(
     # span nodes are nodes 1 to ne - 2
     ne = ns + 2
 
-    # hht weights: y(n+1) = y_base + dy_dv * v(n+1), and the step equation,
+    # scheme weights: y(n+1) = y_base + dy_dv * v(n+1), and the step equation,
     # multiplied by gamma*dt, weights the forces at n+1 by weight_new and the
     # forces at n by weight_old
-    alpha = _HHT_ALPHA
-    gamma = 0.5 - alpha
-    beta = 0.25 * (1.0 - alpha) ** 2
+    gamma, beta = newmark_parameters(alpha_m, alpha_f)
     dy_dv = beta * dt / gamma
-    weight_new = gamma * dt * (1.0 + alpha)
-    weight_old = -gamma * dt * alpha
+    weight_new = gamma * dt * (1.0 - alpha_f)
+    weight_old = gamma * dt * alpha_f
     bc = span.boundary_conditions
     order = bc.order
 
@@ -256,14 +316,14 @@ def solve_dynamic(
     identity = fdu.clean_matrix(order, sp.sparse.identity(ne))
     chi_operator = curvature.create(ne, ds, approx_curvature)
 
-    # hht matrices; A is state-independent, factorise it once
+    # scheme matrices; A is state-independent, factorise it once
     f0 = 0.5 / span.length * np.sqrt(span.tension / conductor.mass)
     damp = 2.0 * conductor.mass * 2.0 * np.pi * f0 * zeta
     ei_D4 = law.ei_linear * D4
     stiffness = ei_D4 - span.tension * D2
     mass_matrix = conductor.mass * identity
     damping_matrix = damp * identity
-    damped_mass = mass_matrix + weight_new * damping_matrix
+    damped_mass = (1.0 - alpha_m) * mass_matrix + weight_new * damping_matrix
     A = damped_mass + weight_new * dy_dv * stiffness + BC
     lu = sp.sparse.linalg.splu(sp.sparse.csc_matrix(A))
 
@@ -356,7 +416,7 @@ def solve_dynamic(
         lov += list(_energy.NAMES)
         lov_dims += [1] * len(_energy.NAMES)
         balance = _energy.EnergyBalance(
-            conductor.mass, span.tension, damp, law, ds, dt, alpha
+            conductor.mass, span.tension, damp, law, ds, dt, alpha_m, alpha_f
         )
         balance.start(y_old)
     res = simulation.Results(
@@ -412,15 +472,13 @@ def solve_dynamic(
         # y(n+1) = y_base + dy_dv * v(n+1)
         v_star = v_old + dt * (1.0 - gamma) * a_old
         y_base = y_old + dt * v_old + dt**2 * (0.5 - beta) * a_old - dy_dv * v_star
-        inertia = mass_matrix @ v_star
+        inertia = mass_matrix @ (
+            (1.0 - alpha_m) * v_star - gamma * dt * alpha_m * a_old
+        )
         elastic = stiffness @ (
             weight_new * y_base + weight_old * y_old
         ) + weight_old * (damping_matrix @ v_old)
-        external = (
-            gamma
-            * dt
-            * fdu.clean_rhs(order, (1.0 + alpha) * load_new - alpha * load_old)
-        )
+        external = fdu.clean_rhs(order, weight_new * load_new + weight_old * load_old)
         rhs = inertia - elastic + external + rhs_bc
         threshold = max(
             tol * fdu.residual_scale((inertia, elastic, external, rhs_bc)),
@@ -550,6 +608,7 @@ def solve_dynamic(
                 y_new,
                 v_old,
                 v_new,
+                a_old,
                 a_new,
                 chi_old,
                 chi_new,
